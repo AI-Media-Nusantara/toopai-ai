@@ -1,0 +1,23 @@
+[
+    {
+        "order_id": "584209115227718805",
+        "campaign_id": "7626277548004116225",
+        "campaign_name": "",
+        "product_id": "1730372062234248434",
+        "product_name": "[Official] PINKFLASH Multi-Use Watery Blush Stick Healthy and Rosy Cream High pigment Long-lasting 6 Shades F16",
+        "creator_username": "erfinanh",
+        "creator_hid": "",
+        "order_status": "PROCESSING",
+        "create_time_utc": 1779784100,
+        "create_time_formatted": "2026-05-26 15:28:20",
+        "create_date_local": "2026-05-26",
+        "price": 31255,
+        "quantity": 1,
+        "affiliate_gmv": 31255,
+        "estimated_affiliate_commission": 938,
+        "actual_affiliate_commission": 0,
+        "estimated_creator_commission": 1875,
+        "actual_creator_commission": 0,
+        "items_sold": 1
+    }
+]

@@ -1,0 +1,122 @@
+
+RewriteOptions inherit
+# application/.htaccess
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+  
+
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+    # Disable compression for certain paths
+    RewriteCond %{REQUEST_URI} ^/(agent/sync_|sync/|api/) [NC]
+    RewriteRule .* - [E=no-gzip:1,E=dont-vary:1]
+    
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ index.php/$1 [L,QSA]
+    
+
+</IfModule>
+<IfModule mod_mime.c>
+    AddType image/webp .webp
+    AddType image/avif .avif
+    AddType video/webm .webm
+    AddType video/quicktime .mov
+</IfModule>
+# Disable mod_deflate for API and Sync routes
+<IfModule mod_deflate.c>
+    SetEnvIfNoCase Request_URI "^/(agent/sync_|sync/|api/)" no-gzip=1
+</IfModule>
+
+# Set headers untuk disable caching
+<IfModule mod_headers.c>
+    <FilesMatch "\.(php)$">
+        Header set Cache-Control "no-cache, no-store, must-revalidate"
+        Header set Pragma "no-cache"
+        Header set Expires 0
+    </FilesMatch>
+</IfModule>
+
+# .htaccess untuk meningkatkan limit di shared hosting
+<IfModule mod_php.c>
+    php_value max_execution_time 300
+    php_value memory_limit 512M
+    php_value upload_max_filesize 100M
+    php_value post_max_size 105M
+    php_value max_input_time 300
+</IfModule>
+
+# Untuk LiteSpeed
+<IfModule mod_lsapi.c>
+    php_value max_execution_time 300
+    php_value memory_limit 512M
+    php_value upload_max_filesize 100M
+    php_value post_max_size 105M
+    php_value max_input_time 300
+</IfModule>
+RewriteCond %{HTTP_HOST} ^toopai\.ai\.holasync\.com$ [OR]
+RewriteCond %{HTTP_HOST} ^www\.toopai\.ai\.holasync\.com$
+RewriteRule ^/?$ "https\:\/\/toopai\.ai\/" [R=301,L]
+
+
+# ============================================================
+# SECURITY HEADERS - Toopai
+# ============================================================
+
+<IfModule mod_headers.c>
+    # X-Frame-Options - Mencegah clickjacking
+    Header always set X-Frame-Options "SAMEORIGIN"
+    
+    # X-XSS-Protection - Mencegah XSS
+    Header always set X-XSS-Protection "1; mode=block"
+    
+    # X-Content-Type-Options - Mencegah MIME type sniffing
+    Header always set X-Content-Type-Options "nosniff"
+    
+    # Content-Security-Policy - Mengontrol resource yang boleh dimuat
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:; font-src 'self' data: https:; connect-src 'self' https:; frame-src 'self' https:; object-src 'none'; base-uri 'self'"
+    
+    # Strict-Transport-Security - Force HTTPS
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    
+    # Referrer-Policy - Kontrol informasi referrer
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    
+    # Permissions-Policy - Kontrol fitur browser
+    Header always set Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=(), usb=(), bluetooth=(), autoplay=()"
+</IfModule>
+
+# ============================================================
+# CACHE CONTROL
+# ============================================================
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css "access plus 1 month"
+    ExpiresByType text/javascript "access plus 1 month"
+    ExpiresByType application/javascript "access plus 1 month"
+    ExpiresByType image/jpeg "access plus 1 year"
+    ExpiresByType image/png "access plus 1 year"
+    ExpiresByType image/gif "access plus 1 year"
+    ExpiresByType image/webp "access plus 1 year"
+    ExpiresByType image/svg+xml "access plus 1 year"
+    ExpiresByType font/woff2 "access plus 1 year"
+    ExpiresByType font/woff "access plus 1 year"
+    ExpiresByType application/json "access plus 0 seconds"
+    ExpiresByType text/html "access plus 0 seconds"
+</IfModule>
+
+# ============================================================
+# COMPRESSION
+# ============================================================
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript application/json
+</IfModule>
+
+# ============================================================
+# BLOCK ACCESS TO SENSITIVE FILES
+# ============================================================
+<FilesMatch "\.(env|ini|log|sh|sql|sqlite|db|json|lock|git|gitignore|htaccess|htpasswd)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+

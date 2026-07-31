@@ -1,0 +1,3693 @@
+[
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626279878945982225",
+        "content_id": "7643669968990735636",
+        "content_type": "VIDEO",
+        "create_time": 1779807296,
+        "creator_shop_ads_commission_rate": 0,
+        "creator_standard_commission_rate": 1100,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "valdisaputra7",
+        "estimated_commission_base": {
+            "amount": "20004",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "amount": "2200",
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "amount": "401",
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584214435449177616",
+        "last_update_time": 1779807426,
+        "partner_shop_ads_commission_rate": 0,
+        "partner_standard_commission_rate": 200,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "20004",
+            "currency": "IDR"
+        },
+        "product_id": "1730686765805373082",
+        "product_name": "Cemilan Cimol Mozzarella\/Cimol Bojot AA Mozzarella Frozen Food",
+        "quantity": 1,
+        "settle_status": "CUSTOMER UNPAID",
+        "sku_id": "1733264178585241242"
+    },
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626279878945982225",
+        "content_id": "7644098713786322197",
+        "content_type": "VIDEO",
+        "create_time": 1779807038,
+        "creator_shop_ads_commission_rate": 592,
+        "creator_standard_commission_rate": 0,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "valdisaputra7",
+        "estimated_commission_base": {
+            "amount": "18813",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "amount": "1114",
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "amount": "203",
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584214314294412494",
+        "last_update_time": 1779807167,
+        "partner_shop_ads_commission_rate": 108,
+        "partner_standard_commission_rate": 0,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "18813",
+            "currency": "IDR"
+        },
+        "product_id": "1730686765805373082",
+        "product_name": "Cemilan Cimol Mozzarella\/Cimol Bojot AA Mozzarella Frozen Food",
+        "quantity": 1,
+        "settle_status": "CUSTOMER UNPAID",
+        "sku_id": "1733264178585175706"
+    },
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626277548004116225",
+        "content_id": "7643779321257037073",
+        "content_type": "VIDEO",
+        "create_time": 1779807029,
+        "creator_shop_ads_commission_rate": 480,
+        "creator_standard_commission_rate": 0,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "aisyah_queensha",
+        "estimated_commission_base": {
+            "amount": "58000",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "amount": "2784",
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "amount": "1856",
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584214300275017599",
+        "last_update_time": 1779807159,
+        "partner_shop_ads_commission_rate": 320,
+        "partner_standard_commission_rate": 0,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "58000",
+            "currency": "IDR"
+        },
+        "product_id": "1731256725563999961",
+        "product_name": "【SARWENDAH】Lydimoon Goat Milk Niacinamide Shower 800ml BPOM - Sabun Susu Kambing Menjaga Elastisitas Mencerahkan & Menutrisi Secara Menyeluruh Untuk Semua Tipe Kulit",
+        "quantity": 1,
+        "settle_status": "CUSTOMER UNPAID",
+        "sku_id": "1732185419718035161"
+    },
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626279879819347728",
+        "content_id": "7616107563079322901",
+        "content_type": "VIDEO",
+        "create_time": 1779802081,
+        "creator_shop_ads_commission_rate": 0,
+        "creator_standard_commission_rate": 900,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "savieralooks",
+        "estimated_commission_base": {
+            "amount": "205499",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "amount": "18495",
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "amount": "6165",
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584213046021227794",
+        "last_update_time": 1779802211,
+        "partner_shop_ads_commission_rate": 0,
+        "partner_standard_commission_rate": 300,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "205499",
+            "currency": "IDR"
+        },
+        "product_id": "1732880475866301798",
+        "product_name": "MOSSDOOM Tas Totebag Tulia Bag  Kulit SuedeTas Berkapasitas Besar Ornamen Kecil",
+        "quantity": 1,
+        "settle_status": "PENDING",
+        "sku_id": "1732881099046684006"
+    },
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626277548004116225",
+        "content_id": "7642645322325445909",
+        "content_type": "VIDEO",
+        "create_time": 1779801007,
+        "creator_shop_ads_commission_rate": 0,
+        "creator_standard_commission_rate": 800,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "susansuka.makeup",
+        "estimated_commission_base": {
+            "amount": "26265",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "amount": "2101",
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "amount": "1051",
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584212812413175049",
+        "last_update_time": 1779801137,
+        "partner_shop_ads_commission_rate": 0,
+        "partner_standard_commission_rate": 400,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "26265",
+            "currency": "IDR"
+        },
+        "product_id": "1734366911314297960",
+        "product_name": "[READY STOCK] Honnete Pink Berry Tone Up Body Spray Mencerahkan Kulit Melembabkan Menghidrasi Sun Protection Wangi Seharian Halal BPOM",
+        "quantity": 1,
+        "settle_status": "PENDING",
+        "sku_id": "1734366855013696616"
+    },
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626277548004116225",
+        "content_id": "7644089189193026836",
+        "content_type": "VIDEO",
+        "create_time": 1779798974,
+        "creator_shop_ads_commission_rate": 0,
+        "creator_standard_commission_rate": 900,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "senjaaa001",
+        "estimated_commission_base": {
+            "amount": "16000",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "amount": "1440",
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "amount": "640",
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584212292203087156",
+        "last_update_time": 1779799103,
+        "partner_shop_ads_commission_rate": 0,
+        "partner_standard_commission_rate": 400,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "16000",
+            "currency": "IDR"
+        },
+        "product_id": "1729385223046727059",
+        "product_name": "[Exfo Pad Series] NPURE Acne Clear Pad Cica \/ Licorice Bright & Glow Exfoliating Pad - Kapas Eksfoliasi untuk Wajah \/ Kulit  Berjerawat & Normal \/ Treatment Wajah \/ Travel Pack Eksfoliasi Pad\/kapas mencerahkan\/ membersihkan pori-pori",
+        "quantity": 1,
+        "settle_status": "CUSTOMER UNPAID",
+        "sku_id": "1729858805779761555"
+    },
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626277548004116225",
+        "content_id": "7635139395951021333",
+        "content_type": "VIDEO",
+        "create_time": 1779795127,
+        "creator_shop_ads_commission_rate": 0,
+        "creator_standard_commission_rate": 700,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "sarwendahofficial",
+        "estimated_commission_base": {
+            "amount": "208390",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "amount": "14587",
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "amount": "6252",
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584211465416771448",
+        "last_update_time": 1779795256,
+        "partner_shop_ads_commission_rate": 0,
+        "partner_standard_commission_rate": 300,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "208390",
+            "currency": "IDR"
+        },
+        "product_id": "1731256725563999961",
+        "product_name": "【SARWENDAH】Lydimoon Goat Milk Niacinamide Shower 800ml BPOM - Sabun Susu Kambing Menjaga Elastisitas Mencerahkan & Menutrisi Secara Menyeluruh Untuk Semua Tipe Kulit",
+        "quantity": 1,
+        "settle_status": "CUSTOMER UNPAID",
+        "sku_id": "1734603069412378329"
+    },
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626279878945982225",
+        "content_id": "7643669968990735636",
+        "content_type": "VIDEO",
+        "create_time": 1779793018,
+        "creator_shop_ads_commission_rate": 592,
+        "creator_standard_commission_rate": 0,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "valdisaputra7",
+        "estimated_commission_base": {
+            "amount": "22227",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "amount": "1316",
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "amount": "240",
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584210924745819313",
+        "last_update_time": 1779793147,
+        "partner_shop_ads_commission_rate": 108,
+        "partner_standard_commission_rate": 0,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "22227",
+            "currency": "IDR"
+        },
+        "product_id": "1730686765805373082",
+        "product_name": "Cemilan Cimol Mozzarella\/Cimol Bojot AA Mozzarella Frozen Food",
+        "quantity": 1,
+        "settle_status": "CUSTOMER UNPAID",
+        "sku_id": "1733264178585372314"
+    },
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626279878945982225",
+        "content_id": "7643669968990735636",
+        "content_type": "VIDEO",
+        "create_time": 1779791583,
+        "creator_shop_ads_commission_rate": 592,
+        "creator_standard_commission_rate": 0,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "valdisaputra7",
+        "estimated_commission_base": {
+            "amount": "17782",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "amount": "1053",
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "amount": "192",
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584210627059025659",
+        "last_update_time": 1779791712,
+        "partner_shop_ads_commission_rate": 108,
+        "partner_standard_commission_rate": 0,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "17782",
+            "currency": "IDR"
+        },
+        "product_id": "1730686765805373082",
+        "product_name": "Cemilan Cimol Mozzarella\/Cimol Bojot AA Mozzarella Frozen Food",
+        "quantity": 1,
+        "settle_status": "PENDING",
+        "sku_id": "1733264178585372314"
+    },
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626279878945982225",
+        "content_id": "7643669968990735636",
+        "content_type": "VIDEO",
+        "create_time": 1779789621,
+        "creator_shop_ads_commission_rate": 0,
+        "creator_standard_commission_rate": 1100,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "valdisaputra7",
+        "estimated_commission_base": {
+            "amount": "20449",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "amount": "2249",
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "amount": "409",
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584210236038678367",
+        "last_update_time": 1779789750,
+        "partner_shop_ads_commission_rate": 0,
+        "partner_standard_commission_rate": 200,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "20449",
+            "currency": "IDR"
+        },
+        "product_id": "1730686765805373082",
+        "product_name": "Cemilan Cimol Mozzarella\/Cimol Bojot AA Mozzarella Frozen Food",
+        "quantity": 1,
+        "settle_status": "CUSTOMER UNPAID",
+        "sku_id": "1733264178585110170"
+    },
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626279878945982225",
+        "content_id": "7643669968990735636",
+        "content_type": "VIDEO",
+        "create_time": 1779788653,
+        "creator_shop_ads_commission_rate": 0,
+        "creator_standard_commission_rate": 1100,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "valdisaputra7",
+        "estimated_commission_base": {
+            "amount": "20004",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "amount": "2200",
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "amount": "401",
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584210079280039078",
+        "last_update_time": 1779859605,
+        "partner_shop_ads_commission_rate": 0,
+        "partner_standard_commission_rate": 200,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "20004",
+            "currency": "IDR"
+        },
+        "product_id": "1730686765805373082",
+        "product_name": "Cemilan Cimol Mozzarella\/Cimol Bojot AA Mozzarella Frozen Food",
+        "quantity": 1,
+        "settle_status": "INELIGIBLE",
+        "sku_id": "1733264178585110170"
+    },
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626277548004116225",
+        "content_id": "7633574912178818312",
+        "content_type": "VIDEO",
+        "create_time": 1779788020,
+        "creator_shop_ads_commission_rate": 0,
+        "creator_standard_commission_rate": 900,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "nisagumilar",
+        "estimated_commission_base": {
+            "amount": "25850",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "amount": "2327",
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "amount": "1551",
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584209945619498213",
+        "last_update_time": 1779788149,
+        "partner_shop_ads_commission_rate": 0,
+        "partner_standard_commission_rate": 600,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "25850",
+            "currency": "IDR"
+        },
+        "product_id": "1729778628974446144",
+        "product_name": "Purbasari Serum Infused Lipstick \/ Lipstick Tahan Lama Anti Geser \/ Lipstick Serum Lipstik Bibir",
+        "quantity": 1,
+        "settle_status": "CUSTOMER UNPAID",
+        "sku_id": "1729778732466472512"
+    },
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626279878945982225",
+        "content_id": "7643721771165682965",
+        "content_type": "VIDEO",
+        "create_time": 1779786504,
+        "creator_shop_ads_commission_rate": 0,
+        "creator_standard_commission_rate": 1100,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "valdisaputra7",
+        "estimated_commission_base": {
+            "amount": "22227",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "amount": "2445",
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "amount": "445",
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584209612326995032",
+        "last_update_time": 1779786634,
+        "partner_shop_ads_commission_rate": 0,
+        "partner_standard_commission_rate": 200,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "22227",
+            "currency": "IDR"
+        },
+        "product_id": "1730686765805373082",
+        "product_name": "Cemilan Cimol Mozzarella\/Cimol Bojot AA Mozzarella Frozen Food",
+        "quantity": 1,
+        "settle_status": "CUSTOMER UNPAID",
+        "sku_id": "1733264178585241242"
+    },
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626279878945982225",
+        "content_id": "7643324780396973333",
+        "content_type": "VIDEO",
+        "create_time": 1779786158,
+        "creator_shop_ads_commission_rate": 0,
+        "creator_standard_commission_rate": 1100,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "valdisaputra7",
+        "estimated_commission_base": {
+            "amount": "19204",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "amount": "2112",
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "amount": "385",
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584209541452891559",
+        "last_update_time": 1779786287,
+        "partner_shop_ads_commission_rate": 0,
+        "partner_standard_commission_rate": 200,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "19204",
+            "currency": "IDR"
+        },
+        "product_id": "1730686765805373082",
+        "product_name": "Cemilan Cimol Mozzarella\/Cimol Bojot AA Mozzarella Frozen Food",
+        "quantity": 1,
+        "settle_status": "CUSTOMER UNPAID",
+        "sku_id": "1733264178585241242"
+    },
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626279878945982225",
+        "content_id": "7643669968990735636",
+        "content_type": "VIDEO",
+        "create_time": 1779784809,
+        "creator_shop_ads_commission_rate": 0,
+        "creator_standard_commission_rate": 1100,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "valdisaputra7",
+        "estimated_commission_base": {
+            "amount": "22227",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "amount": "2445",
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "amount": "445",
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584209305712756255",
+        "last_update_time": 1779784939,
+        "partner_shop_ads_commission_rate": 0,
+        "partner_standard_commission_rate": 200,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "22227",
+            "currency": "IDR"
+        },
+        "product_id": "1730686765805373082",
+        "product_name": "Cemilan Cimol Mozzarella\/Cimol Bojot AA Mozzarella Frozen Food",
+        "quantity": 1,
+        "settle_status": "CUSTOMER UNPAID",
+        "sku_id": "1733264178585241242"
+    },
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626279879817938704",
+        "content_id": "7642236458694200583",
+        "content_type": "VIDEO",
+        "create_time": 1779784728,
+        "creator_shop_ads_commission_rate": 0,
+        "creator_standard_commission_rate": 1100,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "fairaseptiana",
+        "estimated_commission_base": {
+            "amount": "26500",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "amount": "2915",
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "amount": "265",
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584209273048565370",
+        "last_update_time": 1779784857,
+        "partner_shop_ads_commission_rate": 0,
+        "partner_standard_commission_rate": 100,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "26500",
+            "currency": "IDR"
+        },
+        "product_id": "1729546035478693937",
+        "product_name": "[NDD] MAGISTER ROZE Softlens Minus 14mm (-1.00 s\/d -6.00)  Lensa Kontak Warna  LENS Softlens Min Color Contact Lens Wajah Eye Soflen Nude Brown Beige Brown",
+        "quantity": 1,
+        "settle_status": "CUSTOMER UNPAID",
+        "sku_id": "1729546047009818673"
+    },
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626277548004116225",
+        "content_id": "7643759995879787797",
+        "content_type": "VIDEO",
+        "create_time": 1779784100,
+        "creator_shop_ads_commission_rate": 0,
+        "creator_standard_commission_rate": 600,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "erfinanh",
+        "estimated_commission_base": {
+            "amount": "31255",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "amount": "1875",
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "amount": "938",
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584209115227718805",
+        "last_update_time": 1779784230,
+        "partner_shop_ads_commission_rate": 0,
+        "partner_standard_commission_rate": 300,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "31255",
+            "currency": "IDR"
+        },
+        "product_id": "1730372062234248434",
+        "product_name": "[Official] PINKFLASH Multi-Use Watery Blush Stick Healthy and Rosy Cream High pigment Long-lasting 6 Shades F16",
+        "quantity": 1,
+        "settle_status": "CUSTOMER UNPAID",
+        "sku_id": "1730372106009543922"
+    },
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626279878945982225",
+        "content_id": "7639995846087413013",
+        "content_type": "VIDEO",
+        "create_time": 1779783847,
+        "creator_shop_ads_commission_rate": 0,
+        "creator_standard_commission_rate": 1100,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "valdisaputra7",
+        "estimated_commission_base": {
+            "amount": "20449",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "amount": "2249",
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "amount": "409",
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584209084507260159",
+        "last_update_time": 1779783976,
+        "partner_shop_ads_commission_rate": 0,
+        "partner_standard_commission_rate": 200,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "20449",
+            "currency": "IDR"
+        },
+        "product_id": "1730686765805373082",
+        "product_name": "Cemilan Cimol Mozzarella\/Cimol Bojot AA Mozzarella Frozen Food",
+        "quantity": 1,
+        "settle_status": "CUSTOMER UNPAID",
+        "sku_id": "1733264178585241242"
+    },
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626279879817938704",
+        "content_id": "7605745705369767188",
+        "content_type": "VIDEO",
+        "create_time": 1779782953,
+        "creator_shop_ads_commission_rate": 0,
+        "creator_standard_commission_rate": 1100,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "meisadanis",
+        "estimated_commission_base": {
+            "amount": "30904",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "amount": "3399",
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "amount": "928",
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584208835450406217",
+        "last_update_time": 1779783082,
+        "partner_shop_ads_commission_rate": 0,
+        "partner_standard_commission_rate": 300,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "30904",
+            "currency": "IDR"
+        },
+        "product_id": "1730892278872310787",
+        "product_name": "HANASUI Next Level Butter Balm Tint - Color Butter Balm Tinted Lip Balm Melembabkan & Mencerahkan Bibir Lightweight & Cover Bibir Gelap Beauty Hyper Gloss Lip Balm",
+        "quantity": 1,
+        "settle_status": "CUSTOMER UNPAID",
+        "sku_id": "1730892284155167747"
+    },
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626279878945982225",
+        "content_id": "7639995846087413013",
+        "content_type": "VIDEO",
+        "create_time": 1779782940,
+        "creator_shop_ads_commission_rate": 0,
+        "creator_standard_commission_rate": 1100,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "valdisaputra7",
+        "estimated_commission_base": {
+            "amount": "61347",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "amount": "6747",
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "amount": "1227",
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584208835710453295",
+        "last_update_time": 1779783069,
+        "partner_shop_ads_commission_rate": 0,
+        "partner_standard_commission_rate": 200,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "20449",
+            "currency": "IDR"
+        },
+        "product_id": "1730686765805373082",
+        "product_name": "Cemilan Cimol Mozzarella\/Cimol Bojot AA Mozzarella Frozen Food",
+        "quantity": 3,
+        "settle_status": "CUSTOMER UNPAID",
+        "sku_id": "1733264178585241242"
+    },
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626277548004116225",
+        "content_id": "7643106276297165575",
+        "content_type": "LIVE",
+        "create_time": 1779782177,
+        "creator_shop_ads_commission_rate": 0,
+        "creator_standard_commission_rate": 1400,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "dellapuspita79",
+        "estimated_commission_base": {
+            "amount": "25850",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "amount": "3619",
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "amount": "259",
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584208780590679378",
+        "last_update_time": 1779782307,
+        "partner_shop_ads_commission_rate": 0,
+        "partner_standard_commission_rate": 100,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "25850",
+            "currency": "IDR"
+        },
+        "product_id": "1729778628974446144",
+        "product_name": "Purbasari Serum Infused Lipstick \/ Lipstick Tahan Lama Anti Geser \/ Lipstick Serum Lipstik Bibir",
+        "quantity": 1,
+        "settle_status": "PENDING",
+        "sku_id": "1729778732466472512"
+    },
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626277548004116225",
+        "content_id": "7643106276297165575",
+        "content_type": "LIVE",
+        "create_time": 1779782177,
+        "creator_shop_ads_commission_rate": 0,
+        "creator_standard_commission_rate": 1400,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "dellapuspita79",
+        "estimated_commission_base": {
+            "amount": "25850",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "amount": "3619",
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "amount": "259",
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584208780590548306",
+        "last_update_time": 1779782307,
+        "partner_shop_ads_commission_rate": 0,
+        "partner_standard_commission_rate": 100,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "25850",
+            "currency": "IDR"
+        },
+        "product_id": "1729778628974446144",
+        "product_name": "Purbasari Serum Infused Lipstick \/ Lipstick Tahan Lama Anti Geser \/ Lipstick Serum Lipstik Bibir",
+        "quantity": 1,
+        "settle_status": "PENDING",
+        "sku_id": "1729778732737070656"
+    },
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626279878945982225",
+        "content_id": "7643327138057309458",
+        "content_type": "VIDEO",
+        "create_time": 1779780699,
+        "creator_shop_ads_commission_rate": 0,
+        "creator_standard_commission_rate": 600,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "nayyara_ls",
+        "estimated_commission_base": {
+            "amount": "15271",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "amount": "916",
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "amount": "611",
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584208359200949600",
+        "last_update_time": 1779780829,
+        "partner_shop_ads_commission_rate": 0,
+        "partner_standard_commission_rate": 400,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "15271",
+            "currency": "IDR"
+        },
+        "product_id": "1730515261892757084",
+        "product_name": "[BELI LOKAL] MIE LIDI GEHEL 200gr - Makanan Ringan,  Food Noodles Goreng Instan Pedas Nagih Snack Cemilan Keripik Camilan",
+        "quantity": 1,
+        "settle_status": "PENDING",
+        "sku_id": "1735010246799099484"
+    },
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626277548004116225",
+        "content_id": "7635139395951021333",
+        "content_type": "VIDEO",
+        "create_time": 1779780281,
+        "creator_shop_ads_commission_rate": 0,
+        "creator_standard_commission_rate": 700,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "sarwendahofficial",
+        "estimated_commission_base": {
+            "amount": "74880",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "amount": "5242",
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "amount": "2246",
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584208301631375256",
+        "last_update_time": 1779780410,
+        "partner_shop_ads_commission_rate": 0,
+        "partner_standard_commission_rate": 300,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "74880",
+            "currency": "IDR"
+        },
+        "product_id": "1731256725563999961",
+        "product_name": "【SARWENDAH】Lydimoon Goat Milk Niacinamide Shower 800ml BPOM - Sabun Susu Kambing Menjaga Elastisitas Mencerahkan & Menutrisi Secara Menyeluruh Untuk Semua Tipe Kulit",
+        "quantity": 1,
+        "settle_status": "CUSTOMER UNPAID",
+        "sku_id": "1732185419718035161"
+    },
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626277548004116225",
+        "content_id": "7643689598400335125",
+        "content_type": "VIDEO",
+        "create_time": 1779779483,
+        "creator_shop_ads_commission_rate": 200,
+        "creator_standard_commission_rate": 0,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "clara.yaa01",
+        "estimated_commission_base": {
+            "amount": "27359",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "amount": "547",
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "amount": "547",
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584208107569185960",
+        "last_update_time": 1779779612,
+        "partner_shop_ads_commission_rate": 200,
+        "partner_standard_commission_rate": 0,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "27359",
+            "currency": "IDR"
+        },
+        "product_id": "1734366911314297960",
+        "product_name": "[READY STOCK] Honnete Pink Berry Tone Up Body Spray Mencerahkan Kulit Melembabkan Menghidrasi Sun Protection Wangi Seharian Halal BPOM",
+        "quantity": 1,
+        "settle_status": "CUSTOMER UNPAID",
+        "sku_id": "1734366855013696616"
+    },
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626279878945982225",
+        "content_id": "7643324780396973333",
+        "content_type": "VIDEO",
+        "create_time": 1779779283,
+        "creator_shop_ads_commission_rate": 0,
+        "creator_standard_commission_rate": 1100,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "valdisaputra7",
+        "estimated_commission_base": {
+            "amount": "18404",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "amount": "2024",
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "amount": "369",
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584208091220182450",
+        "last_update_time": 1779779413,
+        "partner_shop_ads_commission_rate": 0,
+        "partner_standard_commission_rate": 200,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "18404",
+            "currency": "IDR"
+        },
+        "product_id": "1730686765805373082",
+        "product_name": "Cemilan Cimol Mozzarella\/Cimol Bojot AA Mozzarella Frozen Food",
+        "quantity": 1,
+        "settle_status": "CUSTOMER UNPAID",
+        "sku_id": "1733264178585241242"
+    },
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626279878945982225",
+        "content_id": "7643327138057309458",
+        "content_type": "VIDEO",
+        "create_time": 1779776095,
+        "creator_shop_ads_commission_rate": 0,
+        "creator_standard_commission_rate": 600,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "nayyara_ls",
+        "delivery_time": 1779870009,
+        "estimated_commission_base": {
+            "amount": "15999",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "amount": "960",
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "amount": "640",
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584207346190353638",
+        "last_update_time": 1779870014,
+        "partner_shop_ads_commission_rate": 0,
+        "partner_standard_commission_rate": 400,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "15999",
+            "currency": "IDR"
+        },
+        "product_id": "1730515261892757084",
+        "product_name": "[BELI LOKAL] MIE LIDI GEHEL 200gr - Makanan Ringan,  Food Noodles Goreng Instan Pedas Nagih Snack Cemilan Keripik Camilan",
+        "quantity": 1,
+        "settle_status": "PENDING",
+        "sku_id": "1735010246798640732"
+    },
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626279878945982225",
+        "content_id": "7643669968990735636",
+        "content_type": "VIDEO",
+        "create_time": 1779775857,
+        "creator_shop_ads_commission_rate": 592,
+        "creator_standard_commission_rate": 0,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "valdisaputra7",
+        "estimated_commission_base": {
+            "amount": "20893",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "amount": "1237",
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "amount": "226",
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584207250290607412",
+        "last_update_time": 1779775987,
+        "partner_shop_ads_commission_rate": 108,
+        "partner_standard_commission_rate": 0,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "20893",
+            "currency": "IDR"
+        },
+        "product_id": "1730686765805373082",
+        "product_name": "Cemilan Cimol Mozzarella\/Cimol Bojot AA Mozzarella Frozen Food",
+        "quantity": 1,
+        "settle_status": "CUSTOMER UNPAID",
+        "sku_id": "1733264178585241242"
+    },
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626279878945982225",
+        "content_id": "7643669968990735636",
+        "content_type": "VIDEO",
+        "create_time": 1779775773,
+        "creator_shop_ads_commission_rate": 592,
+        "creator_standard_commission_rate": 0,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "valdisaputra7",
+        "estimated_commission_base": {
+            "amount": "22227",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "amount": "1316",
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "amount": "240",
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584207287675618340",
+        "last_update_time": 1779775903,
+        "partner_shop_ads_commission_rate": 108,
+        "partner_standard_commission_rate": 0,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "22227",
+            "currency": "IDR"
+        },
+        "product_id": "1730686765805373082",
+        "product_name": "Cemilan Cimol Mozzarella\/Cimol Bojot AA Mozzarella Frozen Food",
+        "quantity": 1,
+        "settle_status": "PENDING",
+        "sku_id": "1733264178585241242"
+    },
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626279878945982225",
+        "content_id": "7643324780396973333",
+        "content_type": "VIDEO",
+        "create_time": 1779773620,
+        "creator_shop_ads_commission_rate": 0,
+        "creator_standard_commission_rate": 1100,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "valdisaputra7",
+        "estimated_commission_base": {
+            "amount": "19427",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "amount": "2137",
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "amount": "389",
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584206732990121757",
+        "last_update_time": 1779773749,
+        "partner_shop_ads_commission_rate": 0,
+        "partner_standard_commission_rate": 200,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "19427",
+            "currency": "IDR"
+        },
+        "product_id": "1730686765805373082",
+        "product_name": "Cemilan Cimol Mozzarella\/Cimol Bojot AA Mozzarella Frozen Food",
+        "quantity": 1,
+        "settle_status": "CUSTOMER UNPAID",
+        "sku_id": "1733264178585110170"
+    },
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626279878945982225",
+        "content_id": "7643327138057309458",
+        "content_type": "VIDEO",
+        "create_time": 1779771637,
+        "creator_shop_ads_commission_rate": 0,
+        "creator_standard_commission_rate": 600,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "nayyara_ls",
+        "estimated_commission_base": {
+            "amount": "13599",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "amount": "816",
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "amount": "544",
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584206251350721955",
+        "last_update_time": 1779771767,
+        "partner_shop_ads_commission_rate": 0,
+        "partner_standard_commission_rate": 400,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "13599",
+            "currency": "IDR"
+        },
+        "product_id": "1730515261892757084",
+        "product_name": "[BELI LOKAL] MIE LIDI GEHEL 200gr - Makanan Ringan,  Food Noodles Goreng Instan Pedas Nagih Snack Cemilan Keripik Camilan",
+        "quantity": 1,
+        "settle_status": "CUSTOMER UNPAID",
+        "sku_id": "1735010246798640732"
+    },
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626279878945982225",
+        "content_id": "7643669968990735636",
+        "content_type": "VIDEO",
+        "create_time": 1779770820,
+        "creator_shop_ads_commission_rate": 592,
+        "creator_standard_commission_rate": 0,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "valdisaputra7",
+        "estimated_commission_base": {
+            "amount": "20893",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "amount": "1237",
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "amount": "226",
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584206084195845936",
+        "last_update_time": 1779770950,
+        "partner_shop_ads_commission_rate": 108,
+        "partner_standard_commission_rate": 0,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "20893",
+            "currency": "IDR"
+        },
+        "product_id": "1730686765805373082",
+        "product_name": "Cemilan Cimol Mozzarella\/Cimol Bojot AA Mozzarella Frozen Food",
+        "quantity": 1,
+        "settle_status": "CUSTOMER UNPAID",
+        "sku_id": "1733264178585110170"
+    },
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626277548004116225",
+        "content_id": "7643261757296872720",
+        "content_type": "VIDEO",
+        "create_time": 1779767489,
+        "creator_shop_ads_commission_rate": 480,
+        "creator_standard_commission_rate": 0,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "aisyah_queensha",
+        "estimated_commission_base": {
+            "amount": "78000",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "amount": "3744",
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "amount": "2496",
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584205321580086564",
+        "last_update_time": 1779767618,
+        "partner_shop_ads_commission_rate": 320,
+        "partner_standard_commission_rate": 0,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "78000",
+            "currency": "IDR"
+        },
+        "product_id": "1731256725563999961",
+        "product_name": "【SARWENDAH】Lydimoon Goat Milk Niacinamide Shower 800ml BPOM - Sabun Susu Kambing Menjaga Elastisitas Mencerahkan & Menutrisi Secara Menyeluruh Untuk Semua Tipe Kulit",
+        "quantity": 1,
+        "settle_status": "CUSTOMER UNPAID",
+        "sku_id": "1732185419718035161"
+    },
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626279879819347728",
+        "content_id": "7585190455017590037",
+        "content_type": "VIDEO",
+        "create_time": 1779765976,
+        "creator_shop_ads_commission_rate": 0,
+        "creator_standard_commission_rate": 900,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "savieralooks",
+        "estimated_commission_base": {
+            "amount": "207985",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "amount": "18719",
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "amount": "6239",
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584204912588391851",
+        "last_update_time": 1779766106,
+        "partner_shop_ads_commission_rate": 0,
+        "partner_standard_commission_rate": 300,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "207985",
+            "currency": "IDR"
+        },
+        "product_id": "1732477696021005670",
+        "product_name": "MOSSDOOM Tas Wanita Aurea Bag Kemewahan Yang Elegan Hand Bag Mudah Digunakan Untuk Segala Acara",
+        "quantity": 1,
+        "settle_status": "PENDING",
+        "sku_id": "1732477966300710246"
+    },
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626279879817938704",
+        "content_id": "7640429930106473749",
+        "content_type": "VIDEO",
+        "create_time": 1779764871,
+        "creator_shop_ads_commission_rate": 0,
+        "creator_standard_commission_rate": 1100,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "meisadanis",
+        "estimated_commission_base": {
+            "amount": "29206",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "amount": "3213",
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "amount": "876",
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584204693622064604",
+        "last_update_time": 1779765001,
+        "partner_shop_ads_commission_rate": 0,
+        "partner_standard_commission_rate": 300,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "29206",
+            "currency": "IDR"
+        },
+        "product_id": "1730892278872310787",
+        "product_name": "HANASUI Next Level Butter Balm Tint - Color Butter Balm Tinted Lip Balm Melembabkan & Mencerahkan Bibir Lightweight & Cover Bibir Gelap Beauty Hyper Gloss Lip Balm",
+        "quantity": 1,
+        "settle_status": "PENDING",
+        "sku_id": "1730892284155167747"
+    },
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626279878945982225",
+        "content_id": "7643327138057309458",
+        "content_type": "VIDEO",
+        "create_time": 1779762868,
+        "creator_shop_ads_commission_rate": 0,
+        "creator_standard_commission_rate": 600,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "nayyara_ls",
+        "estimated_commission_base": {
+            "amount": "19607",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "amount": "1176",
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "amount": "785",
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584204225734412203",
+        "last_update_time": 1779762998,
+        "partner_shop_ads_commission_rate": 0,
+        "partner_standard_commission_rate": 400,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "19607",
+            "currency": "IDR"
+        },
+        "product_id": "1730515261892757084",
+        "product_name": "[BELI LOKAL] MIE LIDI GEHEL 200gr - Makanan Ringan,  Food Noodles Goreng Instan Pedas Nagih Snack Cemilan Keripik Camilan",
+        "quantity": 1,
+        "settle_status": "CUSTOMER UNPAID",
+        "sku_id": "1735010246799099484"
+    },
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626277548004116225",
+        "content_id": "7642218781808299281",
+        "content_type": "VIDEO",
+        "create_time": 1779762566,
+        "creator_shop_ads_commission_rate": 480,
+        "creator_standard_commission_rate": 0,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "aisyah_queensha",
+        "estimated_commission_base": {
+            "amount": "53760",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "amount": "2580",
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "amount": "1721",
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584204143305000027",
+        "last_update_time": 1779762696,
+        "partner_shop_ads_commission_rate": 320,
+        "partner_standard_commission_rate": 0,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "53760",
+            "currency": "IDR"
+        },
+        "product_id": "1731256725563999961",
+        "product_name": "【SARWENDAH】Lydimoon Goat Milk Niacinamide Shower 800ml BPOM - Sabun Susu Kambing Menjaga Elastisitas Mencerahkan & Menutrisi Secara Menyeluruh Untuk Semua Tipe Kulit",
+        "quantity": 1,
+        "settle_status": "CUSTOMER UNPAID",
+        "sku_id": "1732185419718035161"
+    },
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626279878945982225",
+        "content_id": "7643327138057309458",
+        "content_type": "VIDEO",
+        "create_time": 1779758919,
+        "creator_shop_ads_commission_rate": 0,
+        "creator_standard_commission_rate": 600,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "nayyara_ls",
+        "estimated_commission_base": {
+            "amount": "19607",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "amount": "1176",
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "amount": "785",
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584203418339280673",
+        "last_update_time": 1779759048,
+        "partner_shop_ads_commission_rate": 0,
+        "partner_standard_commission_rate": 400,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "19607",
+            "currency": "IDR"
+        },
+        "product_id": "1730515261892757084",
+        "product_name": "[BELI LOKAL] MIE LIDI GEHEL 200gr - Makanan Ringan,  Food Noodles Goreng Instan Pedas Nagih Snack Cemilan Keripik Camilan",
+        "quantity": 1,
+        "settle_status": "CUSTOMER UNPAID",
+        "sku_id": "1735010246799296092"
+    },
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626277548004116225",
+        "content_id": "7643847063742008584",
+        "content_type": "VIDEO",
+        "create_time": 1779753928,
+        "creator_shop_ads_commission_rate": 267,
+        "creator_standard_commission_rate": 0,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "shopingiin",
+        "estimated_commission_base": {
+            "amount": "27359",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "amount": "730",
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "amount": "364",
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584202570357573314",
+        "last_update_time": 1779754058,
+        "partner_shop_ads_commission_rate": 133,
+        "partner_standard_commission_rate": 0,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "27359",
+            "currency": "IDR"
+        },
+        "product_id": "1734366911314297960",
+        "product_name": "[READY STOCK] Honnete Pink Berry Tone Up Body Spray Mencerahkan Kulit Melembabkan Menghidrasi Sun Protection Wangi Seharian Halal BPOM",
+        "quantity": 1,
+        "settle_status": "CUSTOMER UNPAID",
+        "sku_id": "1734366855013696616"
+    },
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626279878945982225",
+        "content_id": "7643669968990735636",
+        "content_type": "VIDEO",
+        "create_time": 1779753155,
+        "creator_shop_ads_commission_rate": 0,
+        "creator_standard_commission_rate": 1100,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "valdisaputra7",
+        "estimated_commission_base": {
+            "amount": "22227",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "amount": "2445",
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "amount": "445",
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584202488281204405",
+        "last_update_time": 1779753284,
+        "partner_shop_ads_commission_rate": 0,
+        "partner_standard_commission_rate": 200,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "22227",
+            "currency": "IDR"
+        },
+        "product_id": "1730686765805373082",
+        "product_name": "Cemilan Cimol Mozzarella\/Cimol Bojot AA Mozzarella Frozen Food",
+        "quantity": 1,
+        "settle_status": "CUSTOMER UNPAID",
+        "sku_id": "1733264178585110170"
+    },
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626277548004116225",
+        "content_id": "7640527030492138772",
+        "content_type": "VIDEO",
+        "create_time": 1779749775,
+        "creator_shop_ads_commission_rate": 171,
+        "creator_standard_commission_rate": 0,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "graciaguzel_610",
+        "estimated_commission_base": {
+            "amount": "53800",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "amount": "920",
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "amount": "1232",
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584202006846669854",
+        "last_update_time": 1779749904,
+        "partner_shop_ads_commission_rate": 229,
+        "partner_standard_commission_rate": 0,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "53800",
+            "currency": "IDR"
+        },
+        "product_id": "1729708148177404974",
+        "product_name": "OILYOUNG Isolation Moisturizing Spray Niacinamide - Skin Brightening, Hydrating, Moisturizer- Toneup Kulit Kusam [BPOM]",
+        "quantity": 1,
+        "settle_status": "CUSTOMER UNPAID",
+        "sku_id": "1731733708622693422"
+    },
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626279878945982225",
+        "content_id": "7643669968990735636",
+        "content_type": "VIDEO",
+        "create_time": 1779749702,
+        "creator_shop_ads_commission_rate": 592,
+        "creator_standard_commission_rate": 0,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "valdisaputra7",
+        "estimated_commission_base": {
+            "amount": "17782",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "amount": "1053",
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "amount": "192",
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584201996083889538",
+        "last_update_time": 1779749832,
+        "partner_shop_ads_commission_rate": 108,
+        "partner_standard_commission_rate": 0,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "17782",
+            "currency": "IDR"
+        },
+        "product_id": "1730686765805373082",
+        "product_name": "Cemilan Cimol Mozzarella\/Cimol Bojot AA Mozzarella Frozen Food",
+        "quantity": 1,
+        "settle_status": "PENDING",
+        "sku_id": "1733264178585175706"
+    },
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626279878945982225",
+        "content_id": "7641402551367142676",
+        "content_type": "VIDEO",
+        "create_time": 1779743822,
+        "creator_shop_ads_commission_rate": 800,
+        "creator_standard_commission_rate": 0,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "febyzu",
+        "estimated_commission_base": {
+            "amount": "34899",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "amount": "2792",
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "amount": "2443",
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584201505889682436",
+        "last_update_time": 1779743952,
+        "partner_shop_ads_commission_rate": 700,
+        "partner_standard_commission_rate": 0,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "34899",
+            "currency": "IDR"
+        },
+        "product_id": "1729865843115133245",
+        "product_name": "SamBhojo Paket 10pc Sambal Sachet 20gr Free Mangkuk",
+        "quantity": 1,
+        "settle_status": "CUSTOMER UNPAID",
+        "sku_id": "1735179341682083133"
+    },
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626279878945982225",
+        "content_id": "7496097949586590067",
+        "content_type": "SHOP",
+        "create_time": 1779737378,
+        "creator_shop_ads_commission_rate": 0,
+        "creator_standard_commission_rate": 1100,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "ilham_isud",
+        "estimated_commission_base": {
+            "amount": "22225",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "amount": "2445",
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "amount": "444",
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584201149140796945",
+        "last_update_time": 1779737508,
+        "partner_shop_ads_commission_rate": 0,
+        "partner_standard_commission_rate": 200,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "22225",
+            "currency": "IDR"
+        },
+        "product_id": "1730686765805373082",
+        "product_name": "Cemilan Cimol Mozzarella\/Cimol Bojot AA Mozzarella Frozen Food",
+        "quantity": 1,
+        "settle_status": "PENDING",
+        "sku_id": "1733264178585110170"
+    },
+    {
+        "actual_commission_base": {
+            "currency": "IDR"
+        },
+        "actual_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_isr": {
+            "currency": "IDR"
+        },
+        "actual_partner_iva": {
+            "currency": "IDR"
+        },
+        "actual_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_standard_commission": {
+            "currency": "IDR"
+        },
+        "actual_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "campaign_id": "7626277548004116225",
+        "content_id": "7642974887170034965",
+        "content_type": "VIDEO",
+        "create_time": 1779729510,
+        "creator_shop_ads_commission_rate": 0,
+        "creator_standard_commission_rate": 600,
+        "creator_tap_bonus_commission_rate": 0,
+        "creator_username": "clara.yaa01",
+        "estimated_commission_base": {
+            "amount": "27359",
+            "currency": "IDR"
+        },
+        "estimated_creator_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_creator_standard_commission": {
+            "amount": "1642",
+            "currency": "IDR"
+        },
+        "estimated_creator_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_isr": {
+            "currency": "IDR"
+        },
+        "estimated_partner_iva": {
+            "currency": "IDR"
+        },
+        "estimated_partner_shop_ads_commission": {
+            "currency": "IDR"
+        },
+        "estimated_partner_standard_commission": {
+            "amount": "1641",
+            "currency": "IDR"
+        },
+        "estimated_partner_tap_bonus_commission": {
+            "currency": "IDR"
+        },
+        "fully_return": "No",
+        "id": "584200482565621080",
+        "last_update_time": 1779729640,
+        "partner_shop_ads_commission_rate": 0,
+        "partner_standard_commission_rate": 600,
+        "partner_tap_bonus_commission_rate": 0,
+        "price": {
+            "amount": "27359",
+            "currency": "IDR"
+        },
+        "product_id": "1734366911314297960",
+        "product_name": "[READY STOCK] Honnete Pink Berry Tone Up Body Spray Mencerahkan Kulit Melembabkan Menghidrasi Sun Protection Wangi Seharian Halal BPOM",
+        "quantity": 1,
+        "settle_status": "CUSTOMER UNPAID",
+        "sku_id": "1734366855013696616"
+    }
+]
