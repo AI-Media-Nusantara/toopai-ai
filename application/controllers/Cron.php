@@ -78,7 +78,23 @@ private function get_utc_range_from_local_date($local_date, $timezone = 'Asia/Ja
     echo "\nProcessing queue items...\n";
     $this->process_queue();
     
+    // 8. Auto-detect creator link usage
+    echo "\n[8/7] Running auto-detection of creator link usage...\n";
+    $this->auto_detect_creator_link_usage();
+
     echo "\n[" . date('Y-m-d H:i:s') . "] ========== FULL SYNC COMPLETED ==========\n";
+}
+
+/**
+ * Auto-detect creator link usage (onboard from contacted list when they use the link)
+ */
+public function auto_detect_creator_link_usage() {
+    echo "[" . date('Y-m-d H:i:s') . "] Starting auto-detection of creator link usage...\n";
+    $this->load->model('CreatorScouting_model');
+    $results = $this->CreatorScouting_model->run_auto_detection();
+    echo "  Processed " . $results['scouting_onboarded'] . " new onboardings from contacted Scouting List.\n";
+    echo "  Activated " . $results['creators_activated'] . " creators in creators table.\n";
+    echo "[" . date('Y-m-d H:i:s') . "] Auto-detection completed.\n";
 }
     
     /**

@@ -31,8 +31,7 @@ if (php_sapi_name() === 'cli') {
     // Untuk web request
     $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https://' : 'http://';
     $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-    $port = $_SERVER['SERVER_PORT'] ?? '80';
-    $config['base_url'] = $protocol . $host . ($port != 80 && $port != 443 ? ':' . $port : '') . '/';
+    $config['base_url'] = $protocol . $host . '/';
 }
 
 

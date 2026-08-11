@@ -1191,7 +1191,7 @@ public function get_recent_orders_valid($limit = 20) {
             o.order_status,
             o.order_time, 
             o.order_date_local,
-            COALESCE(p1.image_url, p2.image_url) as image_url
+            MAX(COALESCE(p1.image_url, p2.image_url)) as image_url
         ', false)
         ->from('affiliate_orders o')
         ->join(
@@ -1208,7 +1208,19 @@ public function get_recent_orders_valid($limit = 20) {
         ->where_in('o.order_status', ['SETTLED', 'PENDING', 'PROCESSING'])
         ->where('o.creator_username IS NOT NULL')
         ->where("o.creator_username != ''")
-        ->group_by('o.order_id')
+        ->group_by([
+            'o.order_id', 
+            'o.product_id',
+            'o.campaign_id',
+            'o.product_name', 
+            'o.creator_username', 
+            'o.gmv', 
+            'o.estimated_commission', 
+            'o.actual_commission', 
+            'o.order_status',
+            'o.order_time', 
+            'o.order_date_local'
+        ])
         ->order_by('o.order_time', 'DESC')
         ->limit($limit)
         ->get()

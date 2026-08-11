@@ -1342,6 +1342,84 @@
   
 
     <!-- ============================================================ -->
+    <!-- AUTO CREATOR SCOUTING LIST -->
+    <!-- ============================================================ -->
+    <div id="autoScoutingSection" style="margin-bottom: 24px;">
+
+        <!-- Header panel -->
+        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:14px;">
+            <div style="display:flex; align-items:center; gap:10px;">
+                <div style="width:36px;height:36px;background:linear-gradient(135deg,rgba(139,92,246,0.25),rgba(59,130,246,0.2));
+                            border-radius:10px;display:flex;align-items:center;justify-content:center;">
+                    <i class="fas fa-robot" style="color:#a78bfa;font-size:15px;"></i>
+                </div>
+                <div>
+                    <h3 style="margin:0;font-size:14px;font-weight:700;color:var(--text-primary);">
+                        Scouting List Otomatis
+                        <span id="scoutingBadgeCount" style="background:rgba(139,92,246,0.2);color:#a78bfa;
+                              font-size:11px;padding:2px 8px;border-radius:20px;margin-left:6px;font-weight:600;">0</span>
+                    </h3>
+                    <p style="margin:0;font-size:11px;color:var(--text-secondary);">
+                        Creator yang terbukti pernah menjual produk dari brand aktif
+                    </p>
+                </div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <!-- Filter brand -->
+                <select id="scoutingBrandFilter" onchange="loadScoutingList()"
+                    style="padding:7px 12px;background:rgba(255,255,255,0.05);border:1px solid var(--border);
+                           border-radius:10px;color:var(--text-primary);font-size:12px;outline:none;cursor:pointer;">
+                    <option value="">Semua Brand</option>
+                </select>
+                <!-- Filter source -->
+                <select id="scoutingSourceFilter" onchange="loadScoutingList()"
+                    style="padding:7px 12px;background:rgba(255,255,255,0.05);border:1px solid var(--border);
+                           border-radius:10px;color:var(--text-primary);font-size:12px;outline:none;cursor:pointer;">
+                    <option value="">Semua Sumber</option>
+                    <option value="affiliate_orders">Dari Order</option>
+                    <option value="fastmoss">FastMoss</option>
+                </select>
+                <!-- Search -->
+                <input type="text" id="scoutingSearch" placeholder=" Cari creator / produk..."
+                    oninput="debounceScoutingSearch()"
+                    style="padding:7px 12px;background:rgba(255,255,255,0.05);border:1px solid var(--border);
+                           border-radius:10px;color:var(--text-primary);font-size:12px;outline:none;width:180px;">
+                <!-- Refresh -->
+                <button onclick="refreshScoutingList()" id="refreshScoutingBtn"
+                    style="padding:7px 14px;background:rgba(139,92,246,0.15);color:#a78bfa;border:1px solid rgba(139,92,246,0.3);
+                           border-radius:10px;cursor:pointer;font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:5px;">
+                    <i class="fas fa-sync-alt" id="refreshScoutingIcon"></i> Perbarui
+                </button>
+            </div>
+        </div>
+
+        <!-- Scrollable row creator -->
+        <div id="scoutingScrollWrapper" style="position:relative;">
+            <div id="scoutingListGrid"
+                 style="display:flex; gap:12px; overflow-x:auto; overflow-y:hidden;
+                        padding-bottom:10px; scroll-behavior:smooth;
+                        scrollbar-width:thin; scrollbar-color:rgba(139,92,246,0.35) transparent;">
+                <!-- diisi JS -->
+                <div class="scouting-loading-placeholder"
+                     style="width: 100%; text-align: center; padding: 40px 20px; color: var(--text-secondary);
+                            display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0;">
+                    <i class="fas fa-spinner fa-pulse fa-2x" style="color:rgba(139,92,246,0.4);margin-bottom:12px;display:block;"></i>
+                    Memuat...
+                </div>
+            </div>
+            <!-- Fade kanan -->
+            <div id="scoutingFadeRight"
+                 style="position:absolute;top:0;right:0;width:48px;height:100%;pointer-events:none;
+                        background:linear-gradient(to right,transparent,var(--bg,#0a0e17));"></div>
+        </div>
+
+        <!-- Load more sentinel (invisible, trigger infinite scroll) -->
+        <div id="scoutingLoadMore" style="display:none;"></div>
+
+    </div>
+    <!-- END AUTO CREATOR SCOUTING LIST -->
+
+    <!-- ============================================================ -->
     <!-- 3 TASKS -->
     <!-- ============================================================ -->
     <div class="is-tasks">
@@ -1576,7 +1654,7 @@
                 </div>
                 <?php if (!empty($creator->top_product)): ?>
                 <div class="is-item-product">
-                    <span>•0“6 <?= htmlspecialchars(substr($creator->top_product, 0, 40)) ?>...</span>
+                    <span>ï¿½0ï¿½6 <?= htmlspecialchars(substr($creator->top_product, 0, 40)) ?>...</span>
                 </div>
                 <?php endif; ?>
                 <?php if ($creator->deal_status == 'no_handler'): ?>
@@ -1606,9 +1684,9 @@
         <p>Belum ada creator siap claim</p>
         <span style="font-size: 11px; color: var(--is-muted);">Creator akan muncul di sini saat:</span>
         <ul style="text-align: left; font-size: 11px; color: var(--is-muted); margin-top: 8px;">
-            <li>7¼3 Ada link aktif & belum di-claim</li>
-            <li>7¼3 Ada order tapi belum punya handler</li>
-            <li>7¼3 Ada creator baru dengan order</li>
+            <li>ï¿½7ï¿½3 Ada link aktif & belum di-claim</li>
+            <li>ï¿½7ï¿½3 Ada order tapi belum punya handler</li>
+            <li>ï¿½7ï¿½3 Ada creator baru dengan order</li>
         </ul>
     </div>
 <?php endif; ?>
@@ -1673,7 +1751,7 @@
                                         <img src="<?= htmlspecialchars($creator->top_product_image) ?>" onerror="this.parentElement.style.display='none'">
                                     </div>
                                     <?php endif; ?>
-                                    <span>•0“6 <?= htmlspecialchars(substr($creator->top_product, 0, 40)) ?>...</span>
+                                    <span>ï¿½0ï¿½6 <?= htmlspecialchars(substr($creator->top_product, 0, 40)) ?>...</span>
                                 </div>
                                 <?php endif; ?>
                                 <?php if (!empty($creator->brand_name)): ?>
@@ -2090,7 +2168,7 @@ function fallbackCopy(text) {
     textarea.select();
     try {
         document.execCommand('copy');
-        showToastGlobal('7¼3 Link copied!', 'success');
+        showToastGlobal('ï¿½7ï¿½3 Link copied!', 'success');
     } catch (err) {
         showToastGlobal('Gagal copy link', 'error');
     }
@@ -2104,7 +2182,7 @@ function copyMultiLink(link) {
     }
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(link).then(() => {
-            showToastGlobal('7¼3 Multi link copied!', 'success');
+            showToastGlobal('ï¿½7ï¿½3 Multi link copied!', 'success');
         }).catch(() => {
             fallbackCopy(link);
         });
@@ -2358,7 +2436,7 @@ window.savePhoneNumber = async function(creatorId) {
         const result = await response.json();
         
         if (result.success) {
-            showToastGlobal('7¼3 Nomor WhatsApp berhasil diupdate!', 'success');
+            showToastGlobal('ï¿½7ï¿½3 Nomor WhatsApp berhasil diupdate!', 'success');
             window.closeUpdatePhoneModal();
             
             const phoneDisplay = document.getElementById('phoneDisplaySendLink');
@@ -2441,7 +2519,7 @@ async function showTask1SendLinkModal(creatorId) {
             body: new URLSearchParams({ creator_id: creatorId })
         });
         
-        // ”9æ7 CEK RESPONSE STATUS
+        // ï¿½9ï¿½7 CEK RESPONSE STATUS
         if (!response.ok) {
             const text = await response.text();
             console.error('Response error:', text);
@@ -2460,7 +2538,7 @@ async function showTask1SendLinkModal(creatorId) {
         const result = await response.json();
         console.log('Products result:', result);
         
-        // ”9æ7 CEK SESSION EXPIRED DARI RESPONSE
+        // ï¿½9ï¿½7 CEK SESSION EXPIRED DARI RESPONSE
         if (!result.success && result.redirect) {
             showToastGlobal('Session expired. Silakan login ulang.', 'error');
             setTimeout(() => {
@@ -2524,9 +2602,9 @@ async function showTask1SendLinkModal(creatorId) {
                     <div style="text-align:right;">
                         <div style="color:#4ade80; font-size:12px;">
                             ${allProducts.length} products
-                            ${assignedCount > 0 ? `<span style="color:#10b981; margin-left:8px;">7½7 ${assignedCount} assigned</span>` : ''}
-                            ${creatorCount > 0 ? `<span style="color:#4ade80; margin-left:8px;">¡ñ ${creatorCount} creator</span>` : ''}
-                            ${recommendedCount > 0 ? `<span style="color:#8b5cf6; margin-left:8px;">¡ï ${recommendedCount} recommended</span>` : ''}
+                            ${assignedCount > 0 ? `<span style="color:#10b981; margin-left:8px;">ï¿½7ï¿½7 ${assignedCount} assigned</span>` : ''}
+                            ${creatorCount > 0 ? `<span style="color:#4ade80; margin-left:8px;">ï¿½ï¿½ ${creatorCount} creator</span>` : ''}
+                            ${recommendedCount > 0 ? `<span style="color:#8b5cf6; margin-left:8px;">ï¿½ï¿½ ${recommendedCount} recommended</span>` : ''}
                         </div>
                         <div style="font-size:10px; color:var(--text-muted);">
                             <span id="selectedCount">0</span> selected
@@ -2536,7 +2614,7 @@ async function showTask1SendLinkModal(creatorId) {
             </div>
             
             <div style="margin-bottom:12px;">
-                <input type="text" id="searchProductLink" placeholder="”9ä3 Cari produk..." 
+                <input type="text" id="searchProductLink" placeholder="ï¿½9ï¿½3 Cari produk..." 
                        style="width:100%; padding:8px 12px; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:10px; color:var(--text-primary); font-size:12px; outline:none;">
             </div>
             
@@ -2664,7 +2742,7 @@ async function showTask1SendLinkModal(creatorId) {
                 <i class="fas fa-edit" style="color: #f59e0b;"></i> Pesan WhatsApp
             </label>
             <textarea id="sendLinkMessage" rows="3" style="width:100%; padding:10px 12px; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:12px; color:var(--text-primary); font-size:12px; outline: none; transition: var(--transition); resize: vertical; font-family: inherit;">
-Halo! ”9Ð9
+Halo! ï¿½9ï¿½9
 
 Terima kasih telah bergabung dengan Toopai. 
 
@@ -2672,7 +2750,7 @@ Berikut adalah link afiliasi yang dapat Anda gunakan untuk mempromosikan produk:
 
 [LINK]
 
-Selamat berpromosi! •0‹4
+Selamat berpromosi! ï¿½0ï¿½4
 
 Tim Toopai
             </textarea>
@@ -2680,7 +2758,7 @@ Tim Toopai
             <div style="background:rgba(245,158,11,0.1); border-radius:10px; padding:10px 12px; margin-top:8px; border-left:3px solid #f59e0b;">
                 <span style="color:#f59e0b; font-size:10px; display:flex; align-items:center; gap:6px;">
                     <i class="fas fa-info-circle"></i> 
-                    ${hasPhone ? `Link akan dikirim via WhatsApp ke @${escapeHtml(c.username)}` : '7²2„1‚5 <strong>Nomor WhatsApp tidak tersedia!</strong> Silakan update nomor terlebih dahulu.'}
+                    ${hasPhone ? `Link akan dikirim via WhatsApp ke @${escapeHtml(c.username)}` : 'ï¿½7ï¿½2ï¿½1ï¿½5 <strong>Nomor WhatsApp tidak tersedia!</strong> Silakan update nomor terlebih dahulu.'}
                 </span>
             </div>
             
@@ -2702,7 +2780,7 @@ Tim Toopai
         body.innerHTML = html;
         
         // ============================================================
-        // ”9æ7 EVENT LISTENER: SEARCH PRODUCT
+        // ï¿½9ï¿½7 EVENT LISTENER: SEARCH PRODUCT
         // ============================================================
         const searchInput = document.getElementById('searchProductLink');
         if (searchInput) {
@@ -2720,7 +2798,7 @@ Tim Toopai
         }
         
         // ============================================================
-        // ”9æ7 EVENT DELEGATION: KLIK PADA PRODUCT ITEM
+        // ï¿½9ï¿½7 EVENT DELEGATION: KLIK PADA PRODUCT ITEM
         // ============================================================
         const productList = document.getElementById('productLinkList');
         if (productList) {
@@ -2770,12 +2848,12 @@ Tim Toopai
         }
         
         // ============================================================
-        // ”9æ7 INITIAL COUNT
+        // ï¿½9ï¿½7 INITIAL COUNT
         // ============================================================
         window.updateSelectedCount();
         
         // ============================================================
-        // ”9æ7 EVENT LISTENER: SEND BUTTON
+        // ï¿½9ï¿½7 EVENT LISTENER: SEND BUTTON
         // ============================================================
         document.getElementById('sendLinkConfirmBtn').addEventListener('click', async function() {
             const selected = document.querySelectorAll('.product-checkbox:checked');
@@ -2867,7 +2945,7 @@ Tim Toopai
                 }
                 
                 if (successCount > 0) {
-                    showToastGlobal(`7¼3 ${successCount} link berhasil dikirim!${failCount > 0 ? ` (${failCount} gagal)` : ''}`, 'success');
+                    showToastGlobal(`ï¿½7ï¿½3 ${successCount} link berhasil dikirim!${failCount > 0 ? ` (${failCount} gagal)` : ''}`, 'success');
                     
                     const phone = phoneText.replace(/[^0-9]/g, '');
                     const waUrl = 'https://wa.me/' + phone + '?text=' + encodeURIComponent(finalMessage);
@@ -2892,7 +2970,7 @@ Tim Toopai
         });
         
         // ============================================================
-        // ”9æ7 CLOSE MODAL ON OVERLAY CLICK
+        // ï¿½9ï¿½7 CLOSE MODAL ON OVERLAY CLICK
         // ============================================================
         modal.addEventListener('click', function(e) {
             if (e.target === this) {
@@ -2901,7 +2979,7 @@ Tim Toopai
         });
         
         // ============================================================
-        // ”9æ7 CLOSE MODAL ON ESC
+        // ï¿½9ï¿½7 CLOSE MODAL ON ESC
         // ============================================================
         const escHandler = function(e) {
             if (e.key === 'Escape') {
@@ -2994,7 +3072,7 @@ async function showTask1FollowUpModal(creatorId) {
         
         ${logs.length > 0 ? `
         <div style="margin-bottom:12px;">
-            <h4 style="color:var(--text-muted); font-size:11px; margin-bottom:6px;">”9ß5 Riwayat Pesan Terakhir:</h4>
+            <h4 style="color:var(--text-muted); font-size:11px; margin-bottom:6px;">ï¿½9ï¿½5 Riwayat Pesan Terakhir:</h4>
             <div style="max-height:80px; overflow-y:auto; background:var(--bg-elevated); border-radius:8px; padding:6px 10px; border:1px solid var(--border); font-size:10px;">
         ` : ''}
         
@@ -3014,13 +3092,13 @@ async function showTask1FollowUpModal(creatorId) {
             <i class="fas fa-edit" style="color: #f59e0b;"></i> Pesan Follow Up
         </label>
         <textarea id="followUpMessage" rows="4" style="width:100%; padding:10px 12px; background:var(--bg-elevated); border:1px solid var(--border); border-radius:12px; color:var(--text-primary); font-size:12px; outline: none; transition: var(--transition); resize: vertical; font-family: inherit;">
-Halo! ”9Ð9
+Halo! ï¿½9ï¿½9
 
 Kami dari Toopai ingin menanyakan apakah link afiliasi yang kami kirim sudah diterima?
 
 Jangan ragu untuk menghubungi kami jika ada pertanyaan atau kendala.
 
-Terima kasih! •0†5
+Terima kasih! ï¿½0ï¿½5
 
 Tim Toopai
         </textarea>
@@ -3068,7 +3146,7 @@ Tim Toopai
             const result = await response.json();
             
             if (result.success) {
-                showToastGlobal('7¼3 Follow up berhasil dikirim!', 'success');
+                showToastGlobal('ï¿½7ï¿½3 Follow up berhasil dikirim!', 'success');
                 if (result.redirect_url) {
                     window.open(result.redirect_url, '_blank');
                 }
@@ -3900,7 +3978,7 @@ function renderSearchResults(task, creators, container) {
                             ${escapeHtml(creator.username)}
                             ${isTask2 ? `
                                 ${dealStatus === 'ready' ? '<span class="deal-ready"><i class="fas fa-circle"></i> READY TO CLAIM</span>' : ''}
-                                ${dealStatus === 'no_handler' ? '<span class="deal-ready" style="background: rgba(239,68,68,0.2); color: #ef4444; animation: pulse-red 2s infinite;"><i class="fas fa-circle"></i> NO HANDLER ”9æ7</span>' : ''}
+                                ${dealStatus === 'no_handler' ? '<span class="deal-ready" style="background: rgba(239,68,68,0.2); color: #ef4444; animation: pulse-red 2s infinite;"><i class="fas fa-circle"></i> NO HANDLER ï¿½9ï¿½7</span>' : ''}
                             ` : ''}
                             ${isTask3 && creator.handler_name ? `<span style="font-size: 9px; color: var(--is-purple); margin-left: 6px;"><i class="fas fa-user-tie"></i> ${escapeHtml(creator.handler_name)}</span>` : ''}
                         </div>
@@ -3915,7 +3993,7 @@ function renderSearchResults(task, creators, container) {
                         ${creator.top_product ? `
                         <div class="is-item-product">
                             ${creator.top_product_image ? `<div class="product-thumb"><img src="${escapeHtml(creator.top_product_image)}" onerror="this.parentElement.style.display='none'"></div>` : ''}
-                            <span>•0“6 ${escapeHtml(creator.top_product.substring(0, 40))}...</span>
+                            <span>ï¿½0ï¿½6 ${escapeHtml(creator.top_product.substring(0, 40))}...</span>
                         </div>
                         ` : ''}
                         ${creator.brand_name ? `
@@ -4210,7 +4288,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         const updateResult = await updateResponse.json();
                         
                         if (updateResult.success) {
-                            showToastGlobal('7¼3 Nomor WA berhasil di-resync!', 'success');
+                            showToastGlobal('ï¿½7ï¿½3 Nomor WA berhasil di-resync!', 'success');
                             const phoneDisplay = document.getElementById('phoneDisplay_' + creatorId);
                             if (phoneDisplay) {
                                 phoneDisplay.innerHTML = `<i class="fab fa-whatsapp" style="color: #25D366;"></i> ${escapeHtml(found.phone)}`;
@@ -4305,68 +4383,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (formTask3) {
         formTask3.addEventListener('submit', async function(e) {
             e.preventDefault();
-            
-            const username = document.getElementById('task3Username').value.trim();
-            const fullName = document.getElementById('task3FullName').value.trim();
-            const category = document.getElementById('task3Category').value;
-            const phone = document.getElementById('task3Phone').value.trim();
-            const email = document.getElementById('task3Email').value.trim();
-            const followers = document.getElementById('task3Followers').value.trim();
-            const brandId = document.getElementById('task3Brand').value;
-            
-            if (!username) {
-                showToastGlobal('Username TikTok wajib diisi!', 'error');
-                document.getElementById('task3Username').style.borderColor = '#ef4444';
-                setTimeout(() => document.getElementById('task3Username').style.borderColor = '', 2000);
-                return;
-            }
-            
-            const btn = document.getElementById('submitTask3Btn');
-            const originalText = btn.innerHTML;
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-pulse"></i> Menambahkan...';
-            
-            try {
-                const formData = new FormData();
-                formData.append('username', username.replace('@', ''));
-                formData.append('full_name', fullName);
-                formData.append('category', category);
-                formData.append('phone', phone);
-                formData.append('email', email);
-                formData.append('follower_count', followers || 0);
-                formData.append('brand_id', brandId);
-                
-                if (brandId) {
-                    const brandSelect = document.getElementById('task3Brand');
-                    const shopName = brandSelect.options[brandSelect.selectedIndex]?.text || '';
-                    formData.append('shop_name', shopName);
-                }
-                
-                const response = await fetch(BASE_URL + 'is/add_creator_task3', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    showToastGlobal(result.message, 'success');
-                    setTimeout(() => {
-                        closeAddCreatorTask3();
-                        location.reload();
-                    }, 1500);
-                } else {
-                    showToastGlobal(result.message || 'Gagal menambahkan creator', 'error');
-                    btn.disabled = false;
-                    btn.innerHTML = originalText;
-                }
-                
-            } catch (error) {
-                console.error('Error:', error);
-                showToastGlobal('Error: ' + error.message, 'error');
-                btn.disabled = false;
-                btn.innerHTML = originalText;
-            }
+            await submitCreatorForm('task3');
         });
     }
     
@@ -4377,68 +4394,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (formTask1) {
         formTask1.addEventListener('submit', async function(e) {
             e.preventDefault();
-            
-            const username = document.getElementById('creatorUsernameIS').value.trim();
-            const fullName = document.getElementById('creatorNameIS').value.trim();
-            const category = document.getElementById('creatorCategoryIS').value;
-            const phone = document.getElementById('creatorPhoneIS').value.trim();
-            const email = document.getElementById('creatorEmailIS').value.trim();
-            const followers = document.getElementById('creatorFollowersIS').value.trim();
-            const brandId = document.getElementById('creatorBrandIS').value;
-            
-            if (!username) {
-                showToastGlobal('Username TikTok wajib diisi!', 'error');
-                document.getElementById('creatorUsernameIS').style.borderColor = '#ef4444';
-                setTimeout(() => document.getElementById('creatorUsernameIS').style.borderColor = '', 2000);
-                return;
-            }
-            
-            const btn = document.getElementById('saveCreatorBtnIS');
-            const originalText = btn.innerHTML;
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-pulse"></i> Menambahkan...';
-            
-            try {
-                const formData = new FormData();
-                formData.append('username', username.replace('@', ''));
-                formData.append('full_name', fullName);
-                formData.append('category', category);
-                formData.append('phone', phone);
-                formData.append('email', email);
-                formData.append('follower_count', followers || 0);
-                formData.append('brand_id', brandId);
-                
-                if (brandId) {
-                    const brandSelect = document.getElementById('creatorBrandIS');
-                    const shopName = brandSelect.options[brandSelect.selectedIndex]?.text || '';
-                    formData.append('shop_name', shopName);
-                }
-                
-                const response = await fetch(BASE_URL + 'is/add_creator', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    showToastGlobal(result.message, 'success');
-                    setTimeout(() => {
-                        closeModalIS();
-                        location.reload();
-                    }, 1500);
-                } else {
-                    showToastGlobal(result.message || 'Gagal menambahkan creator', 'error');
-                    btn.disabled = false;
-                    btn.innerHTML = originalText;
-                }
-                
-            } catch (error) {
-                console.error('Error:', error);
-                showToastGlobal('Error: ' + error.message, 'error');
-                btn.disabled = false;
-                btn.innerHTML = originalText;
-            }
+            await submitCreatorForm('task1');
         });
     }
     
@@ -4473,3 +4429,664 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('Dashboard initialization complete');
 });
 </script>
+
+<!-- ============================================================ -->
+<!-- MODAL: KONFIRMASI DUPLIKAT NOMOR HP -->
+<!-- ============================================================ -->
+<div id="phoneDuplicateModal" style="
+    display:none; position:fixed; inset:0; z-index:99999;
+    background:rgba(0,0,0,0.7); backdrop-filter:blur(4px);
+    align-items:center; justify-content:center;">
+    <div style="
+        background:#1a1f2e; border:1px solid rgba(139,92,246,0.3);
+        border-radius:20px; padding:28px; max-width:480px; width:95%;
+        box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+
+        <!-- Header -->
+        <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+            <div style="width:42px;height:42px;background:rgba(245,158,11,0.15);border-radius:12px;
+                        display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <i class="fas fa-exclamation-triangle" style="color:#f59e0b;font-size:18px;"></i>
+            </div>
+            <div>
+                <h4 style="color:#f59e0b;margin:0;font-size:15px;font-weight:700;">Nomor HP Sudah Terdaftar</h4>
+                <p style="color:#9aaebe;margin:0;font-size:12px;">Ditemukan creator lain dengan nomor yang sama</p>
+            </div>
+        </div>
+
+        <!-- List matches -->
+        <div id="phoneDuplicateList" style="
+            background:rgba(255,255,255,0.04); border-radius:12px;
+            padding:12px; margin-bottom:16px; max-height:220px; overflow-y:auto;"></div>
+
+        <!-- Pertanyaan konfirmasi -->
+        <p style="color:#e2e8f0;font-size:13px;margin-bottom:20px;line-height:1.6;">
+            Apakah kamu yakin ingin tetap menyimpan data ini?
+        </p>
+
+        <!-- Tombol -->
+        <div style="display:flex;gap:10px;">
+            <button onclick="closePhoduplicateModal()"
+                style="flex:1;background:rgba(255,255,255,0.06);color:#9aaebe;
+                       padding:11px;border-radius:40px;border:1px solid rgba(255,255,255,0.1);
+                       cursor:pointer;font-weight:600;font-size:13px;">
+                <i class="fas fa-times"></i> Batal
+            </button>
+            <button id="phoneDuplicateConfirmBtn"
+                style="flex:1;background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;
+                       padding:11px;border-radius:40px;border:none;
+                       cursor:pointer;font-weight:600;font-size:13px;">
+                <i class="fas fa-check"></i> Ya, Simpan Tetap
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ============================================================
+// PHONE DUPLICATE MODAL HELPERS
+// ============================================================
+const _statusLabel = {
+    PENDING:       {text:'Scouting',   color:'#8b5cf6'},
+    LINK_SENT:     {text:'Link Sent',  color:'#3b82f6'},
+    LINK_SWAPPING: {text:'Swapping',   color:'#06b6d4'},
+    APPROVED:      {text:'Approved',   color:'#10b981'},
+    ACTIVE:        {text:'Monitoring', color:'#10b981'},
+    REJECTED:      {text:'Rejected',   color:'#ef4444'},
+};
+
+function closePhoduplicateModal() {
+    document.getElementById('phoneDuplicateModal').style.display = 'none';
+}
+
+// ============================================================
+// SHARED SUBMIT FUNCTION (task1 & task3)
+// ============================================================
+async function submitCreatorForm(taskType, forceSave = false) {
+    const isTask1 = taskType === 'task1';
+
+    const usernameEl  = document.getElementById(isTask1 ? 'creatorUsernameIS' : 'task3Username');
+    const fullNameEl  = document.getElementById(isTask1 ? 'creatorNameIS'     : 'task3FullName');
+    const categoryEl  = document.getElementById(isTask1 ? 'creatorCategoryIS' : 'task3Category');
+    const phoneEl     = document.getElementById(isTask1 ? 'creatorPhoneIS'    : 'task3Phone');
+    const emailEl     = document.getElementById(isTask1 ? 'creatorEmailIS'    : 'task3Email');
+    const followersEl = document.getElementById(isTask1 ? 'creatorFollowersIS': 'task3Followers');
+    const brandEl     = document.getElementById(isTask1 ? 'creatorBrandIS'    : 'task3Brand');
+    const btn         = document.getElementById(isTask1 ? 'saveCreatorBtnIS'  : 'submitTask3Btn');
+    const endpoint    = isTask1 ? 'is/add_creator' : 'is/add_creator_task3';
+    const closeFn     = isTask1 ? closeModalIS      : closeAddCreatorTask3;
+
+    const username = usernameEl.value.trim();
+    if (!username) {
+        showToastGlobal('Username TikTok wajib diisi!', 'error');
+        usernameEl.style.borderColor = '#ef4444';
+        setTimeout(() => usernameEl.style.borderColor = '', 2000);
+        return;
+    }
+
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-pulse"></i> Menambahkan...';
+
+    try {
+        const formData = new FormData();
+        formData.append('username',       username.replace('@', ''));
+        formData.append('full_name',      fullNameEl.value.trim());
+        formData.append('category',       categoryEl.value);
+        formData.append('phone',          phoneEl.value.trim());
+        formData.append('email',          emailEl.value.trim());
+        formData.append('follower_count', followersEl.value.trim() || 0);
+        formData.append('brand_id',       brandEl.value);
+        formData.append('force_save',     forceSave ? '1' : '0');
+
+        if (brandEl.value) {
+            formData.append('shop_name', brandEl.options[brandEl.selectedIndex]?.text || '');
+        }
+        if (isTask1) {
+            const gmvEl = document.getElementById('creatorGmvIS');
+            if (gmvEl) formData.append('gmv', gmvEl.value.trim());
+        }
+
+        const response = await fetch(BASE_URL + endpoint, { method: 'POST', body: formData });
+        const result   = await response.json();
+
+        // --- Phone duplicate: tampilkan modal konfirmasi ---
+        if (!result.success && result.phone_duplicate) {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+
+            // Render daftar creator yang memiliki nomor sama
+            const list = document.getElementById('phoneDuplicateList');
+            list.innerHTML = (result.matches || []).map(c => {
+                const sl = _statusLabel[c.status] || {text: c.status, color: '#9aaebe'};
+                return `
+                <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06);">
+                    <div style="width:34px;height:34px;border-radius:50%;background:rgba(139,92,246,0.2);
+                                display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                        <i class="fab fa-tiktok" style="color:#8b5cf6;font-size:14px;"></i>
+                    </div>
+                    <div style="flex:1;min-width:0;">
+                        <div style="color:#e2e8f0;font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                            ${escapeHtml(c.full_name || c.username)}
+                        </div>
+                        <div style="color:#9aaebe;font-size:11px;">
+                            @${escapeHtml(c.username)}
+                            &nbsp;Â·&nbsp;
+                            <i class="fab fa-whatsapp" style="color:#25d366;"></i>
+                            ${escapeHtml(c.phone)}
+                        </div>
+                    </div>
+                    <span style="background:rgba(255,255,255,0.05);color:${sl.color};
+                                 padding:3px 8px;border-radius:20px;font-size:11px;font-weight:600;
+                                 border:1px solid ${sl.color}33;white-space:nowrap;">
+                        ${sl.text}
+                    </span>
+                </div>`;
+            }).join('');
+
+            // Daftarkan handler tombol "Ya, Simpan Tetap"
+            const confirmBtn = document.getElementById('phoneDuplicateConfirmBtn');
+            confirmBtn.onclick = async function() {
+                closePhoduplicateModal();
+                await submitCreatorForm(taskType, true); // force_save = true
+            };
+
+            document.getElementById('phoneDuplicateModal').style.display = 'flex';
+            return;
+        }
+
+        // --- Sukses ---
+        if (result.success) {
+            showToastGlobal(result.message, 'success');
+            setTimeout(() => { closeFn(); location.reload(); }, 1500);
+        } else {
+            showToastGlobal(result.message || 'Gagal menambahkan creator', 'error');
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+
+    } catch (error) {
+        console.error('Error:', error);
+        showToastGlobal('Error: ' + error.message, 'error');
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
+}
+
+// Tutup phone duplicate modal saat klik overlay
+document.getElementById('phoneDuplicateModal').addEventListener('click', function(e) {
+    if (e.target === this) closePhoduplicateModal();
+});
+</script>
+
+<!-- ============================================================ -->
+<!-- AUTO SCOUTING JS -->
+<!-- ============================================================ -->
+<script>
+(function() {
+    // ============================================================
+    // STATE
+    // ============================================================
+    let _scoutingOffset   = 0;
+    const _scoutingLimit  = 50;
+    let _scoutingTotal    = 0;
+    let _scoutingTimer    = null;
+    let _scoutingLoading  = false;
+    let _scoutingObserver = null;
+
+    // ============================================================
+    // HELPERS
+    // ============================================================
+    function _fmtRp(val) {
+        return 'Rp ' + Number(val || 0).toLocaleString('id-ID');
+    }
+    function _fmtNum(val) {
+        const n = Number(val || 0);
+        if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+        if (n >= 1000)    return (n / 1000).toFixed(1) + 'K';
+        return String(n);
+    }
+    function _srcBadge(src) {
+        if (src === 'fastmoss')   return {icon:'fas fa-database', color:'#f59e0b', label:'FastMoss'};
+        if (src === 'tiktok_api') return {icon:'fab fa-tiktok',   color:'#e2e8f0', label:'TikTok API'};
+        return                           {icon:'fas fa-chart-bar',color:'#34d399', label:'Dari Order'};
+    }
+
+    // ============================================================
+    // RENDER SATU KARTU â€” lebar tetap agar scroll horizontal rapi
+    // ============================================================
+    function _renderCard(item) {
+        const src   = _srcBadge(item.source);
+        const phone = item.phone
+            ? `<span style="color:#25d366;"><i class="fab fa-whatsapp"></i> ${escapeHtml(item.phone)}</span>`
+            : `<span style="color:#ef4444;font-size:10px;"><i class="fas fa-exclamation-circle"></i> WA tidak tersedia</span>`;
+
+        const avatar = item.avatar_url
+            ? `<img src="${escapeHtml(item.avatar_url)}" alt=""
+                    style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0;"
+                    onerror="this.outerHTML='<div style=\'width:36px;height:36px;border-radius:50%;background:rgba(139,92,246,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;\'><i class=\'fab fa-tiktok\' style=\'color:#8b5cf6;\'></i></div>'">`
+            : `<div style="width:36px;height:36px;border-radius:50%;background:rgba(139,92,246,0.2);
+                           display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                   <i class="fab fa-tiktok" style="color:#8b5cf6;"></i>
+               </div>`;
+
+        const prodImg = item.product_image
+            ? `<img src="${escapeHtml(item.product_image)}" alt=""
+                    style="width:26px;height:26px;border-radius:6px;object-fit:cover;flex-shrink:0;"
+                    onerror="this.style.display='none'">`
+            : '';
+
+        return `
+        <div data-scouting-id="${item.id}"
+             style="flex:0 0 260px; width:260px;
+                    background:rgba(9,17,34,0.75);border:1px solid rgba(112,136,185,0.14);
+                    border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:8px;
+                    transition:border-color .2s, transform .15s;">
+
+            <!-- Row 1: Avatar + Username + Source -->
+            <div style="display:flex;align-items:center;gap:8px;">
+                ${avatar}
+                <div style="flex:1;min-width:0;">
+                    <div style="font-size:12px;font-weight:700;color:var(--text-primary);
+                                overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                        <i class="fab fa-tiktok" style="color:#8b5cf6;font-size:10px;"></i>
+                        @${escapeHtml(item.username)}
+                    </div>
+                    ${item.full_name && item.full_name !== item.username
+                        ? `<div style="font-size:10px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(item.full_name)}</div>`
+                        : ''}
+                </div>
+                <span style="background:rgba(255,255,255,0.05);color:${src.color};
+                             padding:2px 6px;border-radius:12px;font-size:9px;font-weight:600;
+                             border:1px solid ${src.color}33;white-space:nowrap;flex-shrink:0;">
+                    <i class="${src.icon}"></i>
+                </span>
+            </div>
+
+            <!-- Row 2: Brand + Campaign badges -->
+            <div style="display:flex;flex-wrap:wrap;gap:4px;">
+                ${item.brand_name
+                    ? `<span style="background:rgba(74,222,128,0.1);color:#4ade80;
+                                   padding:2px 7px;border-radius:10px;font-size:9px;
+                                   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:120px;">
+                           <i class="fas fa-store" style="font-size:8px;"></i> ${escapeHtml(item.brand_name)}
+                       </span>`
+                    : ''}
+                ${item.campaign_name
+                    ? `<span style="background:rgba(59,130,246,0.1);color:#60a5fa;
+                                   padding:2px 7px;border-radius:10px;font-size:9px;
+                                   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:120px;">
+                           <i class="fas fa-bullhorn" style="font-size:8px;"></i> ${escapeHtml(item.campaign_name)}
+                       </span>`
+                    : ''}
+                ${item.status === 'contacted'
+                    ? `<span style="background:rgba(139,92,246,0.1);color:#a78bfa;
+                                   padding:2px 7px;border-radius:10px;font-size:9px;
+                                   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:240px;width:100%;display:inline-flex;align-items:center;gap:3px;" 
+                                   title="Dihubungi oleh ${escapeHtml(item.contacted_by_name || 'CA')}">
+                           <i class="fas fa-paper-plane" style="font-size:8px;"></i> Dihubungi: ${escapeHtml(item.contacted_by_name || 'CA')}
+                       </span>`
+                    : ''}
+            </div>
+
+            <!-- Row 3: Produk -->
+            ${item.product_name ? `
+            <div style="display:flex;align-items:center;gap:6px;
+                        background:rgba(255,255,255,0.03);border-radius:8px;
+                        padding:6px 8px;border:1px solid rgba(255,255,255,0.05);">
+                ${prodImg}
+                <div style="flex:1;min-width:0;">
+                    <div style="font-size:9px;color:var(--text-secondary);">Produk dijual</div>
+                    <div style="font-size:10px;font-weight:600;color:var(--text-primary);
+                                overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                        ${escapeHtml(item.product_name)}
+                    </div>
+                </div>
+            </div>` : ''}
+
+            <!-- Row 4: GMV + Sales -->
+            <div style="display:flex;gap:6px;">
+                <div style="flex:1;text-align:center;background:rgba(251,191,36,0.08);
+                            border-radius:8px;padding:5px 2px;">
+                    <div style="color:#fbbf24;font-weight:700;font-size:12px;
+                                overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                        ${_fmtRp(item.gmv)}
+                    </div>
+                    <div style="color:var(--text-secondary);font-size:9px;">GMV</div>
+                </div>
+                <div style="flex:1;text-align:center;background:rgba(59,130,246,0.08);
+                            border-radius:8px;padding:5px 2px;">
+                    <div style="color:#60a5fa;font-weight:700;font-size:12px;">${_fmtNum(item.sales_count)}</div>
+                    <div style="color:var(--text-secondary);font-size:9px;">Terjual</div>
+                </div>
+                ${item.follower_count > 0 ? `
+                <div style="flex:1;text-align:center;background:rgba(167,139,250,0.08);
+                            border-radius:8px;padding:5px 2px;">
+                    <div style="color:#a78bfa;font-weight:700;font-size:12px;">${_fmtNum(item.follower_count)}</div>
+                    <div style="color:var(--text-secondary);font-size:9px;">Followers</div>
+                </div>` : ''}
+            </div>
+
+            <!-- Row 5: WA -->
+            <div style="font-size:10px;">${phone}</div>
+
+            <!-- Row 6: Tombol aksi -->
+            <div style="display:flex;gap:6px;margin-top:auto;">
+                ${item.status === 'contacted' ? `
+                    <button onclick="scoutingContact(${item.id})"
+                        style="flex:1;padding:7px 4px;background:rgba(139,92,246,0.15);
+                               color:#a78bfa;border:1px solid rgba(139,92,246,0.3);border-radius:16px;cursor:pointer;
+                               font-size:11px;font-weight:600;display:inline-flex;align-items:center;
+                               justify-content:center;gap:4px;">
+                        <i class="fab fa-whatsapp"></i> Hubungi Lagi
+                    </button>
+                ` : `
+                    <button onclick="scoutingContact(${item.id})"
+                        style="flex:1;padding:7px 4px;background:linear-gradient(135deg,#8b5cf6,#3b82f6);
+                               color:#fff;border:none;border-radius:16px;cursor:pointer;
+                               font-size:11px;font-weight:600;display:inline-flex;align-items:center;
+                               justify-content:center;gap:4px;">
+                        <i class="fab fa-whatsapp"></i> Hubungi
+                    </button>
+                `}
+                <button onclick="scoutingIgnore(${item.id})"
+                    style="padding:7px 10px;background:rgba(239,68,68,0.1);color:#ef4444;
+                           border:1px solid rgba(239,68,68,0.2);border-radius:16px;
+                           cursor:pointer;font-size:11px;">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>`;
+    }
+
+    // ============================================================
+    // LOAD SCOUTING LIST
+    // ============================================================
+    window.loadScoutingList = function(reset = true) {
+        if (_scoutingLoading) return;
+        if (reset) _scoutingOffset = 0;
+
+        const grid   = document.getElementById('scoutingListGrid');
+        const brand  = document.getElementById('scoutingBrandFilter')?.value  || '';
+        const source = document.getElementById('scoutingSourceFilter')?.value || '';
+        const search = document.getElementById('scoutingSearch')?.value        || '';
+
+        if (reset) {
+            grid.innerHTML = `
+            <div class="scouting-loading-placeholder"
+                 style="width: 100%; text-align: center; padding: 40px 20px;
+                        color: var(--text-secondary); display: flex; flex-direction: column;
+                        align-items: center; justify-content: center; flex-shrink: 0;">
+                <i class="fas fa-spinner fa-pulse fa-2x"
+                   style="color:rgba(139,92,246,0.4);margin-bottom:12px;display:block;"></i>
+                Memuat...
+            </div>`;
+        }
+
+        _scoutingLoading = true;
+
+        const params = new URLSearchParams({
+            limit:  _scoutingLimit,
+            offset: _scoutingOffset,
+            ...(brand  && { brand_id: brand }),
+            ...(source && { source }),
+            ...(search && { search }),
+        });
+
+        fetch(BASE_URL + 'is/get_scouting_list?' + params.toString())
+            .then(r => r.json())
+            .then(res => {
+                _scoutingLoading = false;
+                console.log('[Scouting] Response:', res);
+                if (!res.success) {
+                    console.warn('[Scouting] success=false:', res);
+                    return;
+                }
+
+                _scoutingTotal = res.total || 0;
+                document.getElementById('scoutingBadgeCount').textContent = _scoutingTotal;
+
+                // Populate brand filter dropdown (sekali saja)
+                const bf = document.getElementById('scoutingBrandFilter');
+                if (bf && bf.options.length <= 1 && res.brands?.length) {
+                    res.brands.forEach(b => bf.appendChild(new Option(b.brand_name, b.brand_id)));
+                }
+
+                // Bersihkan loading placeholder
+                if (reset) grid.innerHTML = '';
+
+                if (!res.data?.length && reset) {
+                    grid.innerHTML = `
+                    <div style="width: 100%; display: flex; justify-content: center; padding: 10px 0;">
+                        <div style="min-width:300px; text-align:center; padding:48px 24px;
+                                    border:1px dashed rgba(139,92,246,0.2);border-radius:14px;flex-shrink:0;">
+                            <i class="fas fa-robot"
+                               style="font-size:32px;color:rgba(139,92,246,0.3);margin-bottom:10px;display:block;"></i>
+                            <div style="color:var(--text-primary);font-weight:600;margin-bottom:4px;font-size:13px;">
+                                Belum ada data scouting
+                            </div>
+                            <div style="color:var(--text-secondary);font-size:11px;">
+                                Klik <strong>Perbarui</strong> untuk mengambil data creator dari riwayat order brand aktif.
+                            </div>
+                        </div>
+                    </div>`;
+                    _disconnectObserver();
+                    return;
+                }
+
+                res.data.forEach(item => {
+                    grid.insertAdjacentHTML('beforeend', _renderCard(item));
+                });
+
+                _scoutingOffset += res.data.length;
+
+                // Tidak load lebih dari _scoutingLimit (50 teratas GMV sudah cukup)
+                _disconnectObserver();
+
+                // Tampilkan/sembunyikan fade kanan
+                _updateFade();
+            })
+            .catch(() => { _scoutingLoading = false; });
+    };
+
+    // ============================================================
+    // INFINITE SCROLL via IntersectionObserver
+    // ============================================================
+    function _setupObserver() {
+        _disconnectObserver();
+        const sentinel = document.getElementById('scoutingLoadMore');
+        if (!sentinel) return;
+        sentinel.style.display = 'block';
+
+        _scoutingObserver = new IntersectionObserver(entries => {
+            if (entries[0].isIntersecting && !_scoutingLoading) {
+                loadScoutingList(false);
+            }
+        }, { threshold: 0.1 });
+
+        _scoutingObserver.observe(sentinel);
+    }
+
+    function _disconnectObserver() {
+        if (_scoutingObserver) { _scoutingObserver.disconnect(); _scoutingObserver = null; }
+        const s = document.getElementById('scoutingLoadMore');
+        if (s) s.style.display = 'none';
+    }
+
+    // Scroll horizontal juga trigger load-more saat hampir di ujung kanan
+    function _onScrollGrid(e) {
+        const el = e.target;
+        if (el.scrollLeft + el.clientWidth >= el.scrollWidth - 80) {
+            if (!_scoutingLoading && _scoutingOffset < _scoutingTotal) {
+                loadScoutingList(false);
+            }
+        }
+        _updateFade();
+    }
+
+    function _updateFade() {
+        const grid  = document.getElementById('scoutingListGrid');
+        const fade  = document.getElementById('scoutingFadeRight');
+        if (!grid || !fade) return;
+        const atEnd = grid.scrollLeft + grid.clientWidth >= grid.scrollWidth - 10;
+        fade.style.opacity = atEnd ? '0' : '1';
+    }
+
+    // ============================================================
+    // DEBOUNCE SEARCH
+    // ============================================================
+    window.debounceScoutingSearch = function() {
+        clearTimeout(_scoutingTimer);
+        _scoutingTimer = setTimeout(() => loadScoutingList(true), 400);
+    };
+
+    // ============================================================
+    // REFRESH (manual populate dari server)
+    // ============================================================
+    window.refreshScoutingList = function() {
+        const btn  = document.getElementById('refreshScoutingBtn');
+        const icon = document.getElementById('refreshScoutingIcon');
+        if (btn) { btn.disabled = true; icon.classList.add('fa-spin'); }
+
+        fetch(BASE_URL + 'is/refresh_scouting_list', { method: 'POST' })
+            .then(r => r.json())
+            .then(res => {
+                showToastGlobal(res.message || 'Selesai', res.success ? 'success' : 'error');
+                if (res.success) loadScoutingList(true);
+            })
+            .catch(() => showToastGlobal('Gagal menghubungi server', 'error'))
+            .finally(() => {
+                if (btn) { btn.disabled = false; icon.classList.remove('fa-spin'); }
+            });
+    };
+
+    // ============================================================
+    // CONTACT CREATOR (WhatsApp Outreach & update status)
+    // ============================================================
+    window.scoutingContact = function(scoutingId) {
+        const card = document.querySelector(`[data-scouting-id="${scoutingId}"]`);
+        const btn  = card?.querySelector('button');
+        const orig = btn?.innerHTML;
+        
+        // Cek jika nomor WA tidak tersedia (ditandai dengan text 'WA tidak tersedia' pada kartu)
+        const hasPhone = card?.innerHTML.includes('fa-whatsapp') === true;
+        
+        let inputPhone = '';
+        if (!hasPhone) {
+            inputPhone = prompt('Nomor WhatsApp creator tidak tersedia. Silakan masukkan nomor WhatsApp creator (contoh: 08123456789):');
+            if (inputPhone === null) return; // Klik Batal
+            if (inputPhone.trim() === '') {
+                showToastGlobal('Nomor WhatsApp wajib diisi!', 'error');
+                return;
+            }
+        }
+
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-pulse"></i>'; }
+
+        const fd = new FormData();
+        fd.append('scouting_id', scoutingId);
+        if (inputPhone) {
+            fd.append('phone', inputPhone.trim());
+        }
+
+        fetch(BASE_URL + 'is/get_scouting_contact_link', { method: 'POST', body: fd })
+            .then(r => r.json())
+            .then(res => {
+                if (res.success) {
+                    window.open(res.redirect_url, '_blank');
+                    showToastGlobal('WhatsApp dibuka & status diperbarui!', 'success');
+                    setTimeout(() => {
+                        loadScoutingList(true);
+                    }, 1000);
+                } else {
+                    showToastGlobal(res.message || 'Gagal', 'error');
+                    if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+                }
+            })
+            .catch(() => {
+                showToastGlobal('Gagal menghubungi server', 'error');
+                if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+            });
+    };
+
+    // ============================================================
+    // ONBOARD
+    // ============================================================
+    window.scoutingOnboard = function(scoutingId) {
+        const card = document.querySelector(`[data-scouting-id="${scoutingId}"]`);
+        const btn  = card?.querySelector('button');
+        const orig = btn?.innerHTML;
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-pulse"></i>'; }
+
+        const fd = new FormData();
+        fd.append('scouting_id', scoutingId);
+
+        fetch(BASE_URL + 'is/onboard_creator_from_scouting', { method: 'POST', body: fd })
+            .then(r => r.json())
+            .then(res => {
+                if (res.success) {
+                    showToastGlobal(res.message, 'success');
+                    if (card) {
+                        card.style.transition = 'opacity .35s, transform .35s';
+                        card.style.opacity    = '0';
+                        card.style.transform  = 'scale(.9)';
+                        setTimeout(() => {
+                            card.remove();
+                            _scoutingTotal--;
+                            document.getElementById('scoutingBadgeCount').textContent = _scoutingTotal;
+                            // Tarik kartu baru jika row jadi pendek
+                            if (_scoutingOffset < _scoutingTotal) loadScoutingList(false);
+                        }, 350);
+                    }
+                } else {
+                    showToastGlobal(res.message || 'Gagal', 'error');
+                    if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+                }
+            })
+            .catch(() => {
+                showToastGlobal('Gagal', 'error');
+                if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+            });
+    };
+
+    // ============================================================
+    // IGNORE
+    // ============================================================
+    window.scoutingIgnore = function(scoutingId) {
+        const card = document.querySelector(`[data-scouting-id="${scoutingId}"]`);
+        const fd   = new FormData();
+        fd.append('scouting_id', scoutingId);
+
+        fetch(BASE_URL + 'is/ignore_scouting_creator', { method: 'POST', body: fd })
+            .then(r => r.json())
+            .then(res => {
+                if (res.success && card) {
+                    card.style.transition = 'opacity .3s';
+                    card.style.opacity    = '0';
+                    setTimeout(() => {
+                        card.remove();
+                        _scoutingTotal--;
+                        document.getElementById('scoutingBadgeCount').textContent = _scoutingTotal;
+                        if (_scoutingOffset < _scoutingTotal) loadScoutingList(false);
+                    }, 300);
+                }
+            });
+    };
+
+    // ============================================================
+    // INIT
+    // ============================================================
+    document.addEventListener('DOMContentLoaded', function() {
+        loadScoutingList(true);
+
+        // Pasang scroll listener setelah DOM ready
+        setTimeout(() => {
+            const grid = document.getElementById('scoutingListGrid');
+            if (grid) grid.addEventListener('scroll', _onScrollGrid, { passive: true });
+        }, 500);
+    });
+
+})();
+</script>
+
+

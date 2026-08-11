@@ -38,6 +38,13 @@ $route['is'] = 'is/index';
 $route['is/dashboard'] = 'is/dashboard';
 $route['is/creators'] = 'is/creators';
 $route['is/add_creator'] = 'is/add_creator';
+$route['is/check_phone_exists'] = 'is/check_phone_exists';
+
+// IS — Auto Creator Scouting
+$route['is/get_scouting_list']              = 'is/get_scouting_list';
+$route['is/onboard_creator_from_scouting']  = 'is/onboard_creator_from_scouting';
+$route['is/ignore_scouting_creator']        = 'is/ignore_scouting_creator';
+$route['is/refresh_scouting_list']          = 'is/refresh_scouting_list';
 $route['is/get_creator_detail'] = 'is/get_creator_detail';
 $route['is/approve_creator'] = 'is/approve_creator';
 $route['is/generate_affiliate_links'] = 'is/generate_affiliate_links';
@@ -54,6 +61,9 @@ $route['bd/send_whatsapp'] = 'bd/send_whatsapp';
 $route['bd/complete_task'] = 'bd/complete_task';
 
 // TTS Authorization Routes
+// Cron Discovery — Auto Scouting
+$route['cron_discovery/populate_scouting_list'] = 'cron_discovery/populate_scouting_list';
+
 $route['tts/authorize_affiliate']  = 'tts/authorize_affiliate';
 $route['tts/callback_affiliate']   = 'tts/callback_affiliate';
 $route['tts/authorize_seller']     = 'tts/authorize_seller';

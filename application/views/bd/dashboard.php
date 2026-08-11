@@ -2981,8 +2981,54 @@ async function showTask3SetupModalWithRecommendations(brandId, brandName) {
         currentCampaignIdForSetup = pendingProducts[0].campaign_id;
         currentCampaignNameForSetup = pendingProducts[0].campaign_name || 'Campaign';
     }
+      // 馃敟 CLAIM BRAND UI
+    let claimHtml = '';
+    let disableApproval = false;
     
-    // 🔥 BUILD CAMPAIGN INFO HTML
+    if (result.brand_status === 'NEED_CLAIM' || (result.owner_id === null && result.can_claim !== undefined && result.brand_status === 'NEED_CLAIM')) {
+        if (result.can_claim) {
+            // BA yang pernah kontak, tapi belum claim
+            claimHtml = `
+                <div style="background:rgba(239,68,68,0.1); border-radius:12px; padding:16px; margin-bottom:16px; border:1px solid #ef4444; display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <div style="color:#ef4444; font-size:14px; font-weight:bold; margin-bottom:4px;">
+                            <i class="fas fa-hand-paper"></i> Brand Ini Membutuhkan Claim!
+                        </div>
+                        <div style="color:#9aaebe; font-size:12px;">
+                            Sistem mendeteksi bahwa brand ini dihubungi oleh lebih dari 1 BA. Silakan claim jika ini brand Anda.
+                        </div>
+                        <div style="margin-top: 8px; font-size: 11px; color: #ef4444;">
+                            <strong>Dihubungi oleh BA:</strong> ${result.contacted_bas ? result.contacted_bas.join(', ') : '-'}
+                        </div>
+                    </div>
+                    <div>
+                        <button id="claimBrandBtn" data-brand-id="${brandId}" style="background:#ef4444; color:white; padding:10px 20px; border-radius:40px; border:none; cursor:pointer; font-weight:bold;">
+                            <i class="fas fa-lock"></i> Claim Brand
+                        </button>
+                    </div>
+                </div>
+            `;
+            disableApproval = true;
+        } else if (isSupervisor) {
+            // Head BA (Admin) melihat warning
+            claimHtml = `
+                <div style="background:rgba(245,158,11,0.1); border-radius:12px; padding:16px; margin-bottom:16px; border:1px solid #f59e0b;">
+                    <div style="color:#fbbf24; font-size:14px; font-weight:bold; margin-bottom:4px;">
+                        <i class="fas fa-exclamation-triangle"></i> Menunggu Claim Ownership
+                    </div>
+                    <div style="color:#9aaebe; font-size:12px;">
+                        Brand ini sedang diperebutkan oleh lebih dari 1 BA. Menunggu BA terkait untuk melakukan Claim. Proses Setup Campaign dikunci sementara.
+                    </div>
+                    <div style="margin-top: 8px; font-size: 11px; color: #fbbf24;">
+                        <strong>Dihubungi oleh BA:</strong> ${result.contacted_bas ? result.contacted_bas.join(', ') : '-'}
+                    </div>
+                </div>
+            `;
+            disableApproval = true;
+        }
+    }
+    
+    // 馃敟 BUILD CAMPAIGN INFO HTML
     let campaignInfoHtml = '';
     if (currentCampaignIdForSetup) {
         campaignInfoHtml = `
@@ -3306,7 +3352,7 @@ async function showTask3SetupModalWithRecommendations(brandId, brandName) {
                     <!-- Header Produk -->
                     <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: #1a1f2e; border-bottom: 1px solid #2a3346;">
                         <div style="display: flex; align-items: center; gap: 12px;">
-                            ${isSupervisor && requirementsFilled ? `
+                            ${isSupervisor && requirementsFilled && !disableApproval ? `
                             <input type="checkbox" class="product-checkbox" 
                                    data-product-id="${product.product_id}" 
                                    data-campaign-id="${product.campaign_id}"
@@ -3325,7 +3371,7 @@ async function showTask3SetupModalWithRecommendations(brandId, brandName) {
                             </div>
                         </div>
                         
-                        ${isSupervisor && requirementsFilled ? `
+                        ${isSupervisor && requirementsFilled && !disableApproval ? `
                         <div style="display: flex; gap: 8px;">
                             <button class="approve-single-btn" data-product-id="${product.product_id}" data-campaign-id="${product.campaign_id}" 
                                     data-product-name="${escapeHtml(product.product_name)}" data-open-commission="${openCommissionRate}"
@@ -3338,9 +3384,9 @@ async function showTask3SetupModalWithRecommendations(brandId, brandName) {
                             </button>
                         </div>
                         ` : `
-                        <div style="background: rgba(245,158,11,0.15); padding: 6px 12px; border-radius: 20px;">
-                            <span style="color: #f59e0b; font-size: 11px;">
-                                <i class="fas fa-lock"></i> Approve terkunci, isi requirement dulu
+                        <div style="background: ${disableApproval ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)'}; padding: 6px 12px; border-radius: 20px;">
+                            <span style="color: ${disableApproval ? '#ef4444' : '#f59e0b'}; font-size: 11px;">
+                                <i class="fas fa-lock"></i> ${disableApproval ? 'Approve terkunci, butuh claim kepemilikan' : 'Approve terkunci, isi requirement dulu'}
                             </span>
                         </div>
                         `}
@@ -3395,6 +3441,14 @@ async function showTask3SetupModalWithRecommendations(brandId, brandName) {
     }
     
     // 🔥 RENDER MODAL
+    // 馃敟 JIKA DISABLE APPROVAL (NEED CLAIM), KUNCI FORM & ACTIONS
+    if (disableApproval) {
+        requirementFormHtml = '';
+        requirementStatusHtml = '';
+        linkSection = '';
+        approveSection = '';
+    }
+
     modalBodyElem.innerHTML = `
         <div style="background:rgba(74,222,128,0.1); border-radius:14px; padding:12px; margin-bottom:16px;">
             <p style="color:#4ade80; font-size:12px;"><i class="fas fa-info-circle"></i> Setup Campaign - Approve produk untuk generate link afiliasi</p>
@@ -3402,6 +3456,7 @@ async function showTask3SetupModalWithRecommendations(brandId, brandName) {
             ${isActiveBrand ? `<p style="color:#fbbf24; font-size:10px; margin-top:4px;"><i class="fas fa-history"></i> Brand aktif - Requirement auto-fill dari sebelumnya</p>` : ''}
         </div>
         
+        ${claimHtml}
         ${campaignInfoHtml}
         ${requirementFormHtml}
         ${requirementStatusHtml}
@@ -3409,9 +3464,12 @@ async function showTask3SetupModalWithRecommendations(brandId, brandName) {
         ${productsHtml}
         ${linkSection}
         
-        <div class="flex-buttons" style="margin-top:20px;">
+        <div class="flex-buttons" style="margin-top:20px; display:flex; gap:10px;">
             <button id="closeSetupModalBtn" style="background:#1e293b; color:#cbd5e6; flex:1; padding:12px; border-radius:40px; border:1px solid #2a3346; cursor:pointer;">
                 Tutup
+            </button>
+            <button id="rejectBrandBtn" style="background:#ef4444; color:white; flex:1; padding:12px; border-radius:40px; border:none; cursor:pointer; font-weight:600;">
+                <i class="fas fa-times-circle"></i> Tolak Pendaftaran Brand
             </button>
         </div>
     `;
@@ -3419,6 +3477,40 @@ async function showTask3SetupModalWithRecommendations(brandId, brandName) {
     openModalDashboard();
     
     // 🔥 SAVE REQUIREMENT BUTTON
+    // 馃敟 CLAIM BRAND BUTTON
+    const claimBrandBtn = document.getElementById('claimBrandBtn');
+    if (claimBrandBtn) {
+        claimBrandBtn.addEventListener('click', async () => {
+            if (!confirm('Anda yakin ingin mengklaim brand ini? BA lain tidak akan bisa mengklaimnya setelah Anda.')) return;
+            
+            claimBrandBtn.disabled = true;
+            claimBrandBtn.innerHTML = '<i class="fas fa-spinner fa-pulse"></i> Claiming...';
+            
+            try {
+                const claimResponse = await fetch(baseUrlDashboard + 'bd/claim_brand', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({ brand_id: brandId })
+                });
+                const claimResult = await claimResponse.json();
+                
+                if (claimResult.success) {
+                    showToastInModal(claimResult.message, 'success');
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    showToastInModal(claimResult.message, 'error');
+                    claimBrandBtn.disabled = false;
+                    claimBrandBtn.innerHTML = '<i class="fas fa-lock"></i> Claim Brand';
+                }
+            } catch(e) {
+                showToastInModal('Error claiming brand', 'error');
+                claimBrandBtn.disabled = false;
+                claimBrandBtn.innerHTML = '<i class="fas fa-lock"></i> Claim Brand';
+            }
+        });
+    }
+
+    // 馃敟 SAVE REQUIREMENT BUTTON
     const saveRequirementsBtn = document.getElementById('saveRequirementsBtn');
     if (saveRequirementsBtn) {
         saveRequirementsBtn.addEventListener('click', async () => {
@@ -3827,6 +3919,46 @@ if (approveSelectedBtn) {
                 modalGlass.style.maxWidth = '550px';
             }
             closeModalDashboard();
+        });
+    }
+    
+    // Tombol Tolak Pendaftaran Brand
+    const rejectBrandBtn = document.getElementById('rejectBrandBtn');
+    if (rejectBrandBtn) {
+        rejectBrandBtn.addEventListener('click', async () => {
+            if (!confirm(`Apakah Anda yakin ingin menolak pendaftaran brand "${brandName}" dan mengembalikannya ke Step 2 (Follow Up)?\n\nSemua produk pending dari brand ini akan dihapus dari daftar pengajuan.`)) {
+                return;
+            }
+            
+            rejectBrandBtn.disabled = true;
+            rejectBrandBtn.innerHTML = '<i class="fas fa-spinner fa-pulse"></i> Menolak Brand...';
+            
+            try {
+                const response = await fetch(baseUrlDashboard + 'bd/reject_brand', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({ brand_id: brandId, brand_name: brandName })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showToastInModal('Brand berhasil ditolak!', 'success');
+                    setTimeout(() => {
+                        closeModalDashboard();
+                        location.reload();
+                    }, 1500);
+                } else {
+                    showToastInModal(result.message || 'Gagal menolak brand', 'error');
+                    rejectBrandBtn.disabled = false;
+                    rejectBrandBtn.innerHTML = '<i class="fas fa-times-circle"></i> Tolak Pendaftaran Brand';
+                }
+            } catch (error) {
+                console.error('Error rejecting brand:', error);
+                showToastInModal('Terjadi kesalahan koneksi', 'error');
+                rejectBrandBtn.disabled = false;
+                rejectBrandBtn.innerHTML = '<i class="fas fa-times-circle"></i> Tolak Pendaftaran Brand';
+            }
         });
     }
 }

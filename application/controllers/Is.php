@@ -67,7 +67,6 @@ public function dashboard() {
     // 🔥 TASK 2: WAITING HANDLER - DEAL READY (LAMPU HIJAU)
     // ====================================================================
  $task2_sql = "
-    (
         -- PART 1: Creator yang sudah ada di tabel creators tapi is_id NULL
         SELECT 
             c.id,
@@ -100,7 +99,7 @@ public function dashboard() {
              GROUP BY o2.product_name 
              ORDER BY SUM(o2.gmv) DESC 
              LIMIT 1) as top_product,
-            (SELECT ap.image_url 
+            (SELECT MAX(ap.image_url) 
              FROM affiliate_products ap 
              JOIN affiliate_orders o3 ON ap.product_id = o3.product_id AND ap.campaign_id = o3.campaign_id
              WHERE LOWER(TRIM(o3.creator_username)) = LOWER(TRIM(c.username))
@@ -165,7 +164,7 @@ public function dashboard() {
           )
         GROUP BY o.creator_username
         HAVING SUM(o.gmv) > 0
-    ) 
+        
     ORDER BY 
         CASE WHEN source_type = 'unregistered' THEN 0 ELSE 1 END,
         total_gmv_30d DESC
@@ -219,7 +218,7 @@ $task2_creators = $this->db->query($task2_sql)->result();
              GROUP BY o2.product_name 
              ORDER BY SUM(o2.gmv) DESC 
              LIMIT 1) as top_product,
-            (SELECT ap.image_url 
+            (SELECT MAX(ap.image_url) 
              FROM affiliate_products ap 
              JOIN affiliate_orders o3 ON ap.product_id = o3.product_id AND ap.campaign_id = o3.campaign_id
              WHERE o3.creator_username = c.username 
@@ -334,7 +333,7 @@ public function get_task2_creators() {
              GROUP BY o2.product_name 
              ORDER BY SUM(o2.gmv) DESC 
              LIMIT 1) as top_product,
-            (SELECT ap.image_url 
+            (SELECT MAX(ap.image_url) 
              FROM affiliate_products ap 
              JOIN affiliate_orders o3 ON ap.product_id = o3.product_id AND ap.campaign_id = o3.campaign_id
              WHERE o3.creator_username = c.username 
@@ -423,7 +422,7 @@ public function get_task3_creators() {
              GROUP BY o2.product_name 
              ORDER BY SUM(o2.gmv) DESC 
              LIMIT 1) as top_product,
-            (SELECT ap.image_url 
+            (SELECT MAX(ap.image_url) 
              FROM affiliate_products ap 
              JOIN affiliate_orders o3 ON ap.product_id = o3.product_id AND ap.campaign_id = o3.campaign_id
              WHERE o3.creator_username = c.username 
@@ -577,73 +576,114 @@ public function add_creator_task3() {
         ]));
     }
     
-    $user_id = $this->session->userdata('user_id');
-    $username = ltrim($this->input->post('username'), '@');
-    $full_name = $this->input->post('full_name');
-    $category = $this->input->post('category');
-    $phone = $this->input->post('phone');
-    $email = $this->input->post('email');
-    $brand_id = $this->input->post('brand_id');
-    $shop_name = $this->input->post('shop_name');
-    $avatar_url = $this->input->post('avatar_url');
+    $user_id      = $this->session->userdata('user_id');
+    $username     = strtolower(trim(ltrim($this->input->post('username'), '@')));
+    $full_name    = $this->input->post('full_name');
+    $category     = $this->input->post('category');
+    $phone        = $this->input->post('phone');
+    $email        = $this->input->post('email');
+    $brand_id     = $this->input->post('brand_id');
+    $shop_name    = $this->input->post('shop_name');
+    $avatar_url   = $this->input->post('avatar_url');
     $follower_count = $this->input->post('follower_count');
-    
+    $force_save   = $this->input->post('force_save') === '1'; // bypass phone duplicate
+
     if (empty($username)) {
         return $this->output->set_output(json_encode([
             'success' => false,
             'message' => 'Username TikTok wajib diisi'
         ]));
     }
-    
-    // Cek duplikat username
-    $existing = $this->db->where('username', $username)->get('creators')->row();
+
+    // Cek duplikat username pada brand yang sama
+    $existing = $this->db->where('LOWER(username)', $username)
+                         ->where('brand_id', $brand_id)
+                         ->get('creators')
+                         ->row();
     if ($existing) {
         return $this->output->set_output(json_encode([
             'success' => false,
-            'message' => 'Creator dengan username @' . $username . ' sudah ada'
+            'message' => 'Creator dengan username @' . $username . ' sudah terdaftar untuk brand ini'
         ]));
     }
-    
-    // 🔥 INSERT LANGSUNG KE TASK 3 (STATUS ACTIVE)
+
+    // Cek duplikat nomor HP (kecuali force_save)
+    if (!$force_save && !empty($phone)) {
+        $normalized_input = preg_replace('/[^0-9]/', '', $phone);
+        $input_tail = substr($normalized_input, -9);
+
+        if (strlen($input_tail) === 9) {
+            $all_creators = $this->db->select('id, username, full_name, phone, status')
+                ->where('phone IS NOT NULL')
+                ->where('phone !=', '')
+                ->get('creators')
+                ->result();
+
+            $phone_matches = [];
+            foreach ($all_creators as $c) {
+                $db_tail = substr(preg_replace('/[^0-9]/', '', $c->phone), -9);
+                if ($db_tail === $input_tail) {
+                    $phone_matches[] = [
+                        'id'        => $c->id,
+                        'username'  => $c->username,
+                        'full_name' => $c->full_name,
+                        'phone'     => $c->phone,
+                        'status'    => $c->status,
+                    ];
+                }
+            }
+
+            if (!empty($phone_matches)) {
+                return $this->output->set_output(json_encode([
+                    'success'       => false,
+                    'phone_duplicate' => true,
+                    'message'       => 'Nomor HP ini sudah terdaftar untuk creator lain.',
+                    'matches'       => $phone_matches
+                ]));
+            }
+        }
+    }
+
+    // INSERT LANGSUNG KE TASK 3 (STATUS ACTIVE)
     $insert_data = [
-        'username' => $username,
-        'full_name' => $full_name ?: $username,
-        'category' => $category ?: 'Lifestyle',
-        'phone' => $phone,
-        'email' => $email,
-        'is_id' => $user_id,
-        'brand_id' => $brand_id,
-        'shop_name' => $shop_name,
-        'source' => 'manual_task3',
-        'status' => 'ACTIVE',
-        'avatar_url' => $avatar_url,
+        'username'      => $username,
+        'full_name'     => $full_name ?: $username,
+        'category'      => $category ?: 'Lifestyle',
+        'phone'         => $phone,
+        'email'         => $email,
+        'is_id'         => $user_id,
+        'brand_id'      => $brand_id,
+        'shop_name'     => $shop_name,
+        'source'        => 'manual_task3',
+        'status'        => 'ACTIVE',
+        'avatar_url'    => $avatar_url,
         'imported_followers' => $follower_count,
-        'approved_at' => date('Y-m-d H:i:s'),
-        'approved_by' => $user_id,
-        'created_at' => date('Y-m-d H:i:s'),
-        'updated_at' => date('Y-m-d H:i:s')
+        'approved_at'   => date('Y-m-d H:i:s'),
+        'approved_by'   => $user_id,
+        'created_at'    => date('Y-m-d H:i:s'),
+        'updated_at'    => date('Y-m-d H:i:s')
     ];
-    
+
     if ($this->db->insert('creators', $insert_data)) {
         $new_id = $this->db->insert_id();
-        
+
         $this->load->model('User_log_model');
         $this->User_log_model->log(
             $user_id,
             $this->session->userdata('username'),
             'IS',
             'ADD_CREATOR_TASK3',
-            "Added creator @{$username} directly to Task 3 (Monitoring)"
+            "Added creator @{$username} directly to Task 3 (Monitoring)" . ($force_save ? ' [force - phone duplicate bypassed]' : '')
         );
-        
+
         return $this->output->set_output(json_encode([
-            'success' => true,
-            'message' => '✅ @' . $username . ' berhasil ditambahkan ke Task 3 (Monitoring)!',
+            'success'    => true,
+            'message'    => '✅ @' . $username . ' berhasil ditambahkan ke Task 3 (Monitoring)!',
             'creator_id' => $new_id,
-            'username' => $username
+            'username'   => $username
         ]));
     }
-    
+
     return $this->output->set_output(json_encode([
         'success' => false,
         'message' => 'Gagal menambahkan creator'
@@ -1705,18 +1745,19 @@ public function performance() {
         ]));
     }
     
-    $user_id = $this->session->userdata('user_id');
-    $username = ltrim($this->input->post('username'), '@');
-    $full_name = $this->input->post('full_name');
-    $category = $this->input->post('category');
-    $phone = $this->input->post('phone');
-    $email = $this->input->post('email');
-    $brand_id = $this->input->post('brand_id');
-    $shop_name = $this->input->post('shop_name');
-    $avatar_url = $this->input->post('avatar_url');
+    $user_id      = $this->session->userdata('user_id');
+    $username     = strtolower(trim(ltrim($this->input->post('username'), '@')));
+    $full_name    = $this->input->post('full_name');
+    $category     = $this->input->post('category');
+    $phone        = $this->input->post('phone');
+    $email        = $this->input->post('email');
+    $brand_id     = $this->input->post('brand_id');
+    $shop_name    = $this->input->post('shop_name');
+    $avatar_url   = $this->input->post('avatar_url');
     $follower_count = $this->input->post('follower_count');
-    $gmv_28days = $this->input->post('gmv');
-    
+    $gmv_28days   = $this->input->post('gmv');
+    $force_save   = $this->input->post('force_save') === '1'; // bypass phone duplicate
+
     // Validasi
     if (empty($username)) {
         return $this->output->set_output(json_encode([
@@ -1724,43 +1765,83 @@ public function performance() {
             'message' => 'Username TikTok wajib diisi'
         ]));
     }
-    
-    // Cek duplikat username
-    $existing = $this->db->where('username', $username)->get('creators')->row();
+
+    // Cek duplikat username pada brand yang sama
+    $existing = $this->db->where('LOWER(username)', $username)
+                         ->where('brand_id', $brand_id)
+                         ->get('creators')
+                         ->row();
     if ($existing) {
         return $this->output->set_output(json_encode([
             'success' => false,
-            'message' => 'Creator dengan username @' . $username . ' sudah ada'
+            'message' => 'Creator dengan username @' . $username . ' sudah terdaftar untuk brand ini'
         ]));
     }
-    
-    // 🔥 INSERT KE TASK 1 (STATUS PENDING)
+
+    // Cek duplikat nomor HP (kecuali force_save)
+    if (!$force_save && !empty($phone)) {
+        $normalized_input = preg_replace('/[^0-9]/', '', $phone);
+        $input_tail = substr($normalized_input, -9);
+
+        if (strlen($input_tail) === 9) {
+            $all_creators = $this->db->select('id, username, full_name, phone, status')
+                ->where('phone IS NOT NULL')
+                ->where('phone !=', '')
+                ->get('creators')
+                ->result();
+
+            $phone_matches = [];
+            foreach ($all_creators as $c) {
+                $db_tail = substr(preg_replace('/[^0-9]/', '', $c->phone), -9);
+                if ($db_tail === $input_tail) {
+                    $phone_matches[] = [
+                        'id'        => $c->id,
+                        'username'  => $c->username,
+                        'full_name' => $c->full_name,
+                        'phone'     => $c->phone,
+                        'status'    => $c->status,
+                    ];
+                }
+            }
+
+            if (!empty($phone_matches)) {
+                return $this->output->set_output(json_encode([
+                    'success'         => false,
+                    'phone_duplicate' => true,
+                    'message'         => 'Nomor HP ini sudah terdaftar untuk creator lain.',
+                    'matches'         => $phone_matches
+                ]));
+            }
+        }
+    }
+
+    // INSERT KE TASK 1 (STATUS PENDING)
     $insert_data = [
-        'username' => $username,
-        'full_name' => $full_name ?: $username,
-        'category' => $category ?: 'Lifestyle',
-        'phone' => $phone,
-        'email' => $email,
-        'is_id' => $user_id,
-        'brand_id' => $brand_id,
-        'shop_name' => $shop_name,
-        'source' => 'manual',
-        'status' => 'PENDING',  // 🔥 TASK 1: SCOUTING
-        'avatar_url' => $avatar_url,
+        'username'      => $username,
+        'full_name'     => $full_name ?: $username,
+        'category'      => $category ?: 'Lifestyle',
+        'phone'         => $phone,
+        'email'         => $email,
+        'is_id'         => $user_id,
+        'brand_id'      => $brand_id,
+        'shop_name'     => $shop_name,
+        'source'        => 'manual',
+        'status'        => 'PENDING',
+        'avatar_url'    => $avatar_url,
         'imported_followers' => $follower_count,
-        'imported_gmv' => $gmv_28days,
-        'created_at' => date('Y-m-d H:i:s'),
-        'updated_at' => date('Y-m-d H:i:s')
+        'imported_gmv'  => $gmv_28days,
+        'created_at'    => date('Y-m-d H:i:s'),
+        'updated_at'    => date('Y-m-d H:i:s')
     ];
-    
-    // Filter null values
+
+    // Filter null/empty values
     $insert_data = array_filter($insert_data, function($value) {
         return $value !== null && $value !== '';
     });
-    
+
     if ($this->db->insert('creators', $insert_data)) {
         $new_id = $this->db->insert_id();
-        
+
         // Log aktivitas
         $this->load->model('User_log_model');
         $this->User_log_model->log(
@@ -1768,17 +1849,17 @@ public function performance() {
             $this->session->userdata('username'),
             'IS',
             'ADD_CREATOR_TASK1',
-            "Added creator @{$username} to Task 1 (Scouting)"
+            "Added creator @{$username} to Task 1 (Scouting)" . ($force_save ? ' [force - phone duplicate bypassed]' : '')
         );
-        
+
         return $this->output->set_output(json_encode([
-            'success' => true,
-            'message' => '✅ @' . $username . ' berhasil ditambahkan ke Task 1 (Scouting)!',
+            'success'    => true,
+            'message'    => '✅ @' . $username . ' berhasil ditambahkan ke Task 1 (Scouting)!',
             'creator_id' => $new_id,
-            'username' => $username
+            'username'   => $username
         ]));
     }
-    
+
     return $this->output->set_output(json_encode([
         'success' => false,
         'message' => 'Gagal menambahkan creator'
@@ -4435,8 +4516,11 @@ private function process_import_creators() {
                 continue;
             }
             
-            // Cek existing
-            $existing = $this->db->where('username', $creator['username'])->get('creators')->row();
+            // Cek existing untuk brand yang sama
+            $existing = $this->db->where('username', $creator['username'])
+                                 ->where('brand_id', $brand_id)
+                                 ->get('creators')
+                                 ->row();
             
             if ($existing) {
                 if ($skip_existing) {
@@ -8151,6 +8235,256 @@ public function send_link_task1() {
     ]));
 }
 
+// =====================================================================
+// AUTO CREATOR SCOUTING — IS ENDPOINTS
+// =====================================================================
 
+/**
+ * AJAX — Ambil scouting list
+ */
+public function get_scouting_list() {
+    $this->output->set_content_type('application/json');
 
+    if (!$this->session->userdata('logged_in')) {
+        return $this->output->set_output(json_encode(['success' => false, 'message' => 'Session expired']));
+    }
+
+    $this->load->model('CreatorScouting_model');
+
+    $filters = [
+        'status'   => ['pending', 'contacted'],
+        'brand_id' => $this->input->get('brand_id') ?: null,
+        'source'   => $this->input->get('source')   ?: null,
+        'search'   => $this->input->get('search')   ?: '',
+        'limit'    => 50,
+        'offset'   => intval($this->input->get('offset') ?: 0),
+    ];
+
+    $list   = $this->CreatorScouting_model->get_scouting_list($filters);
+    $total  = $this->CreatorScouting_model->get_scouting_count(['pending', 'contacted'], $filters['brand_id']);
+    $brands = $this->CreatorScouting_model->get_brands_in_scouting();
+
+    return $this->output->set_output(json_encode([
+        'success' => true,
+        'total'   => $total,
+        'data'    => $list,
+        'brands'  => $brands,
+    ]));
 }
+
+/**
+ * AJAX — Hubungi creator dari scouting list (WhatsApp redirect & update status)
+ * POST params: scouting_id, phone (optional)
+ */
+public function get_scouting_contact_link() {
+    $this->output->set_content_type('application/json');
+
+    if (!$this->session->userdata('logged_in')) {
+        return $this->output->set_output(json_encode(['success' => false, 'message' => 'Session expired']));
+    }
+
+    $scouting_id = $this->input->post('scouting_id');
+    $input_phone = $this->input->post('phone');
+
+    if (!$scouting_id) {
+        return $this->output->set_output(json_encode(['success' => false, 'message' => 'Scouting ID wajib diisi']));
+    }
+
+    $this->load->model('CreatorScouting_model');
+    $item = $this->CreatorScouting_model->get_by_id($scouting_id);
+
+    if (!$item) {
+        return $this->output->set_output(json_encode(['success' => false, 'message' => 'Scouting item tidak ditemukan']));
+    }
+
+    if ($input_phone) {
+        $this->db->where('id', $scouting_id)->update('creator_scouting', [
+            'phone'      => $input_phone,
+            'updated_at' => date('Y-m-d H:i:s')
+        ]);
+        $item->phone = $input_phone;
+    }
+
+    if (empty($item->phone)) {
+        return $this->output->set_output(json_encode(['success' => false, 'message' => 'Creator tidak memiliki nomor WhatsApp']));
+    }
+
+    // Cari link di bd_affiliate_links
+    $link_row = $this->db->select('affiliate_link')
+                         ->from('bd_affiliate_links')
+                         ->where('campaign_id', $item->campaign_id)
+                         ->where('product_id', $item->product_id)
+                         ->where('status', 'ACTIVE')
+                         ->limit(1)
+                         ->get()
+                         ->row();
+
+    // Fallback: cari link lain dari campaign_id yang sama
+    if (!$link_row) {
+        $link_row = $this->db->select('affiliate_link')
+                             ->from('bd_affiliate_links')
+                             ->where('campaign_id', $item->campaign_id)
+                             ->where('status', 'ACTIVE')
+                             ->limit(1)
+                             ->get()
+                             ->row();
+    }
+
+    if (!$link_row) {
+        return $this->output->set_output(json_encode([
+            'success' => false,
+            'message' => 'Belum ada link afiliasi aktif untuk campaign ini. Silakan hubungi BD/BA untuk membuat link terlebih dahulu.'
+        ]));
+    }
+
+    $affiliate_link = $link_row->affiliate_link;
+
+    // Update status di creator_scouting ke 'contacted'
+    $user_id = $this->session->userdata('user_id');
+    $this->db->where('id', $scouting_id)->update('creator_scouting', [
+        'status'       => 'contacted',
+        'contacted_by' => $user_id,
+        'contacted_at' => date('Y-m-d H:i:s'),
+        'updated_at'   => date('Y-m-d H:i:s')
+    ]);
+
+    // Format phone
+    $phone = preg_replace('/[^0-9+]/', '', $item->phone);
+    if (preg_match('/^0/', $phone)) {
+        $phone = '+62' . substr($phone, 1);
+    } elseif (!preg_match('/^\+/', $phone)) {
+        $phone = '+' . $phone;
+    }
+    $cleanPhone = ltrim($phone, '+');
+
+    $ca_name = $this->session->userdata('full_name') ?: $this->session->userdata('username');
+    $message = "Halo Kak @" . $item->username . ",\n\nPerkenalkan saya " . $ca_name . " dari Toopai. Kami sangat menyukai konten Kakak dan ingin mengundang Kakak untuk bekerja sama dalam campaign *{$item->campaign_name}* untuk brand *{$item->brand_name}*.\n\nBerikut adalah Product Palette Link (Link Produk) untuk ditambahkan ke Showcase Kakak:\n" . $affiliate_link . "\n\nTerima kasih, ditunggu kabarnya ya Kak! 😊";
+
+    // Catat data ke whatsapp_logs untuk tracking
+    $log_data = [
+        'user_id'      => $user_id,
+        'brand_id'     => $item->brand_id,
+        'phone_number' => $phone,
+        'message'      => $message,
+        'status'       => 'SENT',
+        'sent_at'      => date('Y-m-d H:i:s')
+    ];
+
+    $columns = $this->db->list_fields('whatsapp_logs');
+    if (in_array('creator_id', $columns)) {
+        $log_data['creator_id'] = 0;
+    }
+    if (in_array('link_type', $columns)) {
+        $log_data['link_type'] = 'scouting_contact';
+    }
+    if (in_array('link', $columns)) {
+        $log_data['link'] = $affiliate_link;
+    }
+
+    $this->db->insert('whatsapp_logs', $log_data);
+
+    $whatsapp_url = "https://wa.me/{$cleanPhone}?text=" . urlencode($message);
+
+    return $this->output->set_output(json_encode([
+        'success'      => true,
+        'redirect_url' => $whatsapp_url,
+        'message'      => 'WhatsApp url generated successfully'
+    ]));
+}
+
+/**
+ * AJAX — Onboard creator dari scouting list ke Task 1 (PENDING)
+ * POST: scouting_id
+ */
+public function onboard_creator_from_scouting() {
+    $this->output->set_content_type('application/json');
+
+    if (!$this->session->userdata('logged_in')) {
+        return $this->output->set_output(json_encode(['success' => false, 'message' => 'Session expired']));
+    }
+
+    $scouting_id = $this->input->post('scouting_id');
+    if (!$scouting_id) {
+        return $this->output->set_output(json_encode(['success' => false, 'message' => 'Scouting ID wajib diisi']));
+    }
+
+    $this->load->model('CreatorScouting_model');
+    $user_id = $this->session->userdata('user_id');
+
+    $result = $this->CreatorScouting_model->onboard_creator($scouting_id, $user_id);
+
+    if ($result['success']) {
+        $this->load->model('User_log_model');
+        $this->User_log_model->log(
+            $user_id,
+            $this->session->userdata('username'),
+            'IS',
+            'ONBOARD_SCOUTING',
+            "Onboard creator from scouting ID={$scouting_id}, creator_id={$result['creator_id']}"
+        );
+    }
+
+    return $this->output->set_output(json_encode($result));
+}
+
+/**
+ * AJAX — Abaikan creator dari scouting list
+ * POST: scouting_id
+ */
+public function ignore_scouting_creator() {
+    $this->output->set_content_type('application/json');
+
+    if (!$this->session->userdata('logged_in')) {
+        return $this->output->set_output(json_encode(['success' => false, 'message' => 'Session expired']));
+    }
+
+    $scouting_id = $this->input->post('scouting_id');
+    if (!$scouting_id) {
+        return $this->output->set_output(json_encode(['success' => false, 'message' => 'Scouting ID wajib diisi']));
+    }
+
+    $this->load->model('CreatorScouting_model');
+    $result = $this->CreatorScouting_model->ignore_creator($scouting_id);
+
+    return $this->output->set_output(json_encode($result));
+}
+
+/**
+ * Trigger manual populate scouting list (opsional, bisa dari tombol UI)
+ */
+public function refresh_scouting_list() {
+    $this->output->set_content_type('application/json');
+
+    if (!$this->session->userdata('logged_in')) {
+        return $this->output->set_output(json_encode(['success' => false, 'message' => 'Session expired']));
+    }
+
+    $this->load->model('CreatorScouting_model');
+
+    try {
+        $stats = $this->CreatorScouting_model->populate_from_orders();
+
+        $this->load->model('User_log_model');
+        $this->User_log_model->log(
+            $this->session->userdata('user_id'),
+            $this->session->userdata('username'),
+            'IS',
+            'REFRESH_SCOUTING',
+            "Manual refresh: inserted={$stats['inserted']}, skipped_dup={$stats['skipped_duplicate']}"
+        );
+
+        $msg = $stats['inserted'] > 0
+            ? "✅ Scouting list diperbarui. {$stats['inserted']} creator baru ditemukan."
+            : "ℹ️ 0 creator baru. " . implode(' | ', $stats['debug'] ?? []);
+
+        return $this->output->set_output(json_encode([
+            'success' => true,
+            'message' => $msg,
+            'stats'   => $stats,
+        ]));
+    } catch (Exception $e) {
+        return $this->output->set_output(json_encode(['success' => false, 'message' => $e->getMessage()]));
+    }
+}
+
+} // end class Is
