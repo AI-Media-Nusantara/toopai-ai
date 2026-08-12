@@ -265,27 +265,57 @@ class Migrasi extends CI_Controller {
             $followers_raw = str_replace(['.', ','], '', $followers_raw);
             $followers = intval(preg_replace('/[^0-9]/', '', $followers_raw));
             
+            // 🔥 CARI BRAND ID
+            $brand_name = trim($row['brand'] ?? $row['brand_name'] ?? $row['brand creator'] ?? '');
+            $brand_id = null;
+            $shop_name = null;
+            if (!empty($brand_name)) {
+                $brand = $this->db->select('id, name, shop_name')
+                    ->group_start()
+                        ->where('name', $brand_name)
+                        ->or_where('shop_name', $brand_name)
+                        ->or_like('name', $brand_name, 'both')
+                        ->or_like('shop_name', $brand_name, 'both')
+                    ->group_end()
+                    ->limit(1)
+                    ->get('brands')
+                    ->row();
+                if ($brand) {
+                    $brand_id = $brand->id;
+                    $shop_name = $brand->shop_name;
+                }
+            }
+
             // 🔥 DATA CREATOR
-         $creator_data = [
-        'username' => $username_creator,
-        'full_name' => $row['full_name'] ?? $row['nama'] ?? $username_creator,
-        'category' => $row['category'] ?? 'Lifestyle',
-        'is_id' => $is_id,
-        'status' => 'ACTIVE',
-        'source' => 'import_assigned',
-        'imported_followers' => $followers,
-        'phone' => $phone ?: null,
-        'penerima' => $penerima ?: null,
-        'alamat' => $alamat ?: null,
-        'updated_at' => $now
-    ];
+            $creator_data = [
+                'username' => $username_creator,
+                'full_name' => $row['full_name'] ?? $row['nama'] ?? $username_creator,
+                'category' => $row['category'] ?? 'Lifestyle',
+                'is_id' => $is_id,
+                'brand_id' => $brand_id,
+                'shop_name' => $shop_name,
+                'status' => 'ACTIVE',
+                'source' => 'import_assigned',
+                'imported_followers' => $followers,
+                'phone' => $phone ?: null,
+                'penerima' => $penerima ?: null,
+                'alamat' => $alamat ?: null,
+                'updated_at' => $now
+            ];
             
             // 🔥 CEK EXISTING
             $existing = $this->db->where('username', $username_creator)
+                                 ->where('brand_id', $brand_id)
                                  ->get('creators')
                                  ->row();
             
             if ($existing) {
+                // Jika sudah ada ownership CA lain, skip agar kepemilikan tetap terjaga
+                if (!empty($existing->is_id) && $existing->is_id != $is_id) {
+                    $errors[] = "Skip @{$username_creator} untuk brand '{$brand_name}': sudah dikelola oleh CA dengan ID {$existing->is_id}";
+                    continue;
+                }
+
                 $update_data = [
                     'status' => 'LINK_SENT',
                     'is_id' => $is_id,
@@ -383,6 +413,84 @@ class Migrasi extends CI_Controller {
         fclose($handle);
         
         return $rows;
+    }
+
+    // ========== MIGRASI FITUR F: SAMPLE PRODUCT CREATOR ==========
+    /**
+     * Jalankan migrasi database untuk fitur Pengiriman Sample Product Creator.
+     * URL: /migrasi/run_sample_feature_migration
+     */
+    public function run_sample_feature_migration() {
+        $this->output->set_content_type('application/json');
+        
+        $results = [];
+        $errors = [];
+        
+        // ---- 1. ALTER TABLE sample_requests ----
+        $columns_sr = $this->db->list_fields('sample_requests');
+        
+        $alter_map = [
+            'willing'       => "ALTER TABLE `sample_requests` ADD COLUMN `willing` TINYINT(1) DEFAULT 1 COMMENT '1=Bersedia, 0=Tidak Bersedia' AFTER `status`",
+            'delivery_method' => "ALTER TABLE `sample_requests` ADD COLUMN `delivery_method` ENUM('system','manual') DEFAULT 'manual' AFTER `willing`",
+            'tap_request_id'  => "ALTER TABLE `sample_requests` ADD COLUMN `tap_request_id` VARCHAR(100) NULL COMMENT 'ID dari TAP Backend jika by system' AFTER `delivery_method`",
+            'video_url'       => "ALTER TABLE `sample_requests` ADD COLUMN `video_url` VARCHAR(500) NULL COMMENT 'Link video creator dari sample ini' AFTER `tap_request_id`",
+            'video_status'    => "ALTER TABLE `sample_requests` ADD COLUMN `video_status` ENUM('no_video','has_video') DEFAULT 'no_video' AFTER `video_url`",
+            'brand_id'        => "ALTER TABLE `sample_requests` ADD COLUMN `brand_id` INT(11) NULL AFTER `video_status`",
+            'brand_name'      => "ALTER TABLE `sample_requests` ADD COLUMN `brand_name` VARCHAR(200) NULL AFTER `brand_id`",
+            'notes'           => "ALTER TABLE `sample_requests` ADD COLUMN `notes` TEXT NULL AFTER `brand_name`",
+        ];
+        
+        foreach ($alter_map as $col => $sql) {
+            if (!in_array($col, $columns_sr)) {
+                if ($this->db->query($sql)) {
+                    $results[] = "✅ sample_requests.{$col} ditambahkan";
+                } else {
+                    $errors[] = "❌ sample_requests.{$col} gagal: " . $this->db->error()['message'];
+                }
+            } else {
+                $results[] = "⏭️ sample_requests.{$col} sudah ada";
+            }
+        }
+        
+        // ---- 2. CREATE TABLE creator_videos ----
+        $tables = $this->db->list_tables();
+        if (!in_array('creator_videos', $tables)) {
+            $create_sql = "
+                CREATE TABLE IF NOT EXISTS `creator_videos` (
+                    `id`               INT AUTO_INCREMENT PRIMARY KEY,
+                    `creator_id`       INT(11) NOT NULL,
+                    `creator_username` VARCHAR(100) NOT NULL,
+                    `video_url`        VARCHAR(500) NOT NULL,
+                    `product_id`       VARCHAR(100) NULL,
+                    `product_name`     VARCHAR(500) NULL,
+                    `posted_at`        DATETIME NULL,
+                    `views`            BIGINT DEFAULT 0,
+                    `likes`            BIGINT DEFAULT 0,
+                    `gmv`              DECIMAL(15,2) DEFAULT 0,
+                    `source`           ENUM('manual','api') DEFAULT 'manual',
+                    `created_at`       DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    `updated_at`       DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    INDEX `idx_creator_id`       (`creator_id`),
+                    INDEX `idx_creator_username` (`creator_username`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            ";
+            if ($this->db->query($create_sql)) {
+                $results[] = "✅ Tabel creator_videos dibuat";
+            } else {
+                $errors[] = "❌ Tabel creator_videos gagal dibuat: " . $this->db->error()['message'];
+            }
+        } else {
+            $results[] = "⏭️ Tabel creator_videos sudah ada";
+        }
+        
+        return $this->output->set_output(json_encode([
+            'success' => empty($errors),
+            'results' => $results,
+            'errors'  => $errors,
+            'message' => empty($errors)
+                ? '✅ Migrasi Fitur F selesai!'
+                : '⚠️ Selesai dengan ' . count($errors) . ' error'
+        ]));
     }
 
     // ========== CLI: Import dari command line ==========

@@ -270,6 +270,13 @@ if (isset($product['lowest_price']) && is_array($product['lowest_price'])) {
         // 🔥 ADS COLLABORATION (TAMBAHKAN INI!)
         $ads_collaboration = $product['partner_shop_ads_commission_rate'] ?? 0;
         
+        $category_name = '';
+        if (isset($product['category']['name'])) {
+            $category_name = $product['category']['name'];
+        } elseif (isset($product['category']) && is_string($product['category'])) {
+            $category_name = $product['category'];
+        }
+        
                 // 🔥 GUNAKAN NAMA KOLOM YANG BENAR
                 $product_data = [
                     'product_id' => $product_id,
@@ -279,6 +286,7 @@ if (isset($product['lowest_price']) && is_array($product['lowest_price'])) {
                     'lowest_price' =>floatval($product['lowest_price']['amount'] ?? 0),
                     'highest_price' => floatval($product['highest_price']['amount'] ?? 0),
                     'image_url' => $product['main_image_url'] ?? '',
+                    'category' => $category_name,
                     'shop_name' => $product['shop_name'] ?? '',
                     'review_status' => $product['review_status'] ?? 'PENDING',
                     'open_commission_rate' => $open_commission,
@@ -376,12 +384,20 @@ public function sync_approved_products() {
                 $total_commission = $product['total_commission_rate'] ?? 0;
                 $shop_ads = $product['shop_ads_commission_rate'] ?? 0;
                 
+                $category_name = '';
+                if (isset($product['category']['name'])) {
+                    $category_name = $product['category']['name'];
+                } elseif (isset($product['category']) && is_string($product['category'])) {
+                    $category_name = $product['category'];
+                }
+                
                 $product_data = [
                     'product_id' => $product_id,
                     'campaign_id' => $campaign_id,
                     'product_name' => $product['name'] ?? '',
                     'price' => $product['price'] ?? 0,
                     'image_url' => $product['main_image_url'] ?? '',
+                    'category' => $category_name,
                     'shop_name' => $product['shop_name'] ?? '',
                     'review_status' => 'APPROVED',
                     'open_commission_rate' => $open_commission,
@@ -394,7 +410,8 @@ public function sync_approved_products() {
                     'sample_quota' => $product['sample_quota'] ?? 0,
                     'approved_at' => date('Y-m-d H:i:s'),
                     'last_sync' => date('Y-m-d H:i:s'),
-                    'updated_at' => date('Y-m-d H:i:s')
+                    'updated_at' => date('Y-m-d H:i:s'),
+                    'raw_data' => json_encode($product)
                 ];
                 
                 $existing = $this->db->where('product_id', $product_id)

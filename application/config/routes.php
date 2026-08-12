@@ -134,5 +134,15 @@ $route['is/get_creator_shipping_address'] = 'is/get_creator_shipping_address';
 $route['is/confirm_sample_with_details'] = 'is/confirm_sample_with_details';
 $route['is/generate_sample_printout'] = 'is/generate_sample_printout';
 $route['is/view_sample_printout'] = 'is/view_sample_printout';
-
 $route['is/get_sample_products'] = 'is/get_sample_products';
+
+// IS - Fitur F: Sample Otomatis & Monitoring
+$route['is/monitoring']                      = 'is/monitoring';
+$route['is/confirm_sample_willingness']      = 'is/confirm_sample_willingness';
+$route['is/get_sample_recommendations']      = 'is/get_sample_recommendations';
+$route['is/save_sample_delivery']            = 'is/save_sample_delivery';
+$route['is/get_monitoring_creator_detail']   = 'is/get_monitoring_creator_detail';
+$route['is/get_creator_gmv_breakdown']       = 'is/get_creator_gmv_breakdown';
+$route['is/add_creator_video']               = 'is/add_creator_video';
+$route['is/update_sample_video_link']        = 'is/update_sample_video_link';
+$route['is/get_sample_keranjang_trigger']    = 'is/get_sample_keranjang_trigger';

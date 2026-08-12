@@ -230,7 +230,7 @@ $task2_creators = $this->db->query($task2_sql)->result();
         ->from('creators c')
         ->join('brands b', 'c.brand_id = b.id', 'left')
         ->join('users u', 'c.is_id = u.id', 'left')
-        ->where('c.status', 'ACTIVE')
+        ->where_in('c.status', ['ACTIVE', 'SAMPLE_SENT'])
         ->order_by('total_gmv_30d', 'DESC')
         ->limit(100)
         ->get()
@@ -250,7 +250,7 @@ foreach ($task2_creators as $c) {
 }
 
     
-    $task3_count = $this->db->where('status', 'ACTIVE')->count_all_results('creators');
+    $task3_count = $this->db->where_in('status', ['ACTIVE', 'SAMPLE_SENT'])->count_all_results('creators');
     
     $today = date('Y-m-d');
     $today_gmv = $this->db->select('COALESCE(SUM(gmv), 0) as total')
@@ -434,7 +434,7 @@ public function get_task3_creators() {
         ->from('creators c')
         ->join('brands b', 'c.brand_id = b.id', 'left')
         ->join('users u', 'c.is_id = u.id', 'left')
-        ->where('c.status', 'ACTIVE')
+        ->where_in('c.status', ['ACTIVE', 'SAMPLE_SENT'])
         ->order_by('total_gmv_30d', 'DESC')
         ->limit(100)
         ->get()
@@ -596,15 +596,58 @@ public function add_creator_task3() {
     }
 
     // Cek duplikat username pada brand yang sama
-    $existing = $this->db->where('LOWER(username)', $username)
-                         ->where('brand_id', $brand_id)
-                         ->get('creators')
+    $existing = $this->db->select('c.*, u.full_name AS owner_name, b.name AS brand_name_label')
+                         ->from('creators c')
+                         ->join('brands b', 'c.brand_id = b.id', 'left')
+                         ->join('users u', 'c.is_id = u.id', 'left')
+                         ->where('LOWER(c.username)', $username)
+                         ->where('c.brand_id', $brand_id)
+                         ->get()
                          ->row();
+
     if ($existing) {
-        return $this->output->set_output(json_encode([
-            'success' => false,
-            'message' => 'Creator dengan username @' . $username . ' sudah terdaftar untuk brand ini'
-        ]));
+        if (!empty($existing->is_id)) {
+            $owner_name = $existing->owner_name ?: 'CA lain';
+            $brand_label = $existing->brand_name_label ?: 'brand ini';
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => "Creator @{$username} untuk brand {$brand_label} sudah dikelola oleh {$owner_name}."
+            ]));
+        } else {
+            // Ada record tapi belum ada ownership (is_id NULL). Kita bisa update is_id
+            $update_data = [
+                'is_id'      => $user_id,
+                'status'     => 'ACTIVE',
+                'updated_at' => date('Y-m-d H:i:s'),
+                'approved_at' => date('Y-m-d H:i:s'),
+                'approved_by' => $user_id
+            ];
+            if (!empty($full_name)) $update_data['full_name'] = $full_name;
+            if (!empty($category)) $update_data['category'] = $category;
+            if (!empty($phone)) $update_data['phone'] = $phone;
+            if (!empty($email)) $update_data['email'] = $email;
+            if (!empty($avatar_url)) $update_data['avatar_url'] = $avatar_url;
+            if (!empty($follower_count)) $update_data['imported_followers'] = $follower_count;
+
+            $this->db->where('id', $existing->id)->update('creators', $update_data);
+
+            // Log aktivitas
+            $this->load->model('User_log_model');
+            $this->User_log_model->log(
+                $user_id,
+                $this->session->userdata('username'),
+                'IS',
+                'CLAIM_CREATOR_TASK3',
+                "Claimed ownership of creator @{$username} for brand ID {$brand_id}"
+            );
+
+            return $this->output->set_output(json_encode([
+                'success'    => true,
+                'message'    => '✅ @' . $username . ' berhasil ditambahkan ke Task 3 (Monitoring)!',
+                'creator_id' => $existing->id,
+                'username'   => $username
+            ]));
+        }
     }
 
     // Cek duplikat nomor HP (kecuali force_save)
@@ -777,7 +820,7 @@ public function get_creator_detail_for_is() {
         ->where('creator_username', $creator->username)
         ->where('order_date_local >=', date('Y-m-d', strtotime('-30 days')))
         ->where('order_status NOT IN ("CANCELLED", "REFUNDED")')
-        ->group_by('product_id')
+        ->group_by('product_id, product_name')
         ->order_by('total_gmv', 'DESC')
         ->limit(5)
         ->get()
@@ -1767,15 +1810,57 @@ public function performance() {
     }
 
     // Cek duplikat username pada brand yang sama
-    $existing = $this->db->where('LOWER(username)', $username)
-                         ->where('brand_id', $brand_id)
-                         ->get('creators')
+    $existing = $this->db->select('c.*, u.full_name AS owner_name, b.name AS brand_name_label')
+                         ->from('creators c')
+                         ->join('brands b', 'c.brand_id = b.id', 'left')
+                         ->join('users u', 'c.is_id = u.id', 'left')
+                         ->where('LOWER(c.username)', $username)
+                         ->where('c.brand_id', $brand_id)
+                         ->get()
                          ->row();
+
     if ($existing) {
-        return $this->output->set_output(json_encode([
-            'success' => false,
-            'message' => 'Creator dengan username @' . $username . ' sudah terdaftar untuk brand ini'
-        ]));
+        if (!empty($existing->is_id)) {
+            $owner_name = $existing->owner_name ?: 'CA lain';
+            $brand_label = $existing->brand_name_label ?: 'brand ini';
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => "Creator @{$username} untuk brand {$brand_label} sudah dikelola oleh {$owner_name}."
+            ]));
+        } else {
+            // Ada record tapi belum ada ownership (is_id NULL). Kita bisa update is_id
+            $update_data = [
+                'is_id'      => $user_id,
+                'status'     => 'PENDING',
+                'updated_at' => date('Y-m-d H:i:s')
+            ];
+            if (!empty($full_name)) $update_data['full_name'] = $full_name;
+            if (!empty($category)) $update_data['category'] = $category;
+            if (!empty($phone)) $update_data['phone'] = $phone;
+            if (!empty($email)) $update_data['email'] = $email;
+            if (!empty($avatar_url)) $update_data['avatar_url'] = $avatar_url;
+            if (!empty($follower_count)) $update_data['imported_followers'] = $follower_count;
+            if (!empty($gmv_28days)) $update_data['imported_gmv'] = $gmv_28days;
+
+            $this->db->where('id', $existing->id)->update('creators', $update_data);
+
+            // Log aktivitas
+            $this->load->model('User_log_model');
+            $this->User_log_model->log(
+                $user_id,
+                $this->session->userdata('username'),
+                'IS',
+                'CLAIM_CREATOR_TASK1',
+                "Claimed ownership of creator @{$username} for brand ID {$brand_id} to Task 1"
+            );
+
+            return $this->output->set_output(json_encode([
+                'success'    => true,
+                'message'    => '✅ @' . $username . ' berhasil ditambahkan ke Task 1 (Scouting)!',
+                'creator_id' => $existing->id,
+                'username'   => $username
+            ]));
+        }
     }
 
     // Cek duplikat nomor HP (kecuali force_save)
@@ -8483,6 +8568,566 @@ public function refresh_scouting_list() {
             'stats'   => $stats,
         ]));
     } catch (Exception $e) {
+        return $this->output->set_output(json_encode(['success' => false, 'message' => $e->getMessage()]));
+    }
+}
+
+
+// ============================================================================
+// FITUR F: PENGIRIMAN SAMPLE PRODUCT CREATOR
+// ============================================================================
+
+// --------------------------------------------------------------------------
+// F.2 — KONFIRMASI KESEDIAAN CREATOR MENERIMA SAMPLE
+// --------------------------------------------------------------------------
+
+/**
+ * Konfirmasi apakah creator bersedia menerima sample.
+ * Dipanggil dari modal Detail Creator via AJAX POST.
+ *
+ * POST params: creator_id, willing (1|0), notes
+ *
+ * Jika NOT willing (0):
+ *   → status creator diupdate ke ACTIVE (masuk Monitoring langsung)
+ * Jika willing (1):
+ *   → status tetap LINK_SENT/SAMPLE_SENT, lanjut ke pemilihan produk
+ */
+public function confirm_sample_willingness() {
+    $this->output->set_content_type('application/json');
+
+    try {
+        $creator_id = $this->input->post('creator_id');
+        $willing    = intval($this->input->post('willing')); // 1 = Ya, 0 = Tidak
+        $notes      = $this->input->post('notes') ?? '';
+
+        if (!$creator_id) {
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Creator ID required'
+            ]));
+        }
+
+        $creator = $this->db->where('id', $creator_id)->get('creators')->row();
+        if (!$creator) {
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Creator not found'
+            ]));
+        }
+
+        $this->load->model('SampleProduct_model');
+
+        // Simpan konfirmasi ke sample_requests
+        $this->SampleProduct_model->save_sample_willingness([
+            'creator_id'  => $creator_id,
+            'campaign_id' => null,
+            'willing'     => $willing,
+            'notes'       => $notes,
+        ]);
+
+        // Jika creator TIDAK bersedia → langsung masuk Monitoring (status ACTIVE)
+        if (!$willing) {
+            $this->db->where('id', $creator_id)->update('creators', [
+                'status'     => 'ACTIVE',
+                'updated_at' => date('Y-m-d H:i:s'),
+            ]);
+
+            return $this->output->set_output(json_encode([
+                'success'    => true,
+                'willing'    => false,
+                'new_status' => 'ACTIVE',
+                'message'    => 'Creator tidak bersedia menerima sample. Creator dipindahkan ke Monitoring.',
+            ]));
+        }
+
+        // Jika bersedia → biarkan status saat ini, kembalikan konfirmasi
+        return $this->output->set_output(json_encode([
+            'success' => true,
+            'willing' => true,
+            'message' => 'Creator bersedia. Lanjutkan ke pemilihan produk sample.',
+        ]));
+
+    } catch (Exception $e) {
+        log_message('error', 'confirm_sample_willingness error: ' . $e->getMessage());
+        return $this->output->set_output(json_encode([
+            'success' => false,
+            'message' => 'Server error: ' . $e->getMessage()
+        ]));
+    }
+}
+
+// --------------------------------------------------------------------------
+// F.3 — REKOMENDASI PRODUK SAMPLE
+// --------------------------------------------------------------------------
+
+/**
+ * Ambil rekomendasi produk sample untuk creator.
+ * Berbasis kategori sama, brand berbeda dari produk yang sudah dimiliki.
+ *
+ * POST params: creator_id
+ */
+public function get_sample_recommendations() {
+    $this->output->set_content_type('application/json');
+
+    try {
+        $creator_id = $this->input->post('creator_id');
+
+        if (!$creator_id) {
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Creator ID required'
+            ]));
+        }
+
+        $this->load->model('SampleProduct_model');
+        $result = $this->SampleProduct_model->get_sample_recommendation($creator_id, 30);
+
+        return $this->output->set_output(json_encode([
+            'success'             => true,
+            'recommendations'     => $result['recommendations'],
+            'creator_brands'      => $result['creator_brands'],
+            'creator_categories'  => $result['creator_categories'],
+            'total'               => count($result['recommendations']),
+        ]));
+
+    } catch (Exception $e) {
+        log_message('error', 'get_sample_recommendations error: ' . $e->getMessage());
+        return $this->output->set_output(json_encode([
+            'success' => false,
+            'message' => 'Server error: ' . $e->getMessage()
+        ]));
+    }
+}
+
+// --------------------------------------------------------------------------
+// F.4 — SIMPAN PENGIRIMAN SAMPLE (MANUAL)
+// --------------------------------------------------------------------------
+
+/**
+ * Simpan data pengiriman sample manual ke database.
+ * Menggantikan pencatatan di Google Sheets.
+ *
+ * POST params: creator_id, product_id, campaign_id, quantity,
+ *              shipping_address, brand_id, brand_name, notes, delivery_method
+ */
+public function save_sample_delivery() {
+    $this->output->set_content_type('application/json');
+
+    try {
+        $creator_id      = $this->input->post('creator_id');
+        $products        = json_decode($this->input->post('products'), true);
+        $shipping_address= $this->input->post('shipping_address');
+        $delivery_method = $this->input->post('delivery_method') ?: 'manual';
+        $tap_request_id  = $this->input->post('tap_request_id') ?: null;
+
+        if (!$creator_id || empty($products)) {
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Creator ID dan produk wajib diisi'
+            ]));
+        }
+
+        $this->load->model('SampleProduct_model');
+
+        $saved       = 0;
+        $request_ids = [];
+        $errors      = [];
+
+        foreach ($products as $product) {
+            // Validasi: product_id wajib ada
+            if (empty($product['product_id'])) {
+                $errors[] = 'product_id kosong, produk dilewati';
+                continue;
+            }
+
+            $result = $this->SampleProduct_model->save_sample_delivery([
+                'creator_id'       => $creator_id,
+                'product_id'       => $product['product_id'],
+                'campaign_id'      => $product['campaign_id'] ?? null,
+                'quantity'         => $product['quantity'] ?? 1,
+                'shipping_address' => $shipping_address,
+                'delivery_method'  => $delivery_method,
+                'tap_request_id'   => $tap_request_id,
+                'brand_id'         => $product['brand_id'] ?? null,
+                'brand_name'       => $product['brand_name'] ?? null,
+                'notes'            => $product['notes'] ?? null,
+            ]);
+
+            if ($result['success']) {
+                $saved++;
+                $request_ids[] = $result['request_id'];
+            } else {
+                $errors[] = 'Gagal insert product_id=' . $product['product_id'] . ': ' . ($result['message'] ?? '?');
+                log_message('error', 'save_sample_delivery: gagal insert product_id=' . $product['product_id']);
+            }
+        }
+
+        if ($saved === 0) {
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Tidak ada produk yang berhasil disimpan. ' . implode('; ', $errors),
+            ]));
+        }
+
+        // Update status creator ke SAMPLE_SENT
+        $this->db->where('id', $creator_id)->update('creators', [
+            'status'     => 'SAMPLE_SENT',
+            'updated_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        return $this->output->set_output(json_encode([
+            'success'     => true,
+            'saved'       => $saved,
+            'request_ids' => $request_ids,
+            'message'     => "{$saved} produk sample berhasil dicatat. Status creator diperbarui ke SAMPLE_SENT.",
+        ]));
+
+    } catch (Exception $e) {
+        log_message('error', 'save_sample_delivery error: ' . $e->getMessage());
+        return $this->output->set_output(json_encode([
+            'success' => false,
+            'message' => 'Server error: ' . $e->getMessage()
+        ]));
+    }
+}
+
+// --------------------------------------------------------------------------
+// F.5 — HALAMAN MONITORING CREATOR (PAGE RENDER)
+// --------------------------------------------------------------------------
+
+/**
+ * Render halaman dedicated Monitoring Creator.
+ * URL: /is/monitoring
+ */
+public function monitoring() {
+    $user_id      = $this->session->userdata('user_id');
+    $is_supervisor = ($user_id == 2);
+
+    // Ambil semua creator ACTIVE yang di-handle IS ini (atau semua jika supervisor)
+    $query = $this->db
+        ->select('c.id, c.username, c.full_name, c.avatar_url, c.category, c.status,
+                  c.brand_id, c.is_id, b.name as brand_name, u.full_name as is_name')
+        ->from('creators c')
+        ->join('brands b', 'c.brand_id = b.id', 'left')
+        ->join('users u', 'c.is_id = u.id', 'left')
+        ->where_in('c.status', ['ACTIVE', 'SAMPLE_SENT']);
+
+    if (!$is_supervisor) {
+        $query->where('c.is_id', $user_id);
+    }
+
+    $creators = $query->order_by('c.updated_at', 'DESC')->limit(200)->get()->result();
+
+    // Hitung statistik ringkas per creator
+    foreach ($creators as &$creator) {
+        $gmv = $this->db
+            ->select('COALESCE(SUM(gmv), 0) as total_gmv, COUNT(DISTINCT order_id) as total_orders')
+            ->from('affiliate_orders')
+            ->where('creator_username', $creator->username)
+            ->where('order_date_local >=', date('Y-m-d', strtotime('-30 days')))
+            ->where('order_status NOT IN ("CANCELLED", "REFUNDED")')
+            ->get()->row();
+
+        $creator->total_gmv_30d   = floatval($gmv->total_gmv ?? 0);
+        $creator->total_orders_30d = intval($gmv->total_orders ?? 0);
+
+        // Jumlah sample yang sudah dikirim
+        $creator->sample_count = $this->db
+            ->where('creator_id', $creator->id)
+            ->where('product_id IS NOT NULL')
+            ->count_all_results('sample_requests');
+
+        // Jumlah video
+        $creator->video_count = 0;
+        $tables = $this->db->list_tables();
+        if (in_array('creator_content_statistics', $tables)) {
+            $creator->video_count = $this->db
+                ->where('creator_username', $creator->username)
+                ->count_all_results('creator_content_statistics');
+        }
+
+        // Apakah ada trigger keranjang kuning (ada transaksi)
+        $creator->has_orders = $creator->total_orders_30d > 0;
+    }
+    unset($creator);
+
+    $data = [
+        'title'         => 'Monitoring Creator - Toopai',
+        'creators'      => $creators,
+        'is_supervisor' => $is_supervisor,
+        'total_creators'=> count($creators),
+    ];
+
+    $this->load->view('templates/new/header', $data);
+    $this->load->view('is/monitoring', $data);
+    $this->load->view('templates/new/footer');
+}
+
+// --------------------------------------------------------------------------
+// F.5 — AJAX: DATA DETAIL MONITORING SATU CREATOR
+// --------------------------------------------------------------------------
+
+/**
+ * Ambil semua data monitoring detail satu creator (AJAX).
+ * Meliputi: GMV breakdown, video, keranjang kuning, sample history & summary.
+ *
+ * POST params: creator_id, start_date (opt), end_date (opt)
+ */
+public function get_monitoring_creator_detail() {
+    $this->output->set_content_type('application/json');
+
+    try {
+        $creator_id = $this->input->post('creator_id');
+        $start_date = $this->input->post('start_date') ?: date('Y-m-d', strtotime('-30 days'));
+        $end_date   = $this->input->post('end_date')   ?: date('Y-m-d');
+
+        if (!$creator_id) {
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Creator ID required'
+            ]));
+        }
+
+        $creator = $this->db
+            ->select('c.*, b.name as brand_name, b.shop_name, u.full_name as is_name')
+            ->from('creators c')
+            ->join('brands b', 'c.brand_id = b.id', 'left')
+            ->join('users u', 'c.is_id = u.id', 'left')
+            ->where('c.id', $creator_id)
+            ->get()->row();
+
+        if (!$creator) {
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Creator not found'
+            ]));
+        }
+
+        $this->load->model('SampleProduct_model');
+
+        // GMV Breakdown
+        $gmv_data = $this->SampleProduct_model->get_gmv_breakdown(
+            $creator->username, $start_date, $end_date
+        );
+
+        // Keranjang Kuning
+        $keranjang = $this->SampleProduct_model->get_keranjang_kuning($creator->username);
+
+        // Video
+        $videos = $this->SampleProduct_model->get_creator_videos($creator_id, $creator->username, 30);
+
+        // Sample History & Summary
+        $sample_history = $this->SampleProduct_model->get_creator_sample_history($creator_id);
+        $sample_summary = $this->SampleProduct_model->get_creator_sample_summary($creator_id);
+
+        // Konfirmasi kesediaan terakhir
+        $last_willing = $this->SampleProduct_model->get_last_willingness($creator_id);
+
+        return $this->output->set_output(json_encode([
+            'success'        => true,
+            'creator'        => $creator,
+            'gmv'            => $gmv_data,
+            'keranjang'      => $keranjang,
+            'videos'         => $videos,
+            'sample_history' => $sample_history,
+            'sample_summary' => $sample_summary,
+            'last_willing'   => $last_willing,
+            'date_range'     => ['start' => $start_date, 'end' => $end_date],
+        ]));
+
+    } catch (Exception $e) {
+        log_message('error', 'get_monitoring_creator_detail error: ' . $e->getMessage());
+        return $this->output->set_output(json_encode([
+            'success' => false,
+            'message' => 'Server error: ' . $e->getMessage()
+        ]));
+    }
+}
+
+// --------------------------------------------------------------------------
+// F.5 — AJAX: GMV BREAKDOWN PER PRODUK (POPUP)
+// --------------------------------------------------------------------------
+
+/**
+ * Ambil GMV breakdown per produk untuk ditampilkan di pop-up.
+ *
+ * POST params: creator_id, start_date, end_date
+ */
+public function get_creator_gmv_breakdown() {
+    $this->output->set_content_type('application/json');
+
+    try {
+        $creator_id = $this->input->post('creator_id');
+        $start_date = $this->input->post('start_date') ?: date('Y-m-d', strtotime('-30 days'));
+        $end_date   = $this->input->post('end_date')   ?: date('Y-m-d');
+
+        $creator = $this->db->where('id', $creator_id)->get('creators')->row();
+        if (!$creator) {
+            return $this->output->set_output(json_encode(['success' => false, 'message' => 'Creator not found']));
+        }
+
+        $this->load->model('SampleProduct_model');
+        $data = $this->SampleProduct_model->get_gmv_breakdown($creator->username, $start_date, $end_date);
+
+        return $this->output->set_output(json_encode([
+            'success'  => true,
+            'products' => $data['rows'],
+            'total_gmv'   => $data['total_gmv'],
+            'total_sold'  => $data['total_sold'],
+            'total_orders'=> $data['total_orders'],
+        ]));
+
+    } catch (Exception $e) {
+        return $this->output->set_output(json_encode(['success' => false, 'message' => $e->getMessage()]));
+    }
+}
+
+// --------------------------------------------------------------------------
+// F.5 — AJAX: TAMBAH VIDEO MANUAL
+// --------------------------------------------------------------------------
+
+/**
+ * Simpan link video creator yang diinput manual oleh tim CA.
+ *
+ * POST params: creator_id, video_url, product_id (opt), product_name (opt), posted_at (opt)
+ */
+public function add_creator_video() {
+    $this->output->set_content_type('application/json');
+
+    try {
+        $creator_id = $this->input->post('creator_id');
+        $video_url  = trim($this->input->post('video_url'));
+
+        if (!$creator_id || empty($video_url)) {
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Creator ID dan URL video wajib diisi'
+            ]));
+        }
+
+        $creator = $this->db->where('id', $creator_id)->get('creators')->row();
+        if (!$creator) {
+            return $this->output->set_output(json_encode(['success' => false, 'message' => 'Creator not found']));
+        }
+
+        $this->load->model('SampleProduct_model');
+
+        $result = $this->SampleProduct_model->save_manual_video([
+            'creator_id'       => $creator_id,
+            'creator_username' => $creator->username,
+            'video_url'        => $video_url,
+            'product_id'       => $this->input->post('product_id'),
+            'product_name'     => $this->input->post('product_name'),
+            'posted_at'        => $this->input->post('posted_at') ?: date('Y-m-d H:i:s'),
+            'views'            => intval($this->input->post('views') ?? 0),
+            'likes'            => intval($this->input->post('likes') ?? 0),
+        ]);
+
+        return $this->output->set_output(json_encode($result));
+
+    } catch (Exception $e) {
+        log_message('error', 'add_creator_video error: ' . $e->getMessage());
+        return $this->output->set_output(json_encode(['success' => false, 'message' => $e->getMessage()]));
+    }
+}
+
+// --------------------------------------------------------------------------
+// F.5 — AJAX: UPDATE LINK VIDEO KE SAMPLE REQUEST
+// --------------------------------------------------------------------------
+
+/**
+ * Update link video creator ke sample_request tertentu
+ * untuk tracking efektivitas sample.
+ *
+ * POST params: sample_id, video_url
+ */
+public function update_sample_video_link() {
+    $this->output->set_content_type('application/json');
+
+    try {
+        $sample_id = $this->input->post('sample_id');
+        $video_url = trim($this->input->post('video_url'));
+
+        if (!$sample_id || empty($video_url)) {
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Sample ID dan URL video wajib diisi'
+            ]));
+        }
+
+        $this->load->model('SampleProduct_model');
+        $ok = $this->SampleProduct_model->update_sample_video_status($sample_id, $video_url);
+
+        return $this->output->set_output(json_encode([
+            'success' => (bool)$ok,
+            'message' => $ok ? 'Video link berhasil diupdate' : 'Gagal mengupdate video link',
+        ]));
+
+    } catch (Exception $e) {
+        return $this->output->set_output(json_encode(['success' => false, 'message' => $e->getMessage()]));
+    }
+}
+
+// --------------------------------------------------------------------------
+// F.2 — AJAX: CEK TRIGGER KERANJANG KUNING (apakah siap proses sample)
+// --------------------------------------------------------------------------
+
+/**
+ * Cek apakah creator sudah layak masuk proses pengiriman sample.
+ * Kriteria: sudah ada transaksi nyata di affiliate_orders untuk brand yang relevan.
+ *
+ * POST params: creator_id
+ */
+public function get_sample_keranjang_trigger() {
+    $this->output->set_content_type('application/json');
+
+    try {
+        $creator_id = $this->input->post('creator_id');
+
+        if (!$creator_id) {
+            return $this->output->set_output(json_encode(['success' => false, 'message' => 'Creator ID required']));
+        }
+
+        $creator = $this->db->where('id', $creator_id)->get('creators')->row();
+        if (!$creator) {
+            return $this->output->set_output(json_encode(['success' => false, 'message' => 'Creator not found']));
+        }
+
+        // Cek apakah ada transaksi nyata (keranjang kuning = order nyata)
+        $has_orders = $this->db
+            ->where('creator_username', $creator->username)
+            ->where('order_status NOT IN ("CANCELLED", "REFUNDED")')
+            ->count_all_results('affiliate_orders');
+
+        // Cek konfirmasi kesediaan sebelumnya
+        $this->load->model('SampleProduct_model');
+        $last_willing = $this->SampleProduct_model->get_last_willingness($creator_id);
+
+        // Cek sample yang sudah pernah dikirim
+        $sample_count = $this->db
+            ->where('creator_id', $creator_id)
+            ->where('product_id IS NOT NULL')
+            ->count_all_results('sample_requests');
+
+        return $this->output->set_output(json_encode([
+            'success'      => true,
+            'has_orders'   => $has_orders > 0,
+            'order_count'  => $has_orders,
+            'last_willing' => $last_willing,
+            'sample_count' => $sample_count,
+            'creator'      => [
+                'id'       => $creator->id,
+                'username' => $creator->username,
+                'status'   => $creator->status,
+            ],
+            'can_process_sample' => $has_orders > 0,
+            'message' => $has_orders > 0
+                ? "Creator sudah memiliki {$has_orders} transaksi. Siap proses sample."
+                : "Creator belum memiliki transaksi. Tunggu creator menggunakan link terlebih dahulu.",
+        ]));
+
+    } catch (Exception $e) {
+        log_message('error', 'get_sample_keranjang_trigger error: ' . $e->getMessage());
         return $this->output->set_output(json_encode(['success' => false, 'message' => $e->getMessage()]));
     }
 }

@@ -260,6 +260,7 @@ public function save_creators_from_fastmoss($brand_id, $creators_data, $is_id = 
         
         // CEK APAKAH SUDAH ADA DI creators
         $existing_creator = $this->db->where('username', $username)
+            ->where('brand_id', $brand_id)
             ->get('creators')
             ->row();
         

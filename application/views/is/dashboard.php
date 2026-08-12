@@ -1761,9 +1761,24 @@
                                 <?php endif; ?>
                             </div>
                             <div class="is-item-actions">
-                                <button class="btn-detail" onclick="showCreatorDetail(<?= $creator->id ?>)">
+                                <button class="btn-detail" onclick="showCreatorDetail(<?= $creator->id ?>)"
+                                    title="Lihat Detail">
                                     <i class="fas fa-eye"></i>
                                 </button>
+                                <?php if (($creator->total_orders_30d ?? 0) > 0): ?>
+                                <button class="btn-detail"
+                                    style="background:rgba(139,92,246,0.15);color:#8b5cf6;border:1px solid rgba(139,92,246,0.3)"
+                                    onclick="openDashboardWillingModal(<?= $creator->id ?>, '<?= htmlspecialchars($creator->username) ?>')"
+                                    title="Proses Pengiriman Sample">
+                                    <i class="fas fa-gift"></i>
+                                </button>
+                                <?php endif; ?>
+                                <a href="<?= base_url('is/monitoring') ?>" 
+                                    class="btn-detail"
+                                    style="background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.3);text-decoration:none;display:inline-flex;align-items:center;justify-content:center"
+                                    title="Halaman Monitoring">
+                                    <i class="fas fa-chart-bar"></i>
+                                </a>
                             </div>
                         </div>
                     </div>
@@ -2077,7 +2092,7 @@
 // BASE URL CONFIG
 // ============================================================
 if (typeof BASE_URL === 'undefined') {
-    var BASE_URL = window.location.origin + '/';
+    var BASE_URL = '<?= base_url() ?>';
 }
 
 // ============================================================
@@ -3743,9 +3758,19 @@ function renderMonitoringDetail(data, title, body) {
         `;
     }
     
+    // Tombol Sample hanya muncul jika creator sudah ada transaksi (keranjang kuning terdeteksi)
+    const hasOrders = (c.performance && (c.performance.total_orders > 0)) || (c.total_orders > 0) || false;
+    const sampleBtn = hasOrders ? `
+        <button onclick="closeCreatorModal(); setTimeout(() => openDashboardWillingModal(${c.id}, '${c.username ? c.username.replace(/'/g,"\'") : ''}'), 200)"
+            style="flex:1; background:linear-gradient(135deg, rgba(139,92,246,0.3), rgba(124,58,237,0.3)); color:#a78bfa; padding:10px; border-radius:40px; border:1px solid rgba(139,92,246,0.4); cursor:pointer; font-weight:600; font-size:13px; transition: var(--transition);">
+            <i class="fas fa-gift"></i> Proses Sample
+        </button>
+    ` : '';
+
     html += `
         <div style="display:flex; gap:10px; margin-top:16px; padding-top:12px; border-top: 1px solid var(--border);">
             <button onclick="closeCreatorModal()" style="flex:1; background:var(--bg-elevated); color:var(--text-secondary); padding:10px; border-radius:40px; border:1px solid var(--border); cursor:pointer; font-weight:600; font-size:13px; transition: var(--transition);">Tutup</button>
+            ${sampleBtn}
             <button onclick="window.location.href='${BASE_URL}is/creators?creator=${c.id}'" style="flex:1; background:linear-gradient(135deg, #8b5cf6, #7c3aed); color:white; padding:10px; border-radius:40px; border:none; cursor:pointer; font-weight:600; font-size:13px; transition: var(--transition);">
                 <i class="fas fa-external-link-alt"></i> Lihat Semua
             </button>
@@ -5090,3 +5115,321 @@ document.getElementById('phoneDuplicateModal').addEventListener('click', functio
 </script>
 
 
+<!-- ============================================================ -->
+<!-- FITUR F: MODAL KONFIRMASI KESEDIAAN SAMPLE (dari Dashboard)  -->
+<!-- ============================================================ -->
+<style>
+.db-sample-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.9); backdrop-filter: blur(8px);
+    z-index: 5000; display: flex; align-items: center; justify-content: center;
+    visibility: hidden; opacity: 0; transition: 0.2s;
+}
+.db-sample-overlay.active { visibility: visible; opacity: 1; }
+.db-sample-modal {
+    background: #111827; border: 1px solid rgba(139,92,246,0.4);
+    border-radius: 24px; padding: 28px 32px; width: 95%; max-width: 460px;
+    text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+.db-sample-modal h4 { font-size: 17px; font-weight: 700; color: #e2e8f0; margin: 0 0 10px; }
+.db-sample-modal p { font-size: 13px; color: #94a3b8; margin: 0 0 22px; }
+.db-sample-btns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.db-sample-btn { padding: 10px 22px; border-radius: 40px; border: none; font-size: 13px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+.db-sample-btn:hover { filter: brightness(1.1); }
+
+/* Rec modal di dashboard */
+.db-rec-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.9); backdrop-filter: blur(8px);
+    z-index: 5001; display: flex; align-items: center; justify-content: center;
+    visibility: hidden; opacity: 0; transition: 0.2s;
+}
+.db-rec-overlay.active { visibility: visible; opacity: 1; }
+.db-rec-modal {
+    background: #111827; border: 1px solid rgba(139,92,246,0.4);
+    border-radius: 24px; width: 95%; max-width: 760px;
+    max-height: 88vh; overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+.db-rec-head {
+    padding: 20px 24px 14px; border-bottom: 1px solid rgba(255,255,255,0.08);
+    position: sticky; top: 0; background: #111827; z-index: 1;
+    display: flex; justify-content: space-between; align-items: flex-start;
+}
+.db-rec-head h4 { font-size: 15px; font-weight: 700; color: #e2e8f0; margin: 0; }
+.db-rec-head p { font-size: 11px; color: #94a3b8; margin: 4px 0 0; }
+.db-rec-close { background: none; border: none; color: #94a3b8; font-size: 22px; cursor: pointer; }
+.db-rec-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; padding: 18px 24px; }
+.db-rec-item {
+    background: #1e293b; border: 2px solid rgba(255,255,255,0.07);
+    border-radius: 16px; padding: 12px; cursor: pointer; transition: 0.2s;
+    position: relative;
+}
+.db-rec-item:hover { border-color: #8b5cf6; transform: translateY(-2px); }
+.db-rec-item.sel { border-color: #4ade80; background: rgba(74,222,128,0.05); }
+.db-rec-item .chk {
+    position: absolute; top: 8px; right: 8px;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: #4ade80; color: #0a0e17; font-size: 11px; font-weight: 700;
+    display: none; align-items: center; justify-content: center;
+}
+.db-rec-item.sel .chk { display: flex; }
+.db-rec-img { width: 100%; height: 90px; object-fit: cover; border-radius: 10px; background: #0f1420; margin-bottom: 8px; }
+.db-rec-name { font-size: 11px; font-weight: 600; color: #e2e8f0; line-height: 1.4; margin-bottom: 4px; }
+.db-rec-brand { font-size: 10px; color: #94a3b8; }
+.db-rec-foot {
+    padding: 14px 24px; border-top: 1px solid rgba(255,255,255,0.08);
+    display: flex; justify-content: space-between; align-items: center;
+    position: sticky; bottom: 0; background: #111827; flex-wrap: wrap; gap: 8px;
+}
+.db-rec-foot-count { font-size: 12px; color: #94a3b8; }
+.db-rec-foot-count strong { color: #4ade80; }
+</style>
+
+<!-- Modal Konfirmasi Kesediaan -->
+<div class="db-sample-overlay" id="dbWillingOverlay">
+    <div class="db-sample-modal">
+        <div style="font-size:38px;margin-bottom:10px">🎁</div>
+        <h4>Konfirmasi Kesediaan Sample</h4>
+        <p>Apakah creator <strong id="dbWillingName" style="color:#4ade80"></strong> bersedia menerima sample produk?</p>
+        <div style="margin-bottom:18px">
+            <input type="text" id="dbWillingNotes" placeholder="Catatan (opsional)..."
+                style="width:100%;padding:9px 14px;background:#0f1420;border:1px solid rgba(255,255,255,0.1);border-radius:12px;color:#e2e8f0;font-size:12px;outline:none;box-sizing:border-box">
+        </div>
+        <div class="db-sample-btns">
+            <button class="db-sample-btn" style="background:linear-gradient(135deg,#4ade80,#22c55e);color:#0a0e17" onclick="dbSubmitWilling(1)">
+                ✅ Ya, Bersedia
+            </button>
+            <button class="db-sample-btn" style="background:rgba(239,68,68,0.2);color:#ef4444;border:1px solid rgba(239,68,68,0.3)" onclick="dbSubmitWilling(0)">
+                ❌ Tidak Bersedia
+            </button>
+        </div>
+        <button onclick="dbCloseWillingModal()"
+            style="margin-top:14px;background:transparent;border:none;color:#94a3b8;font-size:12px;cursor:pointer">
+            Batal
+        </button>
+    </div>
+</div>
+
+<!-- Modal Rekomendasi Produk -->
+<div class="db-rec-overlay" id="dbRecOverlay">
+    <div class="db-rec-modal">
+        <div class="db-rec-head">
+            <div>
+                <h4>🎯 Pilih Produk Sample</h4>
+                <p id="dbRecSubtitle">Rekomendasi berbasis kategori creator, brand berbeda</p>
+            </div>
+            <button class="db-rec-close" onclick="dbCloseRecModal()">✕</button>
+        </div>
+        <div id="dbRecGrid" class="db-rec-grid">
+            <div style="grid-column:1/-1;text-align:center;padding:30px;color:#94a3b8">
+                <i class="fas fa-spinner fa-pulse fa-2x"></i>
+            </div>
+        </div>
+        <div class="db-rec-foot">
+            <div style="display:flex;flex-direction:column;gap:4px">
+                <span id="dbRecTotalMsg" style="font-size:11px;color:#94a3b8">Menampilkan 0 data produk sample</span>
+                <span class="db-rec-foot-count">Dipilih: <strong id="dbRecCount">0</strong> produk</span>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
+                <!-- Pilihan metode pengiriman -->
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                    <span style="font-size:10px;color:#94a3b8;font-weight:600;">Metode:</span>
+                    <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:#e2e8f0;cursor:pointer">
+                        <input type="radio" name="dbDeliveryMethod" value="manual" checked onchange="dbOnMethodChange(this.value)" style="accent-color:#4ade80">
+                        Manual
+                    </label>
+                    <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:#e2e8f0;cursor:pointer">
+                        <input type="radio" name="dbDeliveryMethod" value="system" onchange="dbOnMethodChange(this.value)" style="accent-color:#3b82f6">
+                        By System (TAP)
+                    </label>
+                </div>
+                <!-- Input TAP Request ID — muncul hanya jika By System -->
+                <div id="dbTapIdWrap" style="display:none;width:100%">
+                    <input type="text" id="dbTapRequestId"
+                        placeholder="TAP Request ID (dari TAP Backend)"
+                        style="width:100%;max-width:320px;padding:7px 12px;background:#0f1420;border:1px solid rgba(59,130,246,0.4);border-radius:10px;color:#e2e8f0;font-size:11px;outline:none;">
+                    <div style="font-size:10px;color:#64748b;margin-top:3px">ID pengajuan sample dari TAP Backend</div>
+                </div>
+                <div style="display:flex;gap:8px">
+                    <button onclick="dbCloseRecModal()"
+                        style="padding:8px 18px;border-radius:40px;border:1px solid rgba(255,255,255,0.15);background:transparent;color:#94a3b8;font-size:12px;cursor:pointer">
+                        Batal
+                    </button>
+                    <button onclick="dbConfirmSampleDelivery()"
+                        style="padding:8px 18px;border-radius:40px;border:none;background:linear-gradient(135deg,#4ade80,#22c55e);color:#0a0e17;font-size:12px;font-weight:600;cursor:pointer">
+                        <i class="fas fa-paper-plane"></i> Konfirmasi Pengiriman
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+/* =============================================
+   FITUR F: JS untuk Dashboard (Konfirmasi Sample & Rekomendasi)
+   ============================================= */
+(function() {
+    let _dbCreatorId   = null;
+    let _dbCreatorName = null;
+    let _dbSelProducts = [];
+
+    // Buka modal konfirmasi kesediaan
+    window.openDashboardWillingModal = function(creatorId, username) {
+        _dbCreatorId   = creatorId;
+        _dbCreatorName = username;
+        _dbSelProducts = [];
+        document.getElementById('dbWillingName').textContent = '@' + username;
+        document.getElementById('dbWillingNotes').value = '';
+        document.getElementById('dbWillingOverlay').classList.add('active');
+    };
+
+    window.dbCloseWillingModal = function() {
+        document.getElementById('dbWillingOverlay').classList.remove('active');
+    };
+
+    window.dbSubmitWilling = function(willing) {
+        const notes = document.getElementById('dbWillingNotes').value;
+        fetch(BASE_URL + 'is/confirm_sample_willingness', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: `creator_id=${_dbCreatorId}&willing=${willing}&notes=${encodeURIComponent(notes)}`
+        })
+        .then(r => r.json())
+        .then(data => {
+            dbCloseWillingModal();
+            if (!data.success) { showToastGlobal(data.message, 'error'); return; }
+            if (willing) {
+                // Buka rekomendasi produk
+                showToastGlobal('Creator bersedia. Memuat rekomendasi produk...', 'success');
+                setTimeout(() => dbOpenRecModal(), 400);
+            } else {
+                showToastGlobal('Creator tidak bersedia. Dipindahkan ke Monitoring.', 'success');
+                setTimeout(() => location.reload(), 1800);
+            }
+        })
+        .catch(() => showToastGlobal('Gagal mengirim konfirmasi', 'error'));
+    };
+
+    function dbOpenRecModal() {
+        _dbSelProducts = [];
+        let _dbRecMap = {};
+        document.getElementById('dbRecCount').textContent = '0';
+        // Reset metode ke Manual setiap kali modal dibuka
+        document.querySelectorAll('input[name="dbDeliveryMethod"]').forEach(r => { r.checked = r.value === 'manual'; });
+        document.getElementById('dbTapIdWrap').style.display = 'none';
+        document.getElementById('dbTapRequestId').value = '';
+        document.getElementById('dbRecGrid').innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:30px;color:#94a3b8"><i class="fas fa-spinner fa-pulse fa-2x"></i></div>';
+        document.getElementById('dbRecOverlay').classList.add('active');
+
+        fetch(BASE_URL + 'is/get_sample_recommendations', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: 'creator_id=' + _dbCreatorId
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success || !data.recommendations || !data.recommendations.length) {
+                document.getElementById('dbRecGrid').innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:30px;color:#94a3b8"><i class="fas fa-box-open fa-2x"></i><p>Tidak ada rekomendasi produk tersedia</p></div>';
+                return;
+            }
+            document.getElementById('dbRecSubtitle').textContent =
+                'Kategori: ' + (data.creator_categories.join(', ') || 'Semua') +
+                ' | Brand creator: ' + (data.creator_brands.join(', ') || '-');
+
+            // Simpan data ke Map — jangan embed JSON ke onclick attribute
+            data.recommendations.forEach((p, i) => { _dbRecMap[i] = p; });
+
+            document.getElementById('dbRecTotalMsg').textContent = `Menampilkan ${data.recommendations.length} data produk sample`;
+
+            const grid = document.getElementById('dbRecGrid');
+            grid.innerHTML = data.recommendations.map((p, i) => `
+                <div class="db-rec-item" data-db-rec-index="${i}">
+                    <div class="chk">✓</div>
+                    ${p.image_url ? `<img src="${escHtmlDb(p.image_url)}" class="db-rec-img" onerror="this.style.display='none'">` : '<div class="db-rec-img" style="display:flex;align-items:center;justify-content:center;color:#64748b"><i class="fas fa-image fa-2x"></i></div>'}
+                    <div class="db-rec-name">${escHtmlDb(p.product_name || p.name || '-')}</div>
+                    <div class="db-rec-brand">🏪 ${escHtmlDb(p.shop_name || p.brand_display_name || '-')}</div>
+                </div>`
+            ).join('');
+
+            // Pasang event listener — hindari bubbling seperti fix di monitoring.php
+            grid.querySelectorAll('.db-rec-item').forEach(card => {
+                card.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const targetCard = this.closest('[data-db-rec-index]');
+                    if (!targetCard) return;
+                    const idx = parseInt(targetCard.dataset.dbRecIndex, 10);
+                    const product = _dbRecMap[idx];
+                    if (!product) return;
+                    const key = String(idx);
+                    const existingIdx = _dbSelProducts.findIndex(p => p._recIdx === key);
+                    if (existingIdx >= 0) {
+                        _dbSelProducts.splice(existingIdx, 1);
+                        targetCard.classList.remove('sel');
+                    } else {
+                        _dbSelProducts.push({ ...product, _recIdx: key });
+                        targetCard.classList.add('sel');
+                    }
+                    document.getElementById('dbRecCount').textContent = _dbSelProducts.length;
+                });
+            });
+        });
+    }
+
+    window.dbCloseRecModal = function() {
+        document.getElementById('dbRecOverlay').classList.remove('active');
+    };
+
+    // Toggle TAP Request ID input berdasarkan metode yang dipilih
+    window.dbOnMethodChange = function(value) {
+        document.getElementById('dbTapIdWrap').style.display = value === 'system' ? 'block' : 'none';
+    };
+
+    window.dbConfirmSampleDelivery = function() {
+        if (_dbSelProducts.length === 0) {
+            showToastGlobal('Pilih minimal 1 produk sample', 'error');
+            return;
+        }
+        const deliveryMethod = document.querySelector('input[name="dbDeliveryMethod"]:checked')?.value || 'manual';
+        const tapRequestId   = document.getElementById('dbTapRequestId').value.trim();
+
+        if (deliveryMethod === 'system' && !tapRequestId) {
+            showToastGlobal('TAP Request ID wajib diisi untuk pengiriman By System', 'error');
+            return;
+        }
+
+        const products = _dbSelProducts.map(p => ({
+            product_id:  p.product_id,
+            product_name: p.product_name || p.name,
+            brand_id:    p.brand_db_id,
+            brand_name:  p.brand_display_name || p.shop_name,
+            quantity:    1,
+        }));
+        fetch(BASE_URL + 'is/save_sample_delivery', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: `creator_id=${_dbCreatorId}&products=${encodeURIComponent(JSON.stringify(products))}&delivery_method=${deliveryMethod}&tap_request_id=${encodeURIComponent(tapRequestId)}`
+        })
+        .then(r => r.json())
+        .then(data => {
+            dbCloseRecModal();
+            if (!data.success) { showToastGlobal(data.message, 'error'); return; }
+            showToastGlobal(data.message, 'success');
+            setTimeout(() => location.reload(), 1800);
+        })
+        .catch(() => showToastGlobal('Gagal menyimpan', 'error'));
+    };
+
+    function escHtmlDb(str) {
+        return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // Close overlay on background click
+    ['dbWillingOverlay','dbRecOverlay'].forEach(id => {
+        document.getElementById(id).addEventListener('click', function(e) {
+            if (e.target === this) this.classList.remove('active');
+        });
+    });
+})();
+</script>
