@@ -8804,32 +8804,34 @@ public function monitoring() {
     $is_supervisor = ($user_id == 2);
 
     // Ambil semua creator ACTIVE yang di-handle IS ini (atau semua jika supervisor)
+    // Urutkan berdasarkan total GMV tertinggi dalam 30 hari terakhir
+    $thirty_days_ago = date('Y-m-d', strtotime('-30 days'));
+    
     $query = $this->db
         ->select('c.id, c.username, c.full_name, c.avatar_url, c.category, c.status,
-                  c.brand_id, c.is_id, b.name as brand_name, u.full_name as is_name')
+                  c.brand_id, c.is_id, b.name as brand_name, u.full_name as is_name,
+                  COALESCE(SUM(ao.gmv), 0) as total_gmv_30d,
+                  COUNT(DISTINCT ao.order_id) as total_orders_30d')
         ->from('creators c')
         ->join('brands b', 'c.brand_id = b.id', 'left')
         ->join('users u', 'c.is_id = u.id', 'left')
+        ->join('affiliate_orders ao', "c.username = ao.creator_username AND ao.order_date_local >= '{$thirty_days_ago}' AND ao.order_status NOT IN ('CANCELLED', 'REFUNDED')", 'left')
         ->where_in('c.status', ['ACTIVE', 'SAMPLE_SENT']);
 
     if (!$is_supervisor) {
         $query->where('c.is_id', $user_id);
     }
 
-    $creators = $query->order_by('c.updated_at', 'DESC')->limit(200)->get()->result();
+    $creators = $query->group_by(array('c.id', 'b.name', 'u.full_name'))
+                      ->order_by('total_gmv_30d', 'DESC')
+                      ->limit(200)
+                      ->get()
+                      ->result();
 
     // Hitung statistik ringkas per creator
     foreach ($creators as &$creator) {
-        $gmv = $this->db
-            ->select('COALESCE(SUM(gmv), 0) as total_gmv, COUNT(DISTINCT order_id) as total_orders')
-            ->from('affiliate_orders')
-            ->where('creator_username', $creator->username)
-            ->where('order_date_local >=', date('Y-m-d', strtotime('-30 days')))
-            ->where('order_status NOT IN ("CANCELLED", "REFUNDED")')
-            ->get()->row();
-
-        $creator->total_gmv_30d   = floatval($gmv->total_gmv ?? 0);
-        $creator->total_orders_30d = intval($gmv->total_orders ?? 0);
+        $creator->total_gmv_30d   = floatval($creator->total_gmv_30d);
+        $creator->total_orders_30d = intval($creator->total_orders_30d);
 
         // Jumlah sample yang sudah dikirim
         $creator->sample_count = $this->db
