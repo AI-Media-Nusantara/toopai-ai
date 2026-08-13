@@ -455,6 +455,7 @@
 }
 </style>
 
+<?php if (!isset($hide_monitoring_main_content) || !$hide_monitoring_main_content): ?>
 <?php
 $total_gmv_all  = array_sum(array_column($creators, 'total_gmv_30d'));
 $total_sample   = array_sum(array_column($creators, 'sample_count'));
@@ -628,6 +629,7 @@ function fmt_rp($val) {
     </div>
 
 </div><!-- .mon-page -->
+<?php endif; ?>
 
 <!-- ====================================================
      MODAL: DETAIL MONITORING
@@ -802,9 +804,9 @@ let monitoringData     = null;
 let selectedRecProducts = [];
 
 // -------- FILTER TABLE --------
-document.getElementById('monSearchBox').addEventListener('input', filterTable);
-document.getElementById('monFilterStatus').addEventListener('change', filterTable);
-document.getElementById('monFilterOrder').addEventListener('change', filterTable);
+document.getElementById('monSearchBox')?.addEventListener('input', filterTable);
+document.getElementById('monFilterStatus')?.addEventListener('change', filterTable);
+document.getElementById('monFilterOrder')?.addEventListener('change', filterTable);
 
 function filterTable() {
     const kw       = document.getElementById('monSearchBox').value.toLowerCase();

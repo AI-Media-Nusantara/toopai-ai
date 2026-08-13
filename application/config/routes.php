@@ -146,3 +146,11 @@ $route['is/get_creator_gmv_breakdown']       = 'is/get_creator_gmv_breakdown';
 $route['is/add_creator_video']               = 'is/add_creator_video';
 $route['is/update_sample_video_link']        = 'is/update_sample_video_link';
 $route['is/get_sample_keranjang_trigger']    = 'is/get_sample_keranjang_trigger';
+
+// Profile & Management User Dashboard
+$route['profile'] = 'profile';
+$route['profile/save'] = 'profile/save';
+$route['profile/add_managed_user'] = 'profile/add_managed_user';
+$route['profile/toggle_status'] = 'profile/toggle_status';
+
+
