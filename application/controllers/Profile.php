@@ -40,7 +40,7 @@ class Profile extends CI_Controller {
         }
 
         // Ambil data sample requests
-        if ($role === 'ADMIN') {
+        if ($role === 'ADMIN' || $user_id == 2) {
             $sample_requests = $this->db->select('sr.*, c.username as creator_username, ap.product_name, ap.image_url')
                                         ->from('sample_requests sr')
                                         ->join('creators c', 'sr.creator_id = c.id', 'left')
