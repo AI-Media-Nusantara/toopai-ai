@@ -39,24 +39,26 @@ class Profile extends CI_Controller {
                                       ->result();
         }
 
-        // Ambil data sample requests
+        // Ambil data sample requests (hanya yang berisi produk/pengiriman nyata)
         if ($role === 'ADMIN' || $user_id == 2) {
             $sample_requests = $this->db->select('sr.*, c.username as creator_username, ap.product_name, ap.image_url')
-                                        ->from('sample_requests sr')
-                                        ->join('creators c', 'sr.creator_id = c.id', 'left')
-                                        ->join('affiliate_products ap', 'sr.product_id = ap.product_id', 'left')
-                                        ->order_by('sr.requested_at', 'DESC')
-                                        ->get()
-                                        ->result();
+                                         ->from('sample_requests sr')
+                                         ->join('creators c', 'sr.creator_id = c.id', 'left')
+                                         ->join('affiliate_products ap', 'sr.product_id = ap.product_id', 'left')
+                                         ->where('sr.product_id IS NOT NULL')
+                                         ->order_by('sr.requested_at', 'DESC')
+                                         ->get()
+                                         ->result();
         } else {
             $sample_requests = $this->db->select('sr.*, c.username as creator_username, ap.product_name, ap.image_url')
-                                        ->from('sample_requests sr')
-                                        ->join('creators c', 'sr.creator_id = c.id', 'left')
-                                        ->join('affiliate_products ap', 'sr.product_id = ap.product_id', 'left')
-                                        ->where('c.is_id', $user_id)
-                                        ->order_by('sr.requested_at', 'DESC')
-                                        ->get()
-                                        ->result();
+                                         ->from('sample_requests sr')
+                                         ->join('creators c', 'sr.creator_id = c.id', 'left')
+                                         ->join('affiliate_products ap', 'sr.product_id = ap.product_id', 'left')
+                                         ->where('c.is_id', $user_id)
+                                         ->where('sr.product_id IS NOT NULL')
+                                         ->order_by('sr.requested_at', 'DESC')
+                                         ->get()
+                                         ->result();
         }
 
         // Ambil data creator untuk Monitoring Creator
