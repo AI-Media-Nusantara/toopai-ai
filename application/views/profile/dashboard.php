@@ -145,52 +145,81 @@
         <div id="samples-tab" class="profile-tab-content">
             <div class="content-header">
                 <h2><i class="fas fa-box-open"></i> Manage Sample Creator</h2>
-                <p>Pantau riwayat dan pengiriman produk sample ke creator affiliate Anda.</p>
+                <p>Pantau dan kelola pengiriman sampel produk gratis ke kreator affiliate langsung dari TAP API.</p>
             </div>
+
+            <!-- Status Tabs (Mirrors TikTok Partner Center) -->
+            <div class="tap-sample-tabs-container">
+                <div class="tap-sample-tab active" data-status="" onclick="selectTapStatus(this)">
+                    Semua <span class="tab-count" id="tapCount-all">0</span>
+                </div>
+                <div class="tap-sample-tab" data-status="PENDING" onclick="selectTapStatus(this)">
+                    Perlu ditinjau <span class="tab-count" id="tapCount-pending">0</span>
+                </div>
+                <div class="tap-sample-tab" data-status="APPROVED" onclick="selectTapStatus(this)">
+                    Siap dikirim <span class="tab-count" id="tapCount-approved">0</span>
+                </div>
+                <div class="tap-sample-tab" data-status="SHIPPED" onclick="selectTapStatus(this)">
+                    Dikirim <span class="tab-count" id="tapCount-shipped">0</span>
+                </div>
+                <div class="tap-sample-tab" data-status="DELIVERED" onclick="selectTapStatus(this)">
+                    Konten tertunda <span class="tab-count" id="tapCount-delivered">0</span>
+                </div>
+                <div class="tap-sample-tab" data-status="COMPLETED" onclick="selectTapStatus(this)">
+                    Selesai <span class="tab-count" id="tapCount-completed">0</span>
+                </div>
+                <div class="tap-sample-tab" data-status="CANCELLED" onclick="selectTapStatus(this)">
+                    Dibatalkan <span class="tab-count" id="tapCount-cancelled">0</span>
+                </div>
+            </div>
+
+            <!-- Filters (Mirrors TikTok Partner Center) -->
+            <div class="tap-sample-filters">
+                <div class="filter-group">
+                    <label for="tapFilterProductId">ID Produk</label>
+                    <input type="text" id="tapFilterProductId" class="form-control-custom" placeholder="Cari ID Produk...">
+                </div>
+                <div class="filter-group">
+                    <label for="tapFilterCampaignId">ID Campaign</label>
+                    <input type="text" id="tapFilterCampaignId" class="form-control-custom" placeholder="Cari ID Campaign...">
+                </div>
+                <div class="filter-group">
+                    <label for="tapFilterUsername">Nama Pengguna Kreator</label>
+                    <input type="text" id="tapFilterUsername" class="form-control-custom" placeholder="Cari username kreator...">
+                </div>
+                <div class="filter-group button-group">
+                    <button class="btn-primary-custom" style="border-radius: var(--radius-sm);" onclick="loadTapSampleRequests()"><i class="fas fa-search"></i> Cari</button>
+                    <button class="btn-secondary-custom" style="height: 48px;" onclick="resetTapFilters()"><i class="fas fa-undo"></i> Reset</button>
+                </div>
+            </div>
+
+            <!-- Sample Requests Card -->
             <div class="profile-card">
-                <table class="table-custom">
-                    <thead>
-                        <tr>
-                            <th>Creator</th>
-                            <th>Produk</th>
-                            <th>Qty</th>
-                            <th>Status</th>
-                            <th>Tanggal Request</th>
-                            <th>Notes</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if (empty($sample_requests)): ?>
+                <div style="overflow-x: auto;">
+                    <table class="table-custom" id="tapSampleTable">
+                        <thead>
                             <tr>
-                                <td colspan="6" class="text-center text-muted">Belum ada data pengiriman sample.</td>
+                                <th>Produk & Campaign</th>
+                                <th>Kreator</th>
+                                <th>Qty</th>
+                                <th>Status</th>
+                                <th>Sisa Waktu / Tanggal</th>
+                                <th style="text-align: right;">Tindakan</th>
                             </tr>
-                        <?php else: ?>
-                            <?php foreach ($sample_requests as $s): ?>
-                                <tr>
-                                    <td><strong>@<?= htmlspecialchars($s->creator_username) ?></strong></td>
-                                    <td>
-                                        <div class="product-cell">
-                                            <?php if ($s->image_url): ?>
-                                                <img src="<?= htmlspecialchars($s->image_url) ?>" alt="Product">
-                                            <?php else: ?>
-                                                <div class="product-placeholder"><i class="fas fa-image"></i></div>
-                                            <?php endif; ?>
-                                            <span><?= htmlspecialchars($s->product_name ?: 'Willingness Confirmation Only') ?></span>
-                                        </div>
-                                    </td>
-                                    <td><?= (int)$s->quantity ?></td>
-                                    <td>
-                                        <span class="status-badge <?= strtolower($s->status) ?>">
-                                            <?= $s->status ?>
-                                        </span>
-                                    </td>
-                                    <td><?= date('d M Y H:i', strtotime($s->requested_at)) ?></td>
-                                    <td class="text-muted italic"><?= htmlspecialchars($s->notes ?: '-') ?></td>
-                                </tr>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            <!-- Loaded via AJAX -->
+                        </tbody>
+                    </table>
+                </div>
+                <!-- Pagination -->
+                <div class="tap-pagination-container" id="tapPagination" style="display: none;">
+                    <div class="tap-pagination-info" id="tapPaginationInfo">Menampilkan 0 - 0 data</div>
+                    <div class="tap-pagination-buttons">
+                        <button class="tap-pagination-btn" id="tapPrevBtn" onclick="tapChangePage(-1)"><i class="fas fa-chevron-left"></i> Sebelum</button>
+                        <button class="tap-pagination-btn" id="tapNextBtn" onclick="tapChangePage(1)">Berikut <i class="fas fa-chevron-right"></i></button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -743,6 +772,297 @@
 .action-flex { display: flex; gap: 8px; align-items: center; }
 .red-badge { background: rgba(255, 79, 101, 0.15); color: var(--red); border: 1px solid rgba(255, 79, 101, 0.3); }
 .stat-span { font-weight: 600; font-size: 13px; }
+
+/* ==========================================================================
+   TAP INTEGRATION STYLING
+   ========================================================================== */
+.tap-sample-tabs-container {
+    display: flex;
+    border-bottom: 2px solid var(--stroke);
+    margin-bottom: 25px;
+    gap: 15px;
+    overflow-x: auto;
+    padding-bottom: 5px;
+}
+
+.tap-sample-tab {
+    padding: 12px 16px;
+    color: var(--muted-2);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.tap-sample-tab:hover {
+    color: #fff;
+}
+
+.tap-sample-tab.active {
+    color: var(--cyan);
+    border-bottom-color: var(--cyan);
+}
+
+.tab-count {
+    font-size: 10px;
+    background: rgba(255, 255, 255, 0.08);
+    padding: 2px 6px;
+    border-radius: 999px;
+    color: var(--muted-2);
+}
+
+.tap-sample-tab.active .tab-count {
+    background: rgba(16, 223, 240, 0.15);
+    color: var(--cyan);
+}
+
+.tap-sample-filters {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr auto;
+    gap: 15px;
+    align-items: flex-end;
+    margin-bottom: 25px;
+    background: rgba(8, 18, 34, 0.45);
+    border: 1px solid var(--stroke);
+    padding: 20px;
+    border-radius: var(--radius-md);
+}
+
+.tap-sample-filters .filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.tap-sample-filters .filter-group label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted-2);
+}
+
+.tap-sample-filters .button-group {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+}
+
+.tap-sample-filters button {
+    height: 48px;
+}
+
+.btn-sm-custom {
+    padding: 8px 14px;
+    font-size: 12px;
+    border-radius: 8px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 0;
+    transition: all 0.2s ease;
+}
+
+.btn-approve-tap {
+    background: rgba(57, 240, 138, 0.12);
+    color: var(--green);
+    border: 1px solid rgba(57, 240, 138, 0.25);
+}
+
+.btn-approve-tap:hover {
+    background: var(--green);
+    color: #030914;
+    transform: translateY(-1px);
+    box-shadow: 0 0 12px rgba(57, 240, 138, 0.2);
+}
+
+.btn-reject-tap {
+    background: rgba(255, 79, 101, 0.12);
+    color: var(--red);
+    border: 1px solid rgba(255, 79, 101, 0.25);
+}
+
+.btn-reject-tap:hover {
+    background: var(--red);
+    color: #fff;
+    transform: translateY(-1px);
+    box-shadow: 0 0 12px rgba(255, 79, 101, 0.2);
+}
+
+.btn-logistics-tap {
+    background: rgba(16, 223, 240, 0.12);
+    color: var(--cyan);
+    border: 1px solid rgba(16, 223, 240, 0.25);
+}
+
+.btn-logistics-tap:hover {
+    background: var(--cyan);
+    color: #030914;
+    transform: translateY(-1px);
+    box-shadow: 0 0 12px rgba(16, 223, 240, 0.2);
+}
+
+.status-badge.tap-pending { background: rgba(245, 166, 35, 0.15); color: var(--orange); border: 1px solid rgba(245, 166, 35, 0.3); }
+.status-badge.tap-approved { background: rgba(124, 60, 255, 0.15); color: var(--purple-2); border: 1px solid rgba(124, 60, 255, 0.3); }
+.status-badge.tap-shipped { background: rgba(16, 223, 240, 0.15); color: var(--cyan); border: 1px solid rgba(16, 223, 240, 0.3); }
+.status-badge.tap-delivered { background: rgba(57, 240, 138, 0.15); color: var(--green); border: 1px solid rgba(57, 240, 138, 0.3); }
+.status-badge.tap-completed { background: rgba(57, 240, 138, 0.15); color: var(--green); border: 1px solid rgba(57, 240, 138, 0.3); }
+.status-badge.tap-rejected { background: rgba(255, 79, 101, 0.15); color: var(--red); border: 1px solid rgba(255, 79, 101, 0.3); }
+.status-badge.tap-cancelled { background: rgba(142, 155, 182, 0.15); color: var(--muted); border: 1px solid rgba(142, 155, 182, 0.3); }
+
+/* Logistics Timeline (Vertical) */
+.logistics-timeline {
+    position: relative;
+    padding-left: 28px;
+    margin: 15px 0;
+}
+
+.logistics-timeline::before {
+    content: '';
+    position: absolute;
+    left: 7px;
+    top: 6px;
+    bottom: 6px;
+    width: 2px;
+    background: rgba(112, 136, 185, 0.15);
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 24px;
+}
+
+.timeline-item:last-child {
+    margin-bottom: 0;
+}
+
+.timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -25px;
+    top: 5px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+    border: 2px solid var(--bg-2);
+    z-index: 2;
+    transition: all 0.2s ease;
+}
+
+.timeline-item.active::before {
+    background: var(--cyan);
+    box-shadow: 0 0 10px var(--cyan);
+    width: 10px;
+    height: 10px;
+    left: -26px;
+}
+
+.timeline-time {
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: 500;
+    margin-bottom: 3px;
+}
+
+.timeline-status {
+    font-size: 13px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 3px;
+}
+
+.timeline-desc {
+    font-size: 12px;
+    color: var(--muted-2);
+    line-height: 1.4;
+}
+
+/* Pagination */
+.tap-pagination-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid rgba(112, 136, 185, 0.08);
+}
+.tap-pagination-info {
+    font-size: 13px;
+    color: var(--muted);
+}
+.tap-pagination-buttons {
+    display: flex;
+    gap: 10px;
+}
+.tap-pagination-btn {
+    padding: 8px 16px;
+    border-radius: 99px;
+    border: 1px solid var(--stroke);
+    background: rgba(8, 18, 34, 0.65);
+    color: #fff;
+    font-weight: 700;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.tap-pagination-btn:hover:not(:disabled) {
+    border-color: var(--stroke-strong);
+    background: rgba(124, 60, 255, 0.15);
+}
+.tap-pagination-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.toast-container {
+    position: fixed;
+    bottom: 25px;
+    right: 25px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.toast-custom {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 20px;
+    border-radius: var(--radius-md);
+    background: rgba(15, 29, 53, 0.95);
+    border-left: 4px solid var(--purple);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(12px);
+    transform: translateY(20px);
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.toast-custom.show {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+.toast-custom.success { border-left-color: var(--green); }
+.toast-custom.error { border-left-color: var(--red); }
+.toast-custom.info { border-left-color: var(--cyan); }
+
+.toast-custom i {
+    font-size: 16px;
+}
+.toast-custom.success i { color: var(--green); }
+.toast-custom.error i { color: var(--red); }
+.toast-custom.info i { color: var(--cyan); }
 </style>
 
 <script>
@@ -759,6 +1079,11 @@ function switchTab(tabId, el) {
         item.classList.remove('active');
     });
     el.classList.add('active');
+
+    // JIKA pindah ke samples-tab, trigger loading data dari TAP
+    if (tabId === 'samples-tab') {
+        loadTapSampleRequests();
+    }
 }
 
 function saveProfile(event) {
@@ -984,9 +1309,440 @@ function fmtRpJs(val) {
     return 'Rp ' + val.toFixed(0);
 }
 
+
+// ==========================================================================
+// TAP SAMPLES INTEGRATION JAVASCRIPT
+// ==========================================================================
+let tapSamples = [];
+let tapFilteredSamples = [];
+let tapCurrentPage = 1;
+let tapPageSize = 10;
+let selectedTapStatus = ""; // Kosong berarti "SEMUA"
+
+function showCustomToast(message, type = 'success') {
+    let container = document.getElementById('tapToastContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'tapToastContainer';
+        container.className = 'toast-container';
+        document.body.appendChild(container);
+    }
+    
+    const toast = document.createElement('div');
+    toast.className = `toast-custom ${type}`;
+    
+    let iconClass = 'fa-check-circle';
+    if (type === 'error') iconClass = 'fa-times-circle';
+    if (type === 'info') iconClass = 'fa-info-circle';
+    
+    toast.innerHTML = `<i class="fas ${iconClass}"></i><span>${message}</span>`;
+    container.appendChild(toast);
+    
+    // trigger reflow
+    setTimeout(() => toast.classList.add('show'), 10);
+    
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    }, 4000);
+}
+
+function loadTapSampleRequests() {
+    const tbody = document.querySelector('#tapSampleTable tbody');
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="6" class="text-center" style="padding: 50px 0;">
+                <i class="fas fa-spinner fa-spin" style="font-size: 32px; color: var(--cyan); margin-bottom: 15px;"></i>
+                <div style="color: var(--muted); font-size: 13px;">Mengambil data dari TAP API...</div>
+            </td>
+        </tr>
+    `;
+    
+    const username = document.getElementById('tapFilterUsername').value.trim();
+    const product_id = document.getElementById('tapFilterProductId').value.trim();
+    
+    const formData = new FormData();
+    if (selectedTapStatus) {
+        formData.append('status', selectedTapStatus);
+    }
+    if (username) {
+        formData.append('username', username);
+    }
+    if (product_id) {
+        formData.append('product_id', product_id);
+    }
+    
+    fetch('<?= base_url('profile/get_tap_sample_requests') ?>', {
+        method: 'POST',
+        body: formData
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            tapSamples = res.data || [];
+            
+            // local filtering untuk ID Campaign
+            const campaignFilter = document.getElementById('tapFilterCampaignId').value.trim();
+            if (campaignFilter) {
+                tapFilteredSamples = tapSamples.filter(s => 
+                    (s.campaign_id && s.campaign_id.toLowerCase().includes(campaignFilter.toLowerCase())) ||
+                    (s.campaign_name && s.campaign_name.toLowerCase().includes(campaignFilter.toLowerCase()))
+                );
+            } else {
+                tapFilteredSamples = tapSamples;
+            }
+            
+            // update counts untuk tabs
+            updateTabCounts();
+            
+            tapCurrentPage = 1;
+            renderTapTable();
+        } else {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="text-center text-muted" style="padding: 40px 0;">
+                        <i class="fas fa-exclamation-triangle" style="font-size: 28px; color: var(--red); margin-bottom: 12px;"></i>
+                        <div style="font-weight:700; margin-bottom:6px;">Gagal Memuat Data</div>
+                        <div>${res.message || 'Pastikan otentikasi Seller TikTok valid.'}</div>
+                    </td>
+                </tr>
+            `;
+            showCustomToast(res.message || 'Gagal memuat data dari TAP API.', 'error');
+        }
+    })
+    .catch(err => {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" class="text-center text-muted" style="padding: 40px 0;">
+                    <i class="fas fa-wifi" style="font-size: 28px; color: var(--red); margin-bottom: 12px;"></i>
+                    <div style="font-weight:700; margin-bottom:6px;">Kesalahan Koneksi</div>
+                    <div>Gagal terhubung dengan server Toopai.</div>
+                </td>
+            </tr>
+        `;
+        showCustomToast('Koneksi bermasalah: ' + err, 'error');
+    });
+}
+
+function updateTabCounts() {
+    if (!selectedTapStatus) {
+        const counts = {
+            all: tapFilteredSamples.length,
+            pending: 0,
+            approved: 0,
+            shipped: 0,
+            delivered: 0,
+            completed: 0,
+            cancelled: 0
+        };
+        
+        tapFilteredSamples.forEach(s => {
+            const status = (s.status || '').toUpperCase();
+            if (status === 'PENDING') counts.pending++;
+            else if (status === 'APPROVED' || status === 'AWAITING_SHIPMENT') counts.approved++;
+            else if (status === 'SHIPPED') counts.shipped++;
+            else if (status === 'DELIVERED') counts.delivered++;
+            else if (status === 'COMPLETED') counts.completed++;
+            else if (status === 'CANCELLED' || status === 'REJECTED') counts.cancelled++;
+        });
+        
+        document.getElementById('tapCount-all').textContent = counts.all;
+        document.getElementById('tapCount-pending').textContent = counts.pending;
+        document.getElementById('tapCount-approved').textContent = counts.approved;
+        document.getElementById('tapCount-shipped').textContent = counts.shipped;
+        document.getElementById('tapCount-delivered').textContent = counts.delivered;
+        document.getElementById('tapCount-completed').textContent = counts.completed;
+        document.getElementById('tapCount-cancelled').textContent = counts.cancelled;
+    }
+}
+
+function selectTapStatus(el) {
+    document.querySelectorAll('.tap-sample-tab').forEach(tab => tab.classList.remove('active'));
+    el.classList.add('active');
+    selectedTapStatus = el.getAttribute('data-status');
+    loadTapSampleRequests();
+}
+
+function resetTapFilters() {
+    document.getElementById('tapFilterProductId').value = '';
+    document.getElementById('tapFilterCampaignId').value = '';
+    document.getElementById('tapFilterUsername').value = '';
+    selectedTapStatus = '';
+    document.querySelectorAll('.tap-sample-tab').forEach(tab => tab.classList.remove('active'));
+    document.querySelector('.tap-sample-tab[data-status=""]').classList.add('active');
+    loadTapSampleRequests();
+}
+
+function renderTapTable() {
+    const tbody = document.querySelector('#tapSampleTable tbody');
+    const paginator = document.getElementById('tapPagination');
+    
+    if (tapFilteredSamples.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted" style="padding: 40px 0;">Tidak ada data pengiriman sampel.</td></tr>';
+        paginator.style.display = 'none';
+        return;
+    }
+    
+    paginator.style.display = 'flex';
+    
+    const startIdx = (tapCurrentPage - 1) * tapPageSize;
+    const endIdx = startIdx + tapPageSize;
+    const pageData = tapFilteredSamples.slice(startIdx, endIdx);
+    
+    tbody.innerHTML = pageData.map(s => {
+        const imgHtml = s.product_image ? 
+            `<img src="${s.product_image}" alt="Product" style="width: 44px; height: 44px; border-radius: 8px; object-fit: cover;">` : 
+            `<div class="product-placeholder" style="width: 44px; height: 44px; border-radius: 8px; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,0.06);"><i class="fas fa-image" style="color:var(--muted);"></i></div>`;
+            
+        const productHtml = `
+            <div style="display: flex; align-items: flex-start; gap: 12px; max-width: 420px;">
+                ${imgHtml}
+                <div>
+                    <div style="font-weight: 700; color: #fff; font-size: 13px; line-height: 1.4; margin-bottom: 4px;">${s.product_name}</div>
+                    <div style="font-size: 11px; color: var(--muted-2); margin-bottom: 2px;">ID Produk: <span style="font-family: monospace;">${s.product_id}</span></div>
+                    <div style="font-size: 11px; color: var(--purple-2); font-weight: 600;">Campaign: ${s.campaign_name || 'N/A'} (<span style="font-family: monospace;">${s.campaign_id || 'N/A'}</span>)</div>
+                </div>
+            </div>
+        `;
+        
+        const creatorHtml = `
+            <div>
+                <strong style="color: #fff;">@${s.creator_username}</strong>
+            </div>
+        `;
+        
+        const statusLower = (s.status || '').toLowerCase();
+        let badgeClass = 'tap-pending';
+        if (statusLower === 'pending') badgeClass = 'tap-pending';
+        else if (statusLower === 'approved' || statusLower === 'awaiting_shipment') badgeClass = 'tap-approved';
+        else if (statusLower === 'shipped') badgeClass = 'tap-shipped';
+        else if (statusLower === 'delivered') badgeClass = 'tap-delivered';
+        else if (statusLower === 'completed') badgeClass = 'tap-completed';
+        else if (statusLower === 'rejected') badgeClass = 'tap-rejected';
+        else if (statusLower === 'cancelled') badgeClass = 'tap-cancelled';
+        
+        const statusHtml = `<span class="status-badge ${badgeClass}">${s.status || 'PENDING'}</span>`;
+        
+        const timeHtml = `
+            <div>
+                <div style="font-size: 12px; font-weight: 600; color: #fff;">${s.request_date_formatted}</div>
+                <div style="font-size: 10px; color: var(--muted); margin-top: 2px;">Expired: ${s.expire_date_formatted}</div>
+            </div>
+        `;
+        
+        let actionsHtml = '';
+        if (statusLower === 'pending') {
+            actionsHtml = `
+                <div class="action-flex" style="justify-content: flex-end;">
+                    <button class="btn-sm-custom btn-approve-tap" onclick="approveTapSample('${s.sample_request_id}', '${s.campaign_id}', '${s.product_id}', '${s.creator_username}')"><i class="fas fa-check"></i> Setujui</button>
+                    <button class="btn-sm-custom btn-reject-tap" onclick="rejectTapSample('${s.sample_request_id}', '${s.campaign_id}', '${s.product_id}', '${s.creator_username}')"><i class="fas fa-times"></i> Tolak</button>
+                </div>
+            `;
+        } else if (['shipped', 'delivered', 'completed'].includes(statusLower)) {
+            actionsHtml = `
+                <div class="action-flex" style="justify-content: flex-end;">
+                    <button class="btn-sm-custom btn-logistics-tap" onclick="viewLogistics('${s.tracking_number}', '${s.status}', '${s.creator_username}', ${s.request_date_raw})"><i class="fas fa-truck"></i> Lihat logistik</button>
+                </div>
+            `;
+        } else {
+            actionsHtml = `
+                <div style="text-align: right; color: var(--muted); font-size: 12px; font-style: italic;">
+                    Tidak ada tindakan
+                </div>
+            `;
+        }
+        
+        return `
+            <tr>
+                <td>${productHtml}</td>
+                <td>${creatorHtml}</td>
+                <td style="font-weight: 700; color: #fff;">${s.available_samples || 1}</td>
+                <td>${statusHtml}</td>
+                <td>${timeHtml}</td>
+                <td>${actionsHtml}</td>
+            </tr>
+        `;
+    }).join('');
+    
+    const totalPages = Math.ceil(tapFilteredSamples.length / tapPageSize);
+    document.getElementById('tapPaginationInfo').textContent = `Menampilkan ${startIdx + 1} - ${Math.min(endIdx, tapFilteredSamples.length)} dari ${tapFilteredSamples.length} data`;
+    document.getElementById('tapPrevBtn').disabled = tapCurrentPage === 1;
+    document.getElementById('tapNextBtn').disabled = tapCurrentPage === totalPages || totalPages === 0;
+}
+
+function tapChangePage(dir) {
+    tapCurrentPage += dir;
+    renderTapTable();
+}
+
+function approveTapSample(requestId, campaignId, productId, username) {
+    if (!confirm(`Apakah Anda yakin ingin MENYETUJUI permintaan sampel dari @${username}?`)) return;
+    
+    showCustomToast('Sedang memproses persetujuan sampel...', 'info');
+    
+    const formData = new FormData();
+    formData.append('sample_request_id', requestId);
+    formData.append('campaign_id', campaignId);
+    formData.append('product_id', productId);
+    formData.append('creator_username', username);
+    
+    fetch('<?= base_url('profile/approve_sample') ?>', {
+        method: 'POST',
+        body: formData
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            showCustomToast('Sampel berhasil disetujui!', 'success');
+            loadTapSampleRequests();
+        } else {
+            showCustomToast('Gagal menyetujui sampel: ' + (res.message || 'Error API'), 'error');
+        }
+    })
+    .catch(err => {
+        showCustomToast('Kesalahan koneksi: ' + err, 'error');
+    });
+}
+
+function rejectTapSample(requestId, campaignId, productId, username) {
+    const reason = prompt(`Masukkan alasan penolakan untuk @${username}:`, 'Persediaan sampel habis');
+    if (reason === null) return;
+    
+    showCustomToast('Sedang memproses penolakan sampel...', 'info');
+    
+    const formData = new FormData();
+    formData.append('sample_request_id', requestId);
+    formData.append('campaign_id', campaignId);
+    formData.append('product_id', productId);
+    formData.append('creator_username', username);
+    formData.append('reason', reason);
+    
+    fetch('<?= base_url('profile/reject_sample') ?>', {
+        method: 'POST',
+        body: formData
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            showCustomToast('Sampel berhasil ditolak.', 'success');
+            loadTapSampleRequests();
+        } else {
+            showCustomToast('Gagal menolak sampel: ' + (res.message || 'Error API'), 'error');
+        }
+    })
+    .catch(err => {
+        showCustomToast('Kesalahan koneksi: ' + err, 'error');
+    });
+}
+
+function viewLogistics(trackingNumber, status, username, requestDate) {
+    document.getElementById('logisticsCourierName').textContent = 'Loading...';
+    document.getElementById('logisticsTrackingNumber').textContent = trackingNumber || '-';
+    document.getElementById('logisticsTimelineContent').innerHTML = `
+        <div style="text-align:center; padding: 25px 0; color:var(--muted);">
+            <i class="fas fa-spinner fa-spin" style="font-size:24px; color:var(--cyan); margin-bottom:10px;"></i>
+            <div>Memuat data pengiriman...</div>
+        </div>
+    `;
+    document.getElementById('tapLogisticsModal').classList.add('show');
+    
+    const formData = new FormData();
+    if (trackingNumber) formData.append('tracking_number', trackingNumber);
+    formData.append('status', status);
+    formData.append('creator_username', username);
+    if (requestDate) formData.append('request_date', requestDate);
+    
+    fetch('<?= base_url('profile/get_logistics_info') ?>', {
+        method: 'POST',
+        body: formData
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            document.getElementById('logisticsCourierName').textContent = res.courier;
+            document.getElementById('logisticsTrackingNumber').textContent = res.tracking_number;
+            
+            const timelineHtml = `
+                <div class="logistics-timeline">
+                    ${res.logs.map((log, idx) => `
+                        <div class="timeline-item ${idx === 0 ? 'active' : ''}">
+                            <div class="timeline-time">${log.time}</div>
+                            <div class="timeline-status">${log.status}</div>
+                            <div class="timeline-desc">${log.desc}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+            document.getElementById('logisticsTimelineContent').innerHTML = timelineHtml;
+        } else {
+            document.getElementById('logisticsTimelineContent').innerHTML = `
+                <div style="text-align:center; padding:20px; color:var(--muted);">
+                    <i class="fas fa-exclamation-circle" style="font-size:24px; color:var(--red); margin-bottom:10px;"></i>
+                    <div>${res.message || 'Logistik belum tersedia.'}</div>
+                </div>
+            `;
+        }
+    })
+    .catch(err => {
+        document.getElementById('logisticsTimelineContent').innerHTML = `
+            <div style="text-align:center; padding:20px; color:var(--muted);">
+                <i class="fas fa-exclamation-triangle" style="font-size:24px; color:var(--red); margin-bottom:10px;"></i>
+                <div>Kesalahan sistem memuat data pengiriman.</div>
+            </div>
+        `;
+    });
+}
+
+function closeLogisticsModal() {
+    document.getElementById('tapLogisticsModal').classList.remove('show');
+}
+
+function copyResi() {
+    const resi = document.getElementById('logisticsTrackingNumber').textContent;
+    if (resi && resi !== '-') {
+        navigator.clipboard.writeText(resi)
+        .then(() => showCustomToast('Nomor resi berhasil disalin!', 'success'))
+        .catch(() => showCustomToast('Gagal menyalin resi.', 'error'));
+    }
+}
+
+window.addEventListener('click', function(event) {
+    const modal = document.getElementById('tapLogisticsModal');
+    if (event.target === modal) {
+        closeLogisticsModal();
+    }
+});
+
 document.addEventListener('DOMContentLoaded', () => {
     initCreatorTable();
 });
 </script>
 
+<!-- MODAL LIHAT LOGISTIK (TAP INTEGRATION) -->
+<div id="tapLogisticsModal" class="modal">
+    <div class="modal-content" style="max-width: 520px;">
+        <div class="modal-header">
+            <h3><i class="fas fa-truck"></i> Pelacakan Logistik Sampel</h3>
+            <span class="close" onclick="closeLogisticsModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div id="logisticsMetaInfo" style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(112,136,185,0.15); padding-bottom: 15px; margin-bottom: 15px;">
+                <div>
+                    <div style="font-size: 11px; color: var(--muted); font-weight:700; text-transform:uppercase;">Ekspedisi</div>
+                    <div id="logisticsCourierName" style="font-weight: 800; font-size: 15px; color: #fff; margin-top:4px;">-</div>
+                </div>
+                <div style="text-align: right;">
+                    <div style="font-size: 11px; color: var(--muted); font-weight:700; text-transform:uppercase;">No. Resi (Salin)</div>
+                    <div id="logisticsTrackingNumber" style="font-weight: 800; font-size: 15px; color: var(--cyan); cursor: pointer; margin-top:4px; text-decoration: underline;" onclick="copyResi()">-</div>
+                </div>
+            </div>
+            
+            <div id="logisticsTimelineContent">
+                <!-- Timeline Dinamis -->
+            </div>
+        </div>
+    </div>
+</div>
+
 <?php $this->load->view('is/monitoring', ['hide_monitoring_main_content' => true]); ?>
+

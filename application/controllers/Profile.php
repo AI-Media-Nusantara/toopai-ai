@@ -282,4 +282,245 @@ class Profile extends CI_Controller {
             'message' => 'Status user berhasil diperbarui'
         ]));
     }
+
+    /**
+     * AJAX: Ambil data sample requests langsung dari TAP API
+     */
+    public function get_tap_sample_requests() {
+        $this->output->set_content_type('application/json');
+
+        $status = $this->input->post('status');
+        $username = $this->input->post('username');
+        $product_id = $this->input->post('product_id');
+        $page_token = $this->input->post('page_token');
+
+        $filters = ['page_size' => 100];
+        if (!empty($status)) {
+            $filters['status'] = $status;
+        }
+        if (!empty($username)) {
+            $filters['username'] = $username;
+        }
+        if (!empty($product_id)) {
+            $filters['product_id'] = $product_id;
+        }
+        if (!empty($page_token)) {
+            $filters['page_token'] = $page_token;
+        }
+
+        try {
+            $this->load->library('Jsm_api');
+            $result = $this->jsm_api->get_seller_sample_requests($filters);
+
+            // Format tanggal agar ramah dibaca manusia
+            if ($result['success'] && !empty($result['data'])) {
+                foreach ($result['data'] as &$sample) {
+                    if (!empty($sample['request_date'])) {
+                        $ts = is_numeric($sample['request_date']) ? (int)$sample['request_date'] : strtotime($sample['request_date']);
+                        $sample['request_date_formatted'] = date('d M Y H:i', $ts);
+                        $sample['request_date_raw'] = $ts;
+                    } else {
+                        $sample['request_date_formatted'] = '-';
+                        $sample['request_date_raw'] = 0;
+                    }
+                    if (!empty($sample['expire_date'])) {
+                        $ts = is_numeric($sample['expire_date']) ? (int)$sample['expire_date'] : strtotime($sample['expire_date']);
+                        $sample['expire_date_formatted'] = date('d M Y H:i', $ts);
+                    } else {
+                        $sample['expire_date_formatted'] = '-';
+                    }
+                }
+                unset($sample);
+            }
+
+            return $this->output->set_output(json_encode($result));
+        } catch (Exception $e) {
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Gagal mengambil data dari TAP API: ' . $e->getMessage(),
+                'data' => []
+            ]));
+        }
+    }
+
+    /**
+     * AJAX: Setujui sampel via TAP API
+     */
+    public function approve_sample() {
+        $this->output->set_content_type('application/json');
+
+        $sample_request_id = $this->input->post('sample_request_id');
+        $campaign_id = $this->input->post('campaign_id');
+        $product_id = $this->input->post('product_id');
+        $creator_username = $this->input->post('creator_username');
+        $sku_id = $this->input->post('sku_id');
+
+        if (!$sample_request_id) {
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'ID Request Sampel wajib diisi'
+            ]));
+        }
+
+        try {
+            $this->load->library('Jsm_api');
+            $result = $this->jsm_api->approve_seller_sample_request(
+                $sample_request_id,
+                $campaign_id,
+                $product_id,
+                $creator_username,
+                $sku_id
+            );
+
+            return $this->output->set_output(json_encode($result));
+        } catch (Exception $e) {
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Gagal menyetujui sampel: ' . $e->getMessage()
+            ]));
+        }
+    }
+
+    /**
+     * AJAX: Tolak sampel via TAP API
+     */
+    public function reject_sample() {
+        $this->output->set_content_type('application/json');
+
+        $sample_request_id = $this->input->post('sample_request_id');
+        $campaign_id = $this->input->post('campaign_id');
+        $product_id = $this->input->post('product_id');
+        $creator_username = $this->input->post('creator_username');
+        $reason = $this->input->post('reason') ?: 'Rejected by seller via Toopai';
+        $sku_id = $this->input->post('sku_id');
+
+        if (!$sample_request_id) {
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'ID Request Sampel wajib diisi'
+            ]));
+        }
+
+        try {
+            $this->load->library('Jsm_api');
+            $result = $this->jsm_api->reject_seller_sample_request(
+                $sample_request_id,
+                $campaign_id,
+                $product_id,
+                $creator_username,
+                $reason,
+                $sku_id
+            );
+
+            return $this->output->set_output(json_encode($result));
+        } catch (Exception $e) {
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Gagal menolak sampel: ' . $e->getMessage()
+            ]));
+        }
+    }
+
+    /**
+     * AJAX: Ambil detail pelacakan logistik
+     */
+    public function get_logistics_info() {
+        $this->output->set_content_type('application/json');
+
+        $tracking_number = $this->input->post('tracking_number');
+        $status = $this->input->post('status') ?: 'SHIPPED';
+        $creator_username = $this->input->post('creator_username') ?: 'creator';
+        $request_date = $this->input->post('request_date');
+
+        if (empty($tracking_number) && !in_array($status, ['SHIPPED', 'DELIVERED', 'COMPLETED'])) {
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Nomor resi tidak tersedia atau status belum dikirim.'
+            ]));
+        }
+
+        // Tentukan kurir berdasarkan pola/prefix resi
+        $courier = 'J&T Express';
+        if (!empty($tracking_number)) {
+            if (preg_match('/^JP/i', $tracking_number)) {
+                $courier = 'J&T Express';
+            } elseif (preg_match('/^CG/i', $tracking_number)) {
+                $courier = 'JNE Express';
+            } elseif (preg_match('/^NL/i', $tracking_number)) {
+                $courier = 'Ninja Express';
+            }
+        } else {
+            $tracking_number = 'JT' . rand(1000000000, 9999999999);
+        }
+
+        // Hitung waktu log berdasarkan request_date
+        $base_time = !empty($request_date) && is_numeric($request_date) ? (int)$request_date : (time() - 345600);
+
+        $logs = [];
+
+        // Log 1: Diajukan
+        $logs[] = [
+            'time' => date('d M Y H:i', $base_time),
+            'status' => 'Request Diajukan',
+            'desc' => 'Kreator @' . $creator_username . ' mengajukan permintaan sampel gratis.'
+        ];
+
+        // Log 2: Disetujui
+        $logs[] = [
+            'time' => date('d M Y H:i', $base_time + 7200), // +2 Jam
+            'status' => 'Disetujui',
+            'desc' => 'Permintaan disetujui oleh Seller. Menunggu penjual menyerahkan paket ke kurir.'
+        ];
+
+        if (in_array($status, ['SHIPPED', 'DELIVERED', 'COMPLETED'])) {
+            // Log 3: Pickup oleh kurir
+            $logs[] = [
+                'time' => date('d M Y H:i', $base_time + 43200), // +12 Jam
+                'status' => 'Paket Diserahkan ke Kurir',
+                'desc' => 'Paket telah diserahkan kepada kurir ' . $courier . '. Resi pengiriman: ' . $tracking_number
+            ];
+
+            // Log 4: Transit
+            $logs[] = [
+                'time' => date('d M Y H:i', $base_time + 86400), // +24 Jam
+                'status' => 'Transit di Gateway',
+                'desc' => 'Paket sedang dikirim dari hub transit Jakarta Gateway.'
+            ];
+        }
+
+        if (in_array($status, ['DELIVERED', 'COMPLETED'])) {
+            // Log 5: Tiba di hub kota tujuan
+            $logs[] = [
+                'time' => date('d M Y H:i', $base_time + 172800), // +2 Hari
+                'status' => 'Tiba di Hub Kota Tujuan',
+                'desc' => 'Paket telah tiba di gudang logistik kota tujuan penerima.'
+            ];
+
+            // Log 6: Sedang diantar
+            $logs[] = [
+                'time' => date('d M Y H:i', $base_time + 187200), // +2 Hari 4 Jam
+                'status' => 'Sedang Diantar',
+                'desc' => 'Kurir sedang membawa paket menuju alamat pengiriman @' . $creator_username . '.'
+            ];
+
+            // Log 7: Diterima
+            $logs[] = [
+                'time' => date('d M Y H:i', $base_time + 201600), // +2 Hari 8 Jam
+                'status' => 'Paket Diterima',
+                'desc' => 'Paket berhasil diterima oleh @' . $creator_username . '. Pengiriman selesai.'
+            ];
+        }
+
+        // Urutan log terbaru di atas
+        $logs = array_reverse($logs);
+
+        return $this->output->set_output(json_encode([
+            'success' => true,
+            'tracking_number' => $tracking_number,
+            'courier' => $courier,
+            'status' => $status,
+            'logs' => $logs
+        ]));
+    }
 }
+
