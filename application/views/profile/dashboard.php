@@ -763,6 +763,7 @@
     .profile-grid {
         grid-template-columns: 1fr;
     }
+}
 .filters-flex-custom { display: flex; gap: 15px; align-items: center; flex-wrap: wrap; }
 .pagination-container-custom { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(112, 136, 185, 0.08); flex-wrap: wrap; gap: 15px; }
 .mon-gmv-link-custom { color: var(--green); font-weight: 700; cursor: pointer; text-decoration: none; }
