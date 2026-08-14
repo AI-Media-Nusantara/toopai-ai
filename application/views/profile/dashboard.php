@@ -1398,15 +1398,38 @@ function loadTapSampleRequests() {
             tapCurrentPage = 1;
             renderTapTable();
         } else {
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="6" class="text-center text-muted" style="padding: 40px 0;">
-                        <i class="fas fa-exclamation-triangle" style="font-size: 28px; color: var(--red); margin-bottom: 12px;"></i>
-                        <div style="font-weight:700; margin-bottom:6px;">Gagal Memuat Data</div>
-                        <div>${res.message || 'Pastikan otentikasi Seller TikTok valid.'}</div>
-                    </td>
-                </tr>
-            `;
+            const isExpired = (res.message && (
+                res.message.toLowerCase().includes('expired') || 
+                res.message.toLowerCase().includes('credential') || 
+                res.message.toLowerCase().includes('token')
+            ));
+            
+            if (isExpired) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="text-center" style="padding: 50px 0;">
+                            <i class="fas fa-key" style="font-size: 32px; color: var(--orange); margin-bottom: 15px;"></i>
+                            <div style="font-weight: 700; color: #fff; font-size: 15px; margin-bottom: 8px;">Akses Token TikTok Expired</div>
+                            <div style="color: var(--muted); font-size: 13px; max-width: 400px; margin: 0 auto 20px auto; line-height: 1.5;">
+                                Kredensial akun Seller TikTok Anda telah kedaluwarsa. Silakan lakukan otentikasi ulang untuk memulihkan koneksi API.
+                            </div>
+                            <a href="<?= base_url('tts/authorize_seller') ?>" class="btn-primary-custom" style="text-decoration:none; display:inline-flex; align-items:center; gap:8px; height:42px; line-height:42px; border-radius:8px; padding:0 20px; font-weight:800; font-size:13px; box-shadow: var(--glow-purple);">
+                                <i class="fas fa-sign-in-alt"></i> Otentikasi Ulang Seller
+                            </a>
+                        </td>
+                    </tr>
+                `;
+            } else {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="text-center text-muted" style="padding: 40px 0;">
+                            <i class="fas fa-exclamation-triangle" style="font-size: 28px; color: var(--red); margin-bottom: 12px;"></i>
+                            <div style="font-weight:700; margin-bottom:6px;">Gagal Memuat Data</div>
+                            <div>${res.message || 'Pastikan otentikasi Seller TikTok valid.'}</div>
+                        </td>
+                    </tr>
+                `;
+            }
             showCustomToast(res.message || 'Gagal memuat data dari TAP API.', 'error');
         }
     })
