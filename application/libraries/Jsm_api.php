@@ -1182,7 +1182,7 @@ public function search_affiliate_orders_raw($filters = []) {
         if (!empty($filters['target_collabration_id'])) $body['target_collabration_id'] = $filters['target_collabration_id'];
         if (!empty($filters['status'])) $body['status'] = $filters['status'];
         
-        $params = ['page_size' => $filters['page_size'] ?? 100];
+        $params = ['page_size' => $filters['page_size'] ?? 50];
         if (!empty($filters['page_token'])) $params['page_token'] = $filters['page_token'];
         
         $result = $this->_api_request_seller($path, $params, 'POST', $body);

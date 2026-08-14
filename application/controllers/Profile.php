@@ -294,7 +294,7 @@ class Profile extends CI_Controller {
         $product_id = $this->input->post('product_id');
         $page_token = $this->input->post('page_token');
 
-        $filters = ['page_size' => 100];
+        $filters = ['page_size' => 50];
         if (!empty($status)) {
             $filters['status'] = $status;
         }
