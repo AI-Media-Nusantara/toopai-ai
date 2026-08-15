@@ -11,6 +11,9 @@
             </div>
         </div>
         <div class="sidebar-menu-list">
+            <a href="<?= base_url('dashboard') ?>" class="sidebar-back-btn">
+                <i class="fas fa-arrow-left"></i> Kembali ke Dashboard
+            </a>
             <a href="javascript:void(0)" onclick="switchTab('profile-tab', this)" class="sidebar-menu-item active">
                 <i class="fas fa-user-cog"></i> Profile settings
             </a>
@@ -395,6 +398,38 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
+}
+
+.sidebar-back-btn {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 18px;
+    color: var(--cyan);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 700;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(16, 223, 240, 0.25);
+    background: rgba(16, 223, 240, 0.05);
+    margin-bottom: 8px;
+    transition: all 0.2s ease;
+}
+
+.sidebar-back-btn i {
+    font-size: 16px;
+    transition: transform 0.2s ease;
+}
+
+.sidebar-back-btn:hover {
+    background: rgba(16, 223, 240, 0.15) !important;
+    border-color: var(--cyan) !important;
+    color: #fff;
+    box-shadow: 0 0 12px rgba(16, 223, 240, 0.15);
+}
+
+.sidebar-back-btn:hover i {
+    transform: translateX(-3px);
 }
 
 .sidebar-menu-item {
