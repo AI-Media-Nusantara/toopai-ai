@@ -880,7 +880,8 @@ public function get_creator_task1_detail() {
             c.follower_count,
             c.total_gmv,
             c.total_orders,
-            c.shop_name
+            c.shop_name,
+            c.tiktok_open_id
         ')
         ->from('creators c')
         ->where('c.id', $creator_id)
@@ -895,6 +896,35 @@ public function get_creator_task1_detail() {
         }
         
         log_message('debug', 'Creator found: ' . $creator->username);
+
+        // Auto-resolve tiktok_open_id and sync FastMoss products if empty
+        if (empty($creator->tiktok_open_id) && !empty($creator->username)) {
+            try {
+                $this->load->model('BrandCreator_model');
+                $fastmoss_uid = $this->BrandCreator_model->find_creator_in_fastmoss($creator->username);
+                if ($fastmoss_uid) {
+                    $this->db->where('id', $creator->id)->update('creators', [
+                        'tiktok_open_id' => $fastmoss_uid,
+                        'updated_at' => date('Y-m-d H:i:s')
+                    ]);
+                    $creator->tiktok_open_id = $fastmoss_uid;
+                }
+            } catch (Exception $e) {
+                log_message('error', 'Auto-resolve tiktok_open_id failed: ' . $e->getMessage());
+            }
+        }
+
+        if (!empty($creator->tiktok_open_id)) {
+            try {
+                $has_products = $this->db->where('creator_id', $creator_id)->count_all_results('creator_products');
+                if ($has_products < 5) {
+                    $this->load->model('BrandCreator_model');
+                    $this->BrandCreator_model->sync_creator_products_to_db($creator->id, $creator->username, $creator->tiktok_open_id);
+                }
+            } catch (Exception $e) {
+                log_message('error', 'Auto-sync FastMoss products failed: ' . $e->getMessage());
+            }
+        }
         
         // ============================================================
         // 2. AMBIL BRAND NAME
@@ -981,51 +1011,301 @@ public function get_creator_task1_detail() {
         }
         
         // ============================================================
-        // 5. BRANDS (dari products atau dari brand_id creator)
+        // 5. BRANDS (Kombinasi dari orders, affiliate links, dan brand creator)
         // ============================================================
-        $brands = [];
-        
-        // Jika ada products, ambil brand dari product_shop_name
-        if (!empty($products)) {
-            $brand_map = [];
-            foreach ($products as $p) {
-                $shop_name = $p->shop_name ?? '';
-                if (!empty($shop_name) && !isset($brand_map[$shop_name])) {
-                    $brand_map[$shop_name] = [
-                        'brand_name' => $shop_name,
-                        'shop_name' => $shop_name,
-                        'total_products' => 0,
-                        'total_gmv' => 0
-                    ];
+        $brands_map = [];
+
+        // A. Ambil brand dari affiliate_orders (berdasarkan sales/orders history)
+        if (!empty($creator->username)) {
+            try {
+                $this->db->select('
+                    o.shop_name,
+                    COUNT(DISTINCT o.product_id) as total_products,
+                    SUM(o.gmv) as total_gmv
+                ')
+                ->from('affiliate_orders o')
+                ->where('o.creator_username', $creator->username)
+                ->where_not_in('o.order_status', ['CANCELLED', 'REFUNDED'])
+                ->where('o.shop_name IS NOT NULL', NULL, FALSE)
+                ->where('o.shop_name !=', '')
+                ->group_by('o.shop_name');
+
+                $q = $this->db->get();
+                if ($q) {
+                    $orders_brands = $q->result();
+                    foreach ($orders_brands as $ob) {
+                        $s_name = trim($ob->shop_name);
+                        $key = strtolower($s_name);
+                        if (!empty($s_name)) {
+                            $brands_map[$key] = [
+                                'brand_id' => null,
+                                'brand_name' => $s_name,
+                                'shop_name' => $s_name,
+                                'category' => '',
+                                'total_products' => intval($ob->total_products),
+                                'total_gmv' => floatval($ob->total_gmv)
+                            ];
+                        }
+                    }
+                } else {
+                    log_message('error', 'Orders brands query failed: ' . json_encode($this->db->error()));
                 }
-                if (!empty($shop_name)) {
-                    $brand_map[$shop_name]['total_products']++;
-                    $brand_map[$shop_name]['total_gmv'] += floatval($p->product_gmv ?? 0);
-                }
+            } catch (Exception $e) {
+                log_message('error', 'Error getting brands from orders: ' . $e->getMessage());
             }
+        }
+
+        // B. Ambil brand dari affiliate_creator_links (baik yang ACTIVE maupun status lainnya)
+        try {
+            $this->db->select('
+                ap.shop_name,
+                COUNT(DISTINCT acl.product_id) as total_products,
+                SUM(acl.total_gmv) as total_gmv
+            ')
+            ->from('affiliate_creator_links acl')
+            ->join('affiliate_products ap', 'acl.product_id = ap.product_id AND acl.campaign_id = ap.campaign_id', 'inner')
+            ->where('acl.creator_id', $creator_id)
+            ->where('ap.shop_name IS NOT NULL', NULL, FALSE)
+            ->where('ap.shop_name !=', '')
+            ->group_by('ap.shop_name');
+
+            $q = $this->db->get();
+            if ($q) {
+                $links_brands = $q->result();
+                foreach ($links_brands as $lb) {
+                    $s_name = trim($lb->shop_name);
+                    $key = strtolower($s_name);
+                    if (!empty($s_name)) {
+                        if (isset($brands_map[$key])) {
+                            $brands_map[$key]['total_gmv'] = max($brands_map[$key]['total_gmv'], floatval($lb->total_gmv));
+                            $brands_map[$key]['total_products'] = max($brands_map[$key]['total_products'], intval($lb->total_products));
+                        } else {
+                            $brands_map[$key] = [
+                                'brand_id' => null,
+                                'brand_name' => $s_name,
+                                'shop_name' => $s_name,
+                                'category' => '',
+                                'total_products' => intval($lb->total_products),
+                                'total_gmv' => floatval($lb->total_gmv)
+                            ];
+                        }
+                    }
+                }
+            } else {
+                log_message('error', 'Links brands query failed: ' . json_encode($this->db->error()));
+            }
+        } catch (Exception $e) {
+            log_message('error', 'Error getting brands from links: ' . $e->getMessage());
+        }
+
+        // C. Ambil brand dari creator_products (data FastMoss/Tiktok Shop yang disinkronkan)
+        if ($this->db->table_exists('creator_products')) {
+            try {
+                $this->db->select('
+                    cp.shop_name,
+                    COUNT(DISTINCT cp.product_id) as total_products,
+                    SUM(cp.gmv) as total_gmv
+                ')
+                ->from('creator_products cp')
+                ->where('cp.creator_id', $creator_id)
+                ->where('cp.shop_name IS NOT NULL', NULL, FALSE)
+                ->where('cp.shop_name !=', '')
+                ->where('cp.gmv >', 0)
+                ->group_by('cp.shop_name');
+
+                $q = $this->db->get();
+                if ($q) {
+                    $fm_brands = $q->result();
+                    foreach ($fm_brands as $fb) {
+                        $s_name = trim($fb->shop_name);
+                        $key = strtolower($s_name);
+                        if (!empty($s_name)) {
+                            if (isset($brands_map[$key])) {
+                                $brands_map[$key]['total_gmv'] = max($brands_map[$key]['total_gmv'], floatval($fb->total_gmv));
+                                $brands_map[$key]['total_products'] = max($brands_map[$key]['total_products'], intval($fb->total_products));
+                            } else {
+                                $brands_map[$key] = [
+                                    'brand_id' => null,
+                                    'brand_name' => $s_name,
+                                    'shop_name' => $s_name,
+                                    'category' => '',
+                                    'total_products' => intval($fb->total_products),
+                                    'total_gmv' => floatval($fb->total_gmv)
+                                ];
+                            }
+                        }
+                    }
+                } else {
+                    log_message('error', 'Creator products brands query failed: ' . json_encode($this->db->error()));
+                }
+            } catch (Exception $e) {
+                log_message('error', 'Error getting brands from creator_products: ' . $e->getMessage());
+            }
+        }
+
+        // D. Ambil brand dari creator\'s brand_id (jika ada)
+        if (!empty($creator->brand_id) && !empty($brand_name)) {
+            $key = strtolower(trim($brand_name));
+            $key_shop = !empty($brand_shop_name) ? strtolower(trim($brand_shop_name)) : $key;
             
-            foreach ($brand_map as $key => $b) {
-                $brands[] = (object)[
-                    'brand_id' => null,
-                    'brand_name' => $b['brand_name'],
-                    'shop_name' => $b['shop_name'],
-                    'category' => '',
-                    'total_products' => $b['total_products'],
-                    'total_gmv' => $b['total_gmv']
+            $found_key = null;
+            if (isset($brands_map[$key_shop])) {
+                $found_key = $key_shop;
+            } elseif (isset($brands_map[$key])) {
+                $found_key = $key;
+            }
+
+            if ($found_key) {
+                $brands_map[$found_key]['brand_id'] = $creator->brand_id;
+                $brands_map[$found_key]['brand_name'] = $brand_name;
+                if (!empty($brand_shop_name)) {
+                    $brands_map[$found_key]['shop_name'] = $brand_shop_name;
+                }
+            } else {
+                $brands_map[$key_shop] = [
+                    'brand_id' => $creator->brand_id,
+                    'brand_name' => $brand_name,
+                    'shop_name' => !empty($brand_shop_name) ? $brand_shop_name : $brand_name,
+                    'category' => $creator->category ?? '',
+                    'total_products' => 0,
+                    'total_gmv' => floatval($creator->imported_gmv ?? 0)
                 ];
             }
         }
-        
-        // Jika tidak ada brands dari products, gunakan brand dari creator
-        if (empty($brands) && !empty($brand_name)) {
-            $brands[] = (object)[
-                'brand_id' => $creator->brand_id,
-                'brand_name' => $brand_name,
-                'shop_name' => $brand_shop_name,
-                'category' => $creator->category ?? '',
-                'total_products' => 0,
-                'total_gmv' => floatval($creator->imported_gmv ?? 0)
-            ];
+
+        // D. Untuk semua brand di map, coba cari id dan nama brand aslinya dari tabel `brands` jika brand_id masih null
+        $shop_names = array_column($brands_map, 'shop_name');
+        if (!empty($shop_names)) {
+            try {
+                $this->db->select('id, name, shop_name')
+                    ->where_in('shop_name', $shop_names)
+                    ->from('brands');
+                $q = $this->db->get();
+                if ($q) {
+                    $db_brands = $q->result();
+                    foreach ($db_brands as $db_b) {
+                        $key = strtolower(trim($db_b->shop_name));
+                        if (isset($brands_map[$key])) {
+                            $brands_map[$key]['brand_id'] = $db_b->id;
+                            $brands_map[$key]['brand_name'] = $db_b->name;
+                        }
+                    }
+                } else {
+                    log_message('error', 'Matching database brands query failed: ' . json_encode($this->db->error()));
+                }
+            } catch (Exception $e) {
+                log_message('error', 'Error matching brands to database: ' . $e->getMessage());
+            }
+        }
+
+        // Ubah ke array of objects
+        $brands = [];
+        foreach ($brands_map as $b) {
+            $brands[] = (object)$b;
+        }
+
+        // Urutkan berdasarkan total_gmv DESC agar brand dengan kontribusi tertinggi muncul pertama
+        usort($brands, function($a, $b) {
+            return $b->total_gmv <=> $a->total_gmv;
+        });
+
+        // Kalkulasikan keseluruhan GMV dari seluruh brand yang terhubung
+        $total_gmv_sum = 0;
+        foreach ($brands as $b) {
+            $total_gmv_sum += floatval($b->total_gmv);
+        }
+        if ($total_gmv_sum > 0) {
+            $total_gmv = $total_gmv_sum;
+            $creator->total_gmv = $total_gmv_sum;
+        }
+
+        // ============================================================
+        // 5.5 ENRICH DARI FASTMOSS — ambil semua brand collab creator
+        // Dipanggil selalu; data FastMoss di-merge ke brands_map lokal.
+        // Brand yang sudah ada di lokal diperbarui GMV-nya jika FastMoss
+        // memberikan nilai lebih besar. Brand baru dari FastMoss ditambahkan.
+        // ============================================================
+        try {
+            $this->load->model('Fastmoss_model');
+
+            // Pastikan punya FastMoss UID (= tiktok_open_id di kolom creators)
+            $fm_uid = $creator->tiktok_open_id ?? null;
+
+            if (empty($fm_uid) && !empty($creator->username)) {
+                // Gunakan resolve_uid_by_username yang lebih robust
+                // (coba username langsung sebagai uid, kemudian search dengan/tanpa cookie)
+                $fm_uid = $this->Fastmoss_model->resolve_uid_by_username($creator->username);
+                if ($fm_uid) {
+                    $this->db->where('id', $creator_id)
+                             ->update('creators', [
+                                 'tiktok_open_id' => $fm_uid,
+                                 'updated_at'     => date('Y-m-d H:i:s')
+                             ]);
+                    $creator->tiktok_open_id = $fm_uid;
+                }
+            }
+
+            if (!empty($fm_uid)) {
+                $fm_brands = $this->Fastmoss_model->get_all_creator_brand_collabs($fm_uid, 5);
+
+                log_message('debug', '[task1_detail] FastMoss returned ' . count($fm_brands) . ' brands for uid=' . $fm_uid);
+
+                foreach ($fm_brands as $fb) {
+                    $s_name = trim($fb['shop_name'] ?? '');
+                    if (empty($s_name)) continue;
+
+                    $key = strtolower($s_name);
+
+                    if (isset($brands_map[$key])) {
+                        // Brand sudah ada di lokal — ambil nilai GMV tertinggi
+                        $brands_map[$key]['total_gmv']     = max(
+                            floatval($brands_map[$key]['total_gmv']),
+                            floatval($fb['gmv'])
+                        );
+                        $brands_map[$key]['total_products'] = max(
+                            intval($brands_map[$key]['total_products']),
+                            intval($fb['product_count'])
+                        );
+                        $brands_map[$key]['_source'] = 'merged';
+                    } else {
+                        // Brand baru — hanya dari FastMoss
+                        $brands_map[$key] = [
+                            'brand_id'      => null,
+                            'brand_name'    => $s_name,
+                            'shop_name'     => $s_name,
+                            'shop_logo'     => $fb['shop_logo'] ?? '',
+                            'category'      => '',
+                            'total_products'=> intval($fb['product_count']),
+                            'total_gmv'     => floatval($fb['gmv']),
+                            '_source'       => 'fastmoss',
+                        ];
+                    }
+                }
+
+                // Rebuild $brands array dari brands_map yang sudah di-enrich
+                $brands = [];
+                foreach ($brands_map as $b) {
+                    $brands[] = (object)$b;
+                }
+                usort($brands, function($a, $b) {
+                    return $b->total_gmv <=> $a->total_gmv;
+                });
+
+                log_message('debug', '[task1_detail] Final brands after merge: ' . count($brands));
+
+                // Hitung ulang total GMV
+                $total_gmv_sum = 0;
+                foreach ($brands as $b) {
+                    $total_gmv_sum += floatval($b->total_gmv);
+                }
+                if ($total_gmv_sum > 0) {
+                    $total_gmv = $total_gmv_sum;
+                    $creator->total_gmv = $total_gmv_sum;
+                }
+            }
+        } catch (Exception $e) {
+            // Jangan gagalkan seluruh response jika FastMoss error
+            log_message('error', '[task1_detail] FastMoss enrich error: ' . $e->getMessage());
         }
         
         // ============================================================
@@ -1100,6 +1380,63 @@ public function get_creator_task1_detail() {
             log_message('error', 'Error getting multi_links: ' . $e->getMessage());
         }
         
+        // ============================================================
+        // 8.5 TANDAI is_partner — brand yang sudah bekerja sama
+        // (ada di tabel brands dengan status ACTIVE)
+        // Matching via: brand_id sudah terisi, ATAU shop_name/brand_name
+        // cocok dengan brands.shop_name atau brands.name
+        // ============================================================
+        if (!empty($brands)) {
+            // Kumpulkan semua nama/shop yang belum punya brand_id
+            $unmatched_names = [];
+            foreach ($brands as $b) {
+                if (empty($b->brand_id)) {
+                    if (!empty($b->shop_name))  $unmatched_names[] = trim($b->shop_name);
+                    if (!empty($b->brand_name) && $b->brand_name !== $b->shop_name) {
+                        $unmatched_names[] = trim($b->brand_name);
+                    }
+                }
+            }
+
+            // Satu query untuk ambil semua brand aktif yang namanya cocok
+            $partner_names = [];
+            if (!empty($unmatched_names)) {
+                $q = $this->db->select('id, name, shop_name')
+                    ->where_in('name', $unmatched_names)
+                    ->or_where_in('shop_name', $unmatched_names)
+                    ->get('brands');
+                if ($q) {
+                    foreach ($q->result() as $pb) {
+                        $partner_names[strtolower(trim($pb->name))]      = intval($pb->id);
+                        $partner_names[strtolower(trim($pb->shop_name))] = intval($pb->id);
+                    }
+                }
+            }
+
+            foreach ($brands as $b) {
+                if (!empty($b->brand_id)) {
+                    $b->is_partner = true;
+                } else {
+                    $key_shop  = strtolower(trim($b->shop_name  ?? ''));
+                    $key_brand = strtolower(trim($b->brand_name ?? ''));
+                    if (isset($partner_names[$key_shop]) || isset($partner_names[$key_brand])) {
+                        $b->is_partner = true;
+                        // Isi brand_id jika ketemu
+                        $b->brand_id = $partner_names[$key_shop] ?? $partner_names[$key_brand] ?? null;
+                    } else {
+                        $b->is_partner = false;
+                    }
+                }
+            }
+
+            // Re-sort: partner duluan, lalu prospect, masing-masing by GMV desc
+            $partners  = array_filter($brands, fn($b) => $b->is_partner);
+            $prospects = array_filter($brands, fn($b) => !$b->is_partner);
+            usort($partners,  fn($a, $b) => $b->total_gmv <=> $a->total_gmv);
+            usort($prospects, fn($a, $b) => $b->total_gmv <=> $a->total_gmv);
+            $brands = array_values(array_merge($partners, $prospects));
+        }
+
         // ============================================================
         // 9. KIRIM RESPONSE
         // ============================================================
@@ -9133,5 +9470,194 @@ public function get_sample_keranjang_trigger() {
         return $this->output->set_output(json_encode(['success' => false, 'message' => $e->getMessage()]));
     }
 }
+
+    // ============================================================
+    // SCOUTING CREATOR DETAIL — Brand Collaboration & GMV
+    // ============================================================
+    /**
+     * AJAX endpoint: ambil brand kolaborasi + GMV dari FastMoss
+     * untuk creator tertentu di scouting list.
+     *
+     * POST params:
+     *   scouting_id  — ID baris di tabel creator_scouting
+     *   username     — username creator (fallback jika UID tidak ditemukan)
+     *
+     * Response JSON:
+     *   success, creator {username, full_name, avatar_url, follower_count, gmv},
+     *   brands [{shop_name, shop_logo, product_count, sales_count, gmv}],
+     *   total_gmv, total_brands
+     */
+    public function get_scouting_creator_detail() {
+        $this->output->set_content_type('application/json');
+
+        if (!$this->session->userdata('logged_in')) {
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Session expired'
+            ]));
+        }
+
+        $scouting_id = $this->input->post('scouting_id');
+        $username    = trim($this->input->post('username') ?? '');
+
+        if (empty($scouting_id)) {
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'scouting_id wajib diisi'
+            ]));
+        }
+
+        // ── 1. Ambil baris scouting ──────────────────────────────
+        $this->load->model('CreatorScouting_model');
+        $item = $this->CreatorScouting_model->get_by_id($scouting_id);
+
+        if (!$item) {
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Scouting item tidak ditemukan'
+            ]));
+        }
+
+        $username = $username ?: ($item->username ?? '');
+
+        // ── 2. Cari FastMoss UID (tiktok_open_id) ────────────────
+        // Prioritas: creators table → BrandCreator_model->find_creator_in_fastmoss()
+        $fastmoss_uid = null;
+
+        $creator_row = $this->db
+            ->select('id, username, full_name, avatar_url, follower_count, tiktok_open_id, total_gmv, imported_gmv, category, phone')
+            ->from('creators')
+            ->where('LOWER(username)', strtolower($username))
+            ->limit(1)
+            ->get()
+            ->row();
+
+        if ($creator_row && !empty($creator_row->tiktok_open_id)) {
+            $fastmoss_uid = $creator_row->tiktok_open_id;
+        }
+
+        // Tidak ada UID di DB → cari dari FastMoss (search by username)
+        if (empty($fastmoss_uid) && !empty($username)) {
+            try {
+                $this->load->model('BrandCreator_model');
+                $fastmoss_uid = $this->BrandCreator_model->find_creator_in_fastmoss($username);
+
+                // Simpan ke creators table kalau creator sudah ada
+                if ($fastmoss_uid && $creator_row) {
+                    $this->db->where('id', $creator_row->id)
+                             ->update('creators', [
+                                 'tiktok_open_id' => $fastmoss_uid,
+                                 'updated_at'     => date('Y-m-d H:i:s')
+                             ]);
+                }
+            } catch (Exception $e) {
+                log_message('error', '[ScoutingDetail] find_creator_in_fastmoss error: ' . $e->getMessage());
+            }
+        }
+
+        // ── 3. Fetch brand collab dari FastMoss ──────────────────
+        $brands    = [];
+        $total_gmv = 0;
+        $fm_error  = null;
+
+        if (!empty($fastmoss_uid)) {
+            try {
+                $this->load->model('Fastmoss_model');
+                $brands = $this->Fastmoss_model->get_all_creator_brand_collabs($fastmoss_uid, 5);
+
+                foreach ($brands as $b) {
+                    $total_gmv += floatval($b['gmv']);
+                }
+
+                // Sort by GMV desc (sudah dari API, tapi pastikan)
+                usort($brands, function($a, $b) {
+                    return $b['gmv'] <=> $a['gmv'];
+                });
+
+            } catch (Exception $e) {
+                $fm_error = $e->getMessage();
+                log_message('error', '[ScoutingDetail] get_all_creator_brand_collabs error: ' . $e->getMessage());
+            }
+        }
+
+        // ── 4. Fallback GMV: dari scouting row atau creators table ─
+        // Jika FastMoss tidak return data, pakai data lokal sebagai referensi
+        $fallback_gmv = floatval(
+            $item->gmv
+            ?? $creator_row->total_gmv
+            ?? $creator_row->imported_gmv
+            ?? 0
+        );
+
+        if (empty($brands) && $fallback_gmv > 0) {
+            // Tampilkan 1 entry fallback dari data lokal
+            $brands = [[
+                'shop_id'       => '',
+                'shop_name'     => $item->brand_name ?? 'Brand',
+                'shop_logo'     => '',
+                'product_count' => intval($item->sales_count ?? 0),
+                'sales_count'   => intval($item->sales_count ?? 0),
+                'gmv'           => $fallback_gmv,
+                'region'        => 'ID',
+                '_source'       => 'local',
+            ]];
+            $total_gmv = $fallback_gmv;
+        }
+
+        // ── 5. Susun response ─────────────────────────────────────
+        $creator_info = [
+            'username'       => $username,
+            'full_name'      => $creator_row->full_name      ?? $item->full_name ?? $username,
+            'avatar_url'     => $creator_row->avatar_url     ?? $item->avatar_url ?? null,
+            'follower_count' => intval($creator_row->follower_count ?? $item->follower_count ?? 0),
+            'category'       => $creator_row->category       ?? null,
+            'phone'          => $creator_row->phone          ?? $item->phone ?? null,
+            'fastmoss_uid'   => $fastmoss_uid,
+            'gmv_local'      => floatval($creator_row->total_gmv ?? $creator_row->imported_gmv ?? $item->gmv ?? 0),
+        ];
+
+        return $this->output->set_output(json_encode([
+            'success'      => true,
+            'creator'      => $creator_info,
+            'brands'       => $brands,
+            'total_gmv'    => $total_gmv,
+            'total_brands' => count($brands),
+            'has_fastmoss' => !empty($fastmoss_uid),
+            'error_detail' => $fm_error,
+        ]));
+    }
+
+    public function update_fastmoss_cookie() {
+        $input = $this->input->post('cookie_data');
+        if (empty($input)) {
+            return $this->output->set_output(json_encode(['success' => false, 'message' => 'Input kosong']));
+        }
+        
+        $cookie = trim($input);
+        
+        // Cek jika input berupa cURL command
+        if (stripos($cookie, 'curl') !== false) {
+            if (preg_match('/-b\s+[\'"]([^\'"]+)[\'"]/', $cookie, $matches)) {
+                $cookie = $matches[1];
+            } elseif (preg_match('/--cookie\s+[\'"]([^\'"]+)[\'"]/', $cookie, $matches)) {
+                $cookie = $matches[1];
+            } elseif (preg_match('/-H\s+[\'"]cookie:\s*([^\'"]+)[\'"]/i', $cookie, $matches)) {
+                $cookie = $matches[1];
+            }
+        }
+        
+        // Simpan ke database
+        $this->db->query("
+            INSERT INTO app_config (`key`, `value`, `updated_at`) 
+            VALUES ('fastmoss_cookie', ?, NOW())
+            ON DUPLICATE KEY UPDATE `value` = ?, `updated_at` = NOW()
+        ", [$cookie, $cookie]);
+        
+        return $this->output->set_output(json_encode([
+            'success' => true, 
+            'message' => 'Cookie FastMoss berhasil diperbarui!',
+            'cookie' => substr($cookie, 0, 30) . '...'
+        ]));
+    }
 
 } // end class Is

@@ -1428,9 +1428,14 @@
 <!-- TASK 1: SCOUTING & AUTO GENERATE LINK -->
 <!-- ============================================================ -->
 <div class="stage-card-dashboard" data-stage="1" style="display: flex; flex-direction: column; height: 500px;">
-    <div class="stage-title-dashboard" style="flex-shrink: 0;">
-        <span><i class="fas fa-search" style="color: var(--purple);"></i> 1. SCOUTING (Cari Creator)</span>
-        <span class="stage-count-dashboard" id="scoutingCountDashboard"><?= count($task1_creators ?? []) ?></span>
+    <div class="stage-title-dashboard" style="flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; width: 100%;">
+        <span><i class="fas fa-search" style="color: var(--purple);"></i> 1. SCOUTING</span>
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <button onclick="openCookieModal()" title="Update FastMoss Cookie" style="background: rgba(139,92,246,0.2); border: 1px solid rgba(139,92,246,0.3); color: #a78bfa; padding: 2px 8px; border-radius: 6px; font-size: 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; outline: none; transition: 0.2s;">
+                <i class="fas fa-key" style="font-size: 9px;"></i> Cookie
+            </button>
+            <span class="stage-count-dashboard" id="scoutingCountDashboard"><?= count($task1_creators ?? []) ?></span>
+        </div>
     </div>
     
     <!-- Search input -->
@@ -1808,6 +1813,28 @@
             <div style="text-align:center; padding:40px;">
                 <i class="fas fa-spinner fa-pulse fa-2x"></i>
                 <p>Loading...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- MODAL UPDATE FASTMOSS COOKIE -->
+<!-- ============================================================ -->
+<div id="fastmossCookieModal" class="modal-overlay-dashboard" style="display:none; z-index: 9999;">
+    <div class="modal-glass-dashboard" style="max-width: 550px; width: 95; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 16px;">
+        <div class="modal-header-dashboard" style="border-bottom:1px solid var(--border); padding: 16px 20px;">
+            <h3 style="margin:0; font-size:16px; color:var(--text-primary); display:flex; align-items:center; gap:8px;"><i class="fas fa-key" style="color:var(--purple);"></i> Update FastMoss Cookie</h3>
+            <span class="modal-close-dashboard" onclick="closeCookieModal()" style="cursor:pointer; font-size:20px; color:var(--text-muted);">&times;</span>
+        </div>
+        <div class="modal-body" style="padding: 20px;">
+            <div style="background: rgba(139,92,246,0.1); padding: 12px 16px; border-radius: 12px; border: 1px solid rgba(139,92,246,0.15); font-size: 11px; color: #a78bfa; margin-bottom: 16px; line-height: 1.5;">
+                <i class="fas fa-info-circle"></i> Tempel (Paste) perintah cURL request <strong>baseinfo</strong> FastMoss Anda di bawah ini. Sistem akan otomatis mengekstrak data session cookie baru Anda secara instan.
+            </div>
+            <textarea id="fastmossCookieInput" rows="6" placeholder="Paste cURL command (curl 'https://www.fastmoss.com/api/author/v3/detail/baseInfo?...) di sini..." style="width:100%; background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:10px; padding:12px; color:var(--text-primary); font-size:11.5px; outline:none; font-family:monospace; resize:vertical; line-height: 1.4; box-sizing: border-box;"></textarea>
+            <div style="margin-top: 20px; display:flex; justify-content:flex-end; gap:10px;">
+                <button onclick="closeCookieModal()" style="padding: 8px 18px; background:var(--bg-elevated); border:1px solid var(--border); border-radius:8px; color:var(--text-primary); cursor:pointer; font-size:12px; font-weight: 500;">Batal</button>
+                <button onclick="saveFastmossCookie()" style="padding: 8px 22px; background:var(--purple); border:none; border-radius:8px; color:#fff; cursor:pointer; font-size:12px; font-weight:600; transition: 0.2s;">Simpan Cookie</button>
             </div>
         </div>
     </div>
@@ -3287,29 +3314,113 @@ async function showTask1DetailModal(creatorId) {
             </div>
         `;
         
-        // BRANDS
+        // BRANDS — 2 kolom: Partner (sudah kerja sama) | Prospect (belum)
         if (brands.length > 0) {
+            const partners  = brands.filter(b => b.is_partner);
+            const prospects = brands.filter(b => !b.is_partner);
+
+            // Helper: render satu baris brand
+            function _brandRow(b, isPartner) {
+                const accentColor = isPartner ? '#4ade80' : '#f59e0b';
+                const logoBg      = isPartner ? 'rgba(74,222,128,0.12)' : 'rgba(245,158,11,0.12)';
+                const logoIcon    = isPartner ? '#4ade80' : '#f59e0b';
+                const logo = (b.shop_logo || b.img)
+                    ? `<img src="${escapeHtml(b.shop_logo || b.img)}" alt=""
+                             style="width:26px;height:26px;border-radius:6px;object-fit:cover;flex-shrink:0;"
+                             onerror="this.style.display='none'">`
+                    : `<div style="width:26px;height:26px;border-radius:6px;background:${logoBg};
+                                   display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                           <i class="fas fa-store" style="color:${logoIcon};font-size:10px;"></i>
+                       </div>`;
+                return `
+                <div style="background:var(--bg-elevated);border-radius:9px;padding:8px 10px;
+                            border-left:3px solid ${accentColor};display:flex;align-items:center;gap:8px;
+                            margin-bottom:6px;">
+                    ${logo}
+                    <div style="flex:1;min-width:0;">
+                        <div style="color:var(--text-primary);font-size:11px;font-weight:600;
+                                    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                            ${escapeHtml(b.brand_name || b.shop_name || b.name || '-')}
+                        </div>
+                        <div style="color:var(--text-muted);font-size:9px;">${b.total_products || 0} produk</div>
+                    </div>
+                    <div style="color:${accentColor};font-size:11px;font-weight:700;flex-shrink:0;text-align:right;">
+                        Rp ${formatNumber(b.total_gmv || 0)}
+                    </div>
+                </div>`;
+            }
+
             html += `
                 <div style="margin-bottom:16px;">
-                    <h4 style="color:var(--text-primary); font-size:13px; margin-bottom:8px; display:flex; align-items:center; gap:8px;">
-                        <i class="fas fa-store" style="color: #4ade80;"></i> Brands Collaborated (${brands.length})
+                    <!-- Header -->
+                    <h4 style="color:var(--text-primary);font-size:13px;margin-bottom:10px;
+                               display:flex;align-items:center;gap:8px;">
+                        <i class="fas fa-store" style="color:#4ade80;"></i>
+                        Brands Collaborated
+                        <span style="background:rgba(255,255,255,0.06);color:var(--text-secondary);
+                                     font-size:10px;font-weight:500;padding:1px 7px;border-radius:10px;">
+                            ${brands.length} total
+                        </span>
                     </h4>
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-            `;
-            
-            brands.forEach(b => {
-                html += `
-                    <div style="background:var(--bg-elevated); border-radius:8px; padding:10px 12px; display:flex; justify-content:space-between; align-items:center; border-left:3px solid #4ade80;">
-                        <div style="min-width:0;">
-                            <div style="color:var(--text-primary); font-size:12px; font-weight:500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(b.brand_name)}</div>
-                            <div style="color:var(--text-muted); font-size:9px;">${b.total_products || 0} products</div>
+
+                    <!-- 2-column grid -->
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start;">
+
+                        <!-- Kolom KIRI: Partner -->
+                        <div>
+                            <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+                                <i class="fas fa-handshake" style="color:#4ade80;font-size:10px;"></i>
+                                <span style="font-size:10px;font-weight:700;color:#4ade80;text-transform:uppercase;
+                                             letter-spacing:.5px;">
+                                    Sudah Bekerja Sama
+                                </span>
+                                <span style="background:rgba(74,222,128,0.15);color:#4ade80;
+                                             font-size:9px;padding:1px 6px;border-radius:8px;font-weight:600;">
+                                    ${partners.length}
+                                </span>
+                            </div>
+                            ${partners.length > 0
+                                ? partners.map(b => _brandRow(b, true)).join('')
+                                : `<div style="text-align:center;padding:20px 8px;color:var(--text-muted);font-size:10px;
+                                              border:1px dashed rgba(74,222,128,0.15);border-radius:8px;">
+                                       Belum ada brand partner
+                                   </div>`
+                            }
                         </div>
-                        <div style="color:#4ade80; font-size:12px; font-weight:600; flex-shrink:0;">Rp ${formatNumber(b.total_gmv || 0)}</div>
+
+                        <!-- Kolom KANAN: Prospect -->
+                        <div>
+                            <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+                                <i class="fas fa-bullseye" style="color:#f59e0b;font-size:10px;"></i>
+                                <span style="font-size:10px;font-weight:700;color:#f59e0b;text-transform:uppercase;
+                                             letter-spacing:.5px;">
+                                    Prospect
+                                </span>
+                                <span style="background:rgba(245,158,11,0.15);color:#f59e0b;
+                                             font-size:9px;padding:1px 6px;border-radius:8px;font-weight:600;">
+                                    ${prospects.length}
+                                </span>
+                            </div>
+                            ${prospects.length > 0
+                                ? prospects.map(b => _brandRow(b, false)).join('')
+                                : `<div style="text-align:center;padding:20px 8px;color:var(--text-muted);font-size:10px;
+                                              border:1px dashed rgba(245,158,11,0.15);border-radius:8px;">
+                                       Semua brand sudah partner
+                                   </div>`
+                            }
+                        </div>
+
                     </div>
-                `;
-            });
-            
+                </div>
+            `;
+        } else {
             html += `
+                <div style="margin-bottom:16px; background:rgba(139,92,246,0.05); border:1px solid rgba(139,92,246,0.1); border-radius:12px; padding:16px; text-align:center;">
+                    <div style="color:#a78bfa; font-size:12px; font-weight:600; display:flex; align-items:center; justify-content:center; gap:6px; margin-bottom:6px;">
+                        <i class="fas fa-exclamation-triangle"></i> Data Brand Tidak Ditemukan
+                    </div>
+                    <div style="color:var(--text-muted); font-size:10.5px; margin-bottom:12px; line-height:1.4;">
+                        Data brand kolaborasi kosong. Creator mungkin belum ditemukan di FastMoss atau belum pernah ada order di sistem.
                     </div>
                 </div>
             `;
@@ -4814,6 +4925,13 @@ document.getElementById('phoneDuplicateModal').addEventListener('click', functio
                         <i class="fab fa-whatsapp"></i> Hubungi
                     </button>
                 `}
+                <button onclick="openScoutingCreatorDetail(${item.id}, '${escapeHtml(item.username)}')"
+                    title="Lihat brand kolaborasi & GMV"
+                    style="padding:7px 10px;background:rgba(251,191,36,0.1);color:#fbbf24;
+                           border:1px solid rgba(251,191,36,0.25);border-radius:16px;
+                           cursor:pointer;font-size:11px;">
+                    <i class="fas fa-chart-bar"></i>
+                </button>
                 <button onclick="scoutingIgnore(${item.id})"
                     style="padding:7px 10px;background:rgba(239,68,68,0.1);color:#ef4444;
                            border:1px solid rgba(239,68,68,0.2);border-radius:16px;
@@ -5431,5 +5549,375 @@ document.getElementById('phoneDuplicateModal').addEventListener('click', functio
             if (e.target === this) this.classList.remove('active');
         });
     });
+
+    // FastMoss Cookie Modal Handlers
+    window.openCookieModal = function() {
+        document.getElementById('fastmossCookieInput').value = '';
+        document.getElementById('fastmossCookieModal').style.display = 'flex';
+    };
+    window.closeCookieModal = function() {
+        document.getElementById('fastmossCookieModal').style.display = 'none';
+    };
+    window.saveFastmossCookie = function() {
+        const input = document.getElementById('fastmossCookieInput').value;
+        if (!input.trim()) {
+            showToastGlobal('Silakan paste cURL / cookie terlebih dahulu', 'error');
+            return;
+        }
+        
+        fetch(BASE_URL + 'is/update_fastmoss_cookie', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: 'cookie_data=' + encodeURIComponent(input)
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) {
+                showToastGlobal(data.message, 'error');
+                return;
+            }
+            showToastGlobal(data.message, 'success');
+            closeCookieModal();
+            setTimeout(() => {
+                const modal = document.getElementById('task1DetailModal');
+                if (modal && modal.style.display === 'flex') {
+                    const titleText = document.getElementById('task1ModalTitle').innerText;
+                    const unameMatch = titleText.match(/@([a-zA-Z0-9_\.]+)/);
+                    if (unameMatch && unameMatch[1]) {
+                        const card = document.querySelector(`.scouting-item-dashboard[data-creator-name="${unameMatch[1]}"]`);
+                        if (card) {
+                            card.click();
+                        } else {
+                            location.reload();
+                        }
+                    } else {
+                        location.reload();
+                    }
+                } else {
+                    location.reload();
+                }
+            }, 1000);
+        })
+        .catch(() => showToastGlobal('Gagal memperbarui cookie', 'error'));
+    };
 })();
+
+    // ============================================================
+    // SCOUTING CREATOR DETAIL MODAL — Brand Collaboration & GMV
+    // ============================================================
+    (function() {
+        'use strict';
+
+        // ── Inject modal HTML sekali saat DOM siap ──────────────
+        function _injectModal() {
+            if (document.getElementById('scoutingDetailModal')) return;
+
+            const html = `
+            <!-- ===== MODAL: SCOUTING CREATOR DETAIL ===== -->
+            <div id="scoutingDetailModal"
+                 style="display:none;position:fixed;inset:0;z-index:9999;
+                        background:rgba(0,0,0,0.72);backdrop-filter:blur(4px);
+                        align-items:center;justify-content:center;padding:16px;">
+
+                <div style="background:#0d1526;border:1px solid rgba(112,136,185,0.18);
+                            border-radius:20px;width:100%;max-width:560px;max-height:90vh;
+                            display:flex;flex-direction:column;overflow:hidden;
+                            box-shadow:0 24px 80px rgba(0,0,0,0.6);">
+
+                    <!-- Header -->
+                    <div style="display:flex;align-items:center;justify-content:space-between;
+                                padding:18px 20px 14px;border-bottom:1px solid rgba(112,136,185,0.1);
+                                flex-shrink:0;">
+                        <div style="display:flex;align-items:center;gap:10px;">
+                            <div id="sdModalAvatar"
+                                 style="width:40px;height:40px;border-radius:50%;
+                                        background:rgba(139,92,246,0.2);display:flex;
+                                        align-items:center;justify-content:center;
+                                        overflow:hidden;flex-shrink:0;">
+                                <i class="fab fa-tiktok" style="color:#8b5cf6;"></i>
+                            </div>
+                            <div>
+                                <div id="sdModalTitle"
+                                     style="font-size:14px;font-weight:700;color:#f1f5f9;">
+                                    @creator
+                                </div>
+                                <div id="sdModalSub"
+                                     style="font-size:11px;color:rgba(148,163,184,0.8);margin-top:1px;">
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Total GMV badge -->
+                        <div style="display:flex;align-items:center;gap:10px;">
+                            <div id="sdModalTotalGmvWrap"
+                                 style="text-align:right;background:rgba(16,185,129,0.1);
+                                        border:1px solid rgba(16,185,129,0.2);border-radius:12px;
+                                        padding:6px 14px;display:none;">
+                                <div id="sdModalTotalGmv"
+                                     style="font-size:15px;font-weight:700;color:#10b981;
+                                            white-space:nowrap;"></div>
+                                <div style="font-size:9px;color:rgba(148,163,184,0.7);
+                                            margin-top:1px;">Total GMV</div>
+                            </div>
+                            <button onclick="closeScoutingDetailModal()"
+                                    style="background:rgba(255,255,255,0.06);border:none;
+                                           color:rgba(148,163,184,0.8);width:30px;height:30px;
+                                           border-radius:50%;cursor:pointer;font-size:14px;
+                                           display:flex;align-items:center;justify-content:center;">
+                                ✕
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Body (scrollable) -->
+                    <div id="sdModalBody"
+                         style="flex:1;overflow-y:auto;padding:16px 20px 20px;
+                                scrollbar-width:thin;
+                                scrollbar-color:rgba(139,92,246,0.3) transparent;">
+
+                        <!-- Loading state -->
+                        <div id="sdModalLoading"
+                             style="text-align:center;padding:48px 0;color:rgba(148,163,184,0.6);">
+                            <i class="fas fa-spinner fa-pulse fa-2x"
+                               style="color:rgba(139,92,246,0.5);display:block;margin-bottom:12px;"></i>
+                            Mengambil data dari FastMoss...
+                        </div>
+
+                        <!-- Brands list -->
+                        <div id="sdModalBrandsList" style="display:none;">
+                            <div style="font-size:11px;font-weight:600;color:rgba(148,163,184,0.6);
+                                        text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;">
+                                <i class="fas fa-store" style="margin-right:4px;"></i>
+                                <span id="sdModalBrandsCount">Brands Collaborated (0)</span>
+                            </div>
+                            <div id="sdModalBrandsItems"></div>
+                        </div>
+
+                        <!-- Error state -->
+                        <div id="sdModalError"
+                             style="display:none;text-align:center;padding:40px 0;
+                                    color:rgba(239,68,68,0.7);">
+                            <i class="fas fa-exclamation-circle fa-2x"
+                               style="display:block;margin-bottom:10px;"></i>
+                            <div id="sdModalErrorMsg" style="font-size:12px;"></div>
+                        </div>
+
+                    </div>
+
+                    <!-- Footer -->
+                    <div style="flex-shrink:0;padding:12px 20px;
+                                border-top:1px solid rgba(112,136,185,0.1);text-align:center;">
+                        <button onclick="closeScoutingDetailModal()"
+                                style="padding:9px 28px;background:rgba(255,255,255,0.06);
+                                       color:rgba(148,163,184,0.8);border:1px solid rgba(112,136,185,0.15);
+                                       border-radius:12px;cursor:pointer;font-size:12px;font-weight:600;">
+                            Tutup
+                        </button>
+                    </div>
+                </div>
+            </div>`;
+
+            document.body.insertAdjacentHTML('beforeend', html);
+        }
+
+        // ── Helper: format Rupiah ────────────────────────────────
+        function _fmtRpDetail(num) {
+            const n = parseFloat(num) || 0;
+            if (n >= 1e9)  return 'Rp ' + (n / 1e9).toFixed(1).replace('.', ',')  + 'M';
+            if (n >= 1e6)  return 'Rp ' + (n / 1e6).toFixed(1).replace('.', ',')  + 'jt';
+            if (n >= 1e3)  return 'Rp ' + (n / 1e3).toFixed(0) + 'rb';
+            return 'Rp ' + n.toLocaleString('id-ID');
+        }
+        function _fmtNumDetail(n) {
+            const v = parseInt(n) || 0;
+            if (v >= 1e6) return (v / 1e6).toFixed(1) + 'jt';
+            if (v >= 1e3) return (v / 1e3).toFixed(1) + 'rb';
+            return v.toLocaleString('id-ID');
+        }
+
+        // ── Render satu baris brand ──────────────────────────────
+        function _renderBrandRow(b, totalGmv, index) {
+            const pct     = totalGmv > 0 ? Math.round((b.gmv / totalGmv) * 100) : 0;
+            const logo    = b.shop_logo
+                ? `<img src="${b.shop_logo}" alt=""
+                         style="width:32px;height:32px;border-radius:8px;object-fit:cover;flex-shrink:0;"
+                         onerror="this.outerHTML='<div style=\'width:32px;height:32px;border-radius:8px;background:rgba(74,222,128,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;\'><i class=\'fas fa-store\' style=\'color:#4ade80;font-size:13px;\'></i></div>'">`
+                : `<div style="width:32px;height:32px;border-radius:8px;
+                               background:rgba(74,222,128,0.12);display:flex;
+                               align-items:center;justify-content:center;flex-shrink:0;">
+                       <i class="fas fa-store" style="color:#4ade80;font-size:13px;"></i>
+                   </div>`;
+
+            const isLocal = b._source === 'local';
+            const localBadge = isLocal
+                ? `<span style="font-size:9px;background:rgba(251,191,36,0.1);color:#fbbf24;
+                                padding:1px 5px;border-radius:6px;border:1px solid rgba(251,191,36,0.2);">
+                       data lokal
+                   </span>`
+                : '';
+
+            return `
+            <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;
+                        background:rgba(255,255,255,0.03);border:1px solid rgba(112,136,185,0.1);
+                        border-radius:12px;margin-bottom:8px;
+                        border-left:3px solid rgba(74,222,128,0.5);">
+                ${logo}
+                <div style="flex:1;min-width:0;">
+                    <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">
+                        <span style="font-size:12px;font-weight:700;color:#f1f5f9;
+                                     overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                            ${b.shop_name || 'Brand'}
+                        </span>
+                        ${localBadge}
+                    </div>
+                    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                        <span style="font-size:10px;color:rgba(148,163,184,0.7);">
+                            <i class="fas fa-box" style="font-size:9px;margin-right:2px;"></i>
+                            ${_fmtNumDetail(b.product_count)} produk
+                        </span>
+                        ${b.sales_count > 0 ? `
+                        <span style="font-size:10px;color:rgba(148,163,184,0.7);">
+                            <i class="fas fa-shopping-cart" style="font-size:9px;margin-right:2px;"></i>
+                            ${_fmtNumDetail(b.sales_count)} terjual
+                        </span>` : ''}
+                    </div>
+                    <!-- Progress bar GMV -->
+                    <div style="margin-top:6px;">
+                        <div style="background:rgba(255,255,255,0.05);border-radius:4px;height:4px;overflow:hidden;">
+                            <div style="width:${pct}%;height:100%;
+                                        background:linear-gradient(90deg,#10b981,#34d399);
+                                        border-radius:4px;transition:width .5s ease;"></div>
+                        </div>
+                    </div>
+                </div>
+                <div style="text-align:right;flex-shrink:0;">
+                    <div style="font-size:13px;font-weight:700;color:#4ade80;">
+                        ${_fmtRpDetail(b.gmv)}
+                    </div>
+                    ${pct > 0 ? `<div style="font-size:9px;color:rgba(148,163,184,0.5);margin-top:1px;">${pct}%</div>` : ''}
+                </div>
+            </div>`;
+        }
+
+        // ── Buka modal & fetch data ──────────────────────────────
+        window.openScoutingCreatorDetail = function(scoutingId, username) {
+            _injectModal();
+
+            const modal       = document.getElementById('scoutingDetailModal');
+            const loadingEl   = document.getElementById('sdModalLoading');
+            const brandsEl    = document.getElementById('sdModalBrandsList');
+            const errorEl     = document.getElementById('sdModalError');
+            const titleEl     = document.getElementById('sdModalTitle');
+            const subEl       = document.getElementById('sdModalSub');
+            const avatarEl    = document.getElementById('sdModalAvatar');
+            const totalWrap   = document.getElementById('sdModalTotalGmvWrap');
+            const totalEl     = document.getElementById('sdModalTotalGmv');
+            const countEl     = document.getElementById('sdModalBrandsCount');
+            const itemsEl     = document.getElementById('sdModalBrandsItems');
+            const errorMsgEl  = document.getElementById('sdModalErrorMsg');
+
+            // Reset state
+            loadingEl.style.display  = 'block';
+            brandsEl.style.display   = 'none';
+            errorEl.style.display    = 'none';
+            totalWrap.style.display  = 'none';
+            titleEl.textContent      = '@' + username;
+            subEl.textContent        = '';
+            avatarEl.innerHTML       = '<i class="fab fa-tiktok" style="color:#8b5cf6;"></i>';
+            itemsEl.innerHTML        = '';
+
+            modal.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+
+            // Fetch
+            const fd = new FormData();
+            fd.append('scouting_id', scoutingId);
+            fd.append('username',    username);
+
+            fetch(BASE_URL + 'is/get_scouting_creator_detail', { method: 'POST', body: fd })
+                .then(r => r.json())
+                .then(res => {
+                    loadingEl.style.display = 'none';
+
+                    if (!res.success) {
+                        errorMsgEl.textContent  = res.message || 'Gagal mengambil data';
+                        errorEl.style.display   = 'block';
+                        return;
+                    }
+
+                    const c         = res.creator  || {};
+                    const brands    = res.brands   || [];
+                    const totalGmv  = parseFloat(res.total_gmv) || 0;
+
+                    // Update header
+                    titleEl.textContent = '@' + (c.username || username);
+
+                    const subParts = [];
+                    if (c.full_name && c.full_name !== c.username) subParts.push(c.full_name);
+                    if (c.category)                                 subParts.push(c.category);
+                    if (c.phone)                                    subParts.push('📞 ' + c.phone);
+                    if (c.follower_count > 0)                       subParts.push(_fmtNumDetail(c.follower_count) + ' followers');
+                    subEl.textContent = subParts.join('  ·  ');
+
+                    if (c.avatar_url) {
+                        avatarEl.innerHTML = `<img src="${c.avatar_url}" alt=""
+                            style="width:40px;height:40px;border-radius:50%;object-fit:cover;"
+                            onerror="this.outerHTML='<i class=\\'fab fa-tiktok\\' style=\\'color:#8b5cf6;\\'></i>'">`;
+                    }
+
+                    // Total GMV
+                    if (totalGmv > 0) {
+                        totalEl.textContent     = _fmtRpDetail(totalGmv);
+                        totalWrap.style.display = 'block';
+                    }
+
+                    // Brands list
+                    if (brands.length > 0) {
+                        countEl.textContent = 'Brands Collaborated (' + brands.length + ')';
+                        brands.forEach(b => {
+                            itemsEl.insertAdjacentHTML('beforeend', _renderBrandRow(b, totalGmv, 0));
+                        });
+                        brandsEl.style.display = 'block';
+                    } else {
+                        // Tidak ada data brand
+                        const noData = res.has_fastmoss === false
+                            ? 'Creator belum ditemukan di FastMoss. Pastikan username sesuai dengan akun TikTok-nya.'
+                            : 'Tidak ada data brand kolaborasi yang ditemukan untuk creator ini.';
+                        itemsEl.innerHTML = `
+                            <div style="text-align:center;padding:32px 0;color:rgba(148,163,184,0.5);">
+                                <i class="fas fa-store-slash" style="font-size:28px;display:block;margin-bottom:8px;
+                                   color:rgba(148,163,184,0.25);"></i>
+                                <div style="font-size:12px;">${noData}</div>
+                            </div>`;
+                        brandsEl.style.display = 'block';
+                    }
+                })
+                .catch(err => {
+                    loadingEl.style.display = 'none';
+                    errorMsgEl.textContent  = 'Gagal menghubungi server';
+                    errorEl.style.display   = 'block';
+                    console.error('[ScoutingDetail]', err);
+                });
+        };
+
+        // ── Tutup modal ──────────────────────────────────────────
+        window.closeScoutingDetailModal = function() {
+            const modal = document.getElementById('scoutingDetailModal');
+            if (modal) modal.style.display = 'none';
+            document.body.style.overflow = '';
+        };
+
+        // Tutup saat klik backdrop
+        document.addEventListener('click', function(e) {
+            const modal = document.getElementById('scoutingDetailModal');
+            if (modal && e.target === modal) {
+                closeScoutingDetailModal();
+            }
+        });
+
+        // Tutup saat tekan Escape
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') closeScoutingDetailModal();
+        });
+
+    })();
 </script>

@@ -41,15 +41,27 @@ class BrandCreator_model extends CI_Model {
             // Format produk
             $formatted_products = [];
             foreach ($products as $product) {
+                $price = $product['price'] ?? $product['sales_price'] ?? 0;
+                if (empty($price) && !empty($product['real_price'])) {
+                    $real_price = $product['real_price'];
+                    if (strpos($real_price, '-') !== false) {
+                        $parts = explode('-', $real_price);
+                        $real_price = trim($parts[0]);
+                    }
+                    $price = floatval(preg_replace('/[^0-9]/', '', $real_price));
+                }
+                if ($price > 99999999.99) {
+                    $price = 99999999.99;
+                }
                 $formatted_products[] = [
                     'product_id' => $product['goods_id'] ?? $product['product_id'] ?? null,
                     'product_name' => $product['goods_name'] ?? $product['product_name'] ?? $product['title'] ?? null,
-                    'price' => $product['price'] ?? $product['sales_price'] ?? 0,
+                    'price' => $price,
                     'sales_count' => $product['sold_count'] ?? $product['sales'] ?? 0,
                     'gmv' => $product['gmv'] ?? $product['sale_amount'] ?? 0,
-                    'commission_rate' => $product['commission_rate'] ?? $product['open_collaboration_commission_rate'] ?? null,
-                    'image_url' => $product['image_url'] ?? $product['main_image_url'] ?? '',
-                    'shop_name' => $product['shop_name'] ?? $product['shop']['name'] ?? '',
+                    'commission_rate' => $product['commission_rate'] ?? $product['open_collaboration_commission_rate'] ?? $product['commission_rate_show'] ?? null,
+                    'image_url' => $product['image_url'] ?? $product['main_image_url'] ?? $product['cover'] ?? '',
+                    'shop_name' => $product['shop_name'] ?? $product['shop_title'] ?? ($product['shop']['name'] ?? ''),
                     'category' => $product['category'] ?? $product['category_name'] ?? '',
                     'inventory' => $product['inventory'] ?? 0,
                     'product_url' => $product['detail_link'] ?? $product['url'] ?? null,
@@ -628,15 +640,27 @@ public function get_creator_all_products($fastmoss_uid, $maxPages = 3) {
             }
 
             foreach ($products as $product) {
+                $price = $product['price'] ?? $product['sales_price'] ?? 0;
+                if (empty($price) && !empty($product['real_price'])) {
+                    $real_price = $product['real_price'];
+                    if (strpos($real_price, '-') !== false) {
+                        $parts = explode('-', $real_price);
+                        $real_price = trim($parts[0]);
+                    }
+                    $price = floatval(preg_replace('/[^0-9]/', '', $real_price));
+                }
+                if ($price > 99999999.99) {
+                    $price = 99999999.99;
+                }
                 $allProducts[] = [
                     'product_id' => $product['goods_id'] ?? $product['product_id'] ?? null,
                     'product_name' => $product['goods_name'] ?? $product['product_name'] ?? $product['title'] ?? null,
-                    'price' => $product['price'] ?? $product['sales_price'] ?? 0,
+                    'price' => $price,
                     'sales_count' => $product['sold_count'] ?? $product['sales'] ?? 0,
                     'gmv' => $product['gmv'] ?? $product['sale_amount'] ?? 0,
-                    'commission_rate' => $product['commission_rate'] ?? $product['open_collaboration_commission_rate'] ?? 0,
-                    'image_url' => $product['image_url'] ?? $product['main_image_url'] ?? '',
-                    'shop_name' => $product['shop_name'] ?? $product['shop']['name'] ?? '',
+                    'commission_rate' => $product['commission_rate'] ?? $product['open_collaboration_commission_rate'] ?? $product['commission_rate_show'] ?? 0,
+                    'image_url' => $product['image_url'] ?? $product['main_image_url'] ?? $product['cover'] ?? '',
+                    'shop_name' => $product['shop_name'] ?? $product['shop_title'] ?? ($product['shop']['name'] ?? ''),
                     'category' => $product['category'] ?? $product['category_name'] ?? '',
                     'inventory' => $product['inventory'] ?? 0,
                 ];
@@ -790,15 +814,27 @@ public function get_creator_all_products($fastmoss_uid, $maxPages = 3) {
 
             $formatted_products = [];
             foreach ($products as $product) {
+                $price = $product['price'] ?? $product['sales_price'] ?? 0;
+                if (empty($price) && !empty($product['real_price'])) {
+                    $real_price = $product['real_price'];
+                    if (strpos($real_price, '-') !== false) {
+                        $parts = explode('-', $real_price);
+                        $real_price = trim($parts[0]);
+                    }
+                    $price = floatval(preg_replace('/[^0-9]/', '', $real_price));
+                }
+                if ($price > 99999999.99) {
+                    $price = 99999999.99;
+                }
                 $formatted_products[] = [
                     'product_id' => $product['goods_id'] ?? $product['product_id'] ?? null,
                     'product_name' => $product['goods_name'] ?? $product['product_name'] ?? $product['title'] ?? null,
-                    'price' => $product['price'] ?? $product['sales_price'] ?? 0,
+                    'price' => $price,
                     'sales_count' => $product['sold_count'] ?? $product['sales'] ?? 0,
                     'gmv' => $product['gmv'] ?? $product['sale_amount'] ?? 0,
-                    'commission_rate' => $product['commission_rate'] ?? $product['open_collaboration_commission_rate'] ?? 0,
-                    'image_url' => $product['image_url'] ?? $product['main_image_url'] ?? '',
-                    'shop_name' => $product['shop_name'] ?? $product['shop']['name'] ?? '',
+                    'commission_rate' => $product['commission_rate'] ?? $product['open_collaboration_commission_rate'] ?? $product['commission_rate_show'] ?? 0,
+                    'image_url' => $product['image_url'] ?? $product['main_image_url'] ?? $product['cover'] ?? '',
+                    'shop_name' => $product['shop_name'] ?? $product['shop_title'] ?? ($product['shop']['name'] ?? ''),
                     'category' => $product['category'] ?? $product['category_name'] ?? '',
                     'inventory' => $product['inventory'] ?? 0,
                     'created_at' => $product['create_time'] ?? $product['created_at'] ?? null,
