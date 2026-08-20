@@ -4098,6 +4098,10 @@ function initSearchTaskWithAPI(searchInputId, containerId, countId, searchEndpoi
     const container = document.getElementById(containerId);
     const originalContent = container.innerHTML;
     
+    // Simpan count awal
+    const countSpanRef = document.getElementById(countId);
+    const originalCount = countSpanRef ? countSpanRef.innerText : '';
+    
     searchInput.addEventListener('keyup', function() {
         const keyword = this.value.trim();
         
@@ -4106,9 +4110,10 @@ function initSearchTaskWithAPI(searchInputId, containerId, countId, searchEndpoi
             clearTimeout(searchDebounceTimerTask);
         }
         
-        // Jika keyword kosong, reload page untuk reset ke data awal
+        // Jika keyword kosong, restore data awal tanpa reload halaman
         if (keyword.length === 0) {
-            location.reload();
+            container.innerHTML = originalContent;
+            if (countSpanRef) countSpanRef.innerText = originalCount;
             return;
         }
         
