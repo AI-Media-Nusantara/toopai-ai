@@ -3394,7 +3394,7 @@ async function showTask1DetailModal(creatorId) {
                                 <i class="fas fa-bullseye" style="color:#f59e0b;font-size:10px;"></i>
                                 <span style="font-size:10px;font-weight:700;color:#f59e0b;text-transform:uppercase;
                                              letter-spacing:.5px;">
-                                    Prospect
+                                    Belum Bekerja Sama
                                 </span>
                                 <span style="background:rgba(245,158,11,0.15);color:#f59e0b;
                                              font-size:9px;padding:1px 6px;border-radius:8px;font-weight:600;">
@@ -3405,7 +3405,7 @@ async function showTask1DetailModal(creatorId) {
                                 ? prospects.map(b => _brandRow(b, false)).join('')
                                 : `<div style="text-align:center;padding:20px 8px;color:var(--text-muted);font-size:10px;
                                               border:1px dashed rgba(245,158,11,0.15);border-radius:8px;">
-                                       Semua brand sudah partner
+                                       
                                    </div>`
                             }
                         </div>
