@@ -1402,8 +1402,11 @@ public function get_creator_task1_detail() {
             $partner_names = [];
             if (!empty($unmatched_names)) {
                 $q = $this->db->select('id, name, shop_name')
-                    ->where_in('name', $unmatched_names)
-                    ->or_where_in('shop_name', $unmatched_names)
+                    ->where('status', 'ACTIVE')
+                    ->group_start()
+                        ->where_in('name', $unmatched_names)
+                        ->or_where_in('shop_name', $unmatched_names)
+                    ->group_end()
                     ->get('brands');
                 if ($q) {
                     foreach ($q->result() as $pb) {
@@ -1413,8 +1416,30 @@ public function get_creator_task1_detail() {
                 }
             }
 
+            // Kumpulkan semua brand_id yang sudah terisi untuk di-validasi status ACTIVE-nya
+            $existing_brand_ids = [];
             foreach ($brands as $b) {
                 if (!empty($b->brand_id)) {
+                    $existing_brand_ids[] = intval($b->brand_id);
+                }
+            }
+            // Ambil brand_id yang benar-benar ACTIVE dari DB
+            $active_brand_ids = [];
+            if (!empty($existing_brand_ids)) {
+                $qActive = $this->db->select('id')
+                    ->where('status', 'ACTIVE')
+                    ->where_in('id', $existing_brand_ids)
+                    ->get('brands');
+                if ($qActive) {
+                    foreach ($qActive->result() as $ab) {
+                        $active_brand_ids[intval($ab->id)] = true;
+                    }
+                }
+            }
+
+            foreach ($brands as $b) {
+                if (!empty($b->brand_id) && isset($active_brand_ids[intval($b->brand_id)])) {
+                    // brand_id ada DAN statusnya ACTIVE di DB
                     $b->is_partner = true;
                 } else {
                     $key_shop  = strtolower(trim($b->shop_name  ?? ''));

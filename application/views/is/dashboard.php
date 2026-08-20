@@ -3990,6 +3990,19 @@ function renderMinimalCreatorDetail(username, title, body, task) {
 
 let searchTimer = null;
 
+// Cache konten awal task containers agar bisa di-restore tanpa reload halaman
+const _taskOriginalContent = {};
+const _taskOriginalCount = {};
+function _cacheTaskOriginals() {
+    ['task2', 'task3'].forEach(function(task) {
+        const container = document.getElementById(task + 'Items');
+        const countBadge = document.getElementById(task + 'Count');
+        if (container) _taskOriginalContent[task] = container.innerHTML;
+        if (countBadge) _taskOriginalCount[task] = countBadge.textContent;
+    });
+}
+document.addEventListener('DOMContentLoaded', _cacheTaskOriginals);
+
 function filterTask(task, keyword) {
     const items = document.querySelectorAll(`#${task}Items .is-item`);
     const search = keyword.toLowerCase().trim();
@@ -4011,8 +4024,16 @@ function filterTaskAjax(task, keyword) {
         clearTimeout(searchTimer);
     }
     
+    // Jika keyword kosong, restore data awal tanpa reload halaman
     if (!keyword || keyword.trim() === '') {
-        location.reload();
+        const container = document.getElementById(task + 'Items');
+        const countBadge = document.getElementById(task + 'Count');
+        if (container && _taskOriginalContent[task] !== undefined) {
+            container.innerHTML = _taskOriginalContent[task];
+        }
+        if (countBadge && _taskOriginalCount[task] !== undefined) {
+            countBadge.textContent = _taskOriginalCount[task];
+        }
         return;
     }
     
