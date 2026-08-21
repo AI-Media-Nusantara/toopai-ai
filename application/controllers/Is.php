@@ -969,8 +969,12 @@ public function get_creator_task1_detail() {
         $total_gmv = floatval($creator->imported_gmv ?? 0);
         
         try {
-            // Cek apakah ada link afiliasi
-            $has_links = $this->db->where('creator_id', $creator_id)
+            // Cek apakah ada link afiliasi — fallback ke creator_username jika creator_id NULL
+            $has_links = $this->db
+                ->group_start()
+                    ->where('creator_id', $creator_id)
+                    ->or_where('creator_username', $creator->username)
+                ->group_end()
                 ->where('status', 'ACTIVE')
                 ->count_all_results('affiliate_creator_links');
             
@@ -992,7 +996,10 @@ public function get_creator_task1_detail() {
                 ')
                 ->from('affiliate_creator_links acl')
                 ->join('affiliate_products ap', 'acl.product_id = ap.product_id AND acl.campaign_id = ap.campaign_id', 'left')
-                ->where('acl.creator_id', $creator_id)
+                ->group_start()
+                    ->where('acl.creator_id', $creator_id)
+                    ->or_where('acl.creator_username', $creator->username)
+                ->group_end()
                 ->where('acl.status', 'ACTIVE')
                 ->order_by('acl.total_gmv', 'DESC')
                 ->limit(20)
@@ -1056,6 +1063,7 @@ public function get_creator_task1_detail() {
         }
 
         // B. Ambil brand dari affiliate_creator_links (baik yang ACTIVE maupun status lainnya)
+        // Gunakan creator_username sebagai fallback jika creator_id NULL di tabel (data lama/migrasi)
         try {
             $this->db->select('
                 ap.shop_name,
@@ -1064,7 +1072,10 @@ public function get_creator_task1_detail() {
             ')
             ->from('affiliate_creator_links acl')
             ->join('affiliate_products ap', 'acl.product_id = ap.product_id AND acl.campaign_id = ap.campaign_id', 'inner')
-            ->where('acl.creator_id', $creator_id)
+            ->group_start()
+                ->where('acl.creator_id', $creator_id)
+                ->or_where('acl.creator_username', $creator->username)
+            ->group_end()
             ->where('ap.shop_name IS NOT NULL', NULL, FALSE)
             ->where('ap.shop_name !=', '')
             ->group_by('ap.shop_name');
@@ -2367,7 +2378,10 @@ public function performance() {
         ')
         ->from('affiliate_creator_links acl')
         ->join('affiliate_campaigns cp', 'cp.campaign_id = acl.campaign_id', 'left')
-        ->where('acl.creator_id', $creator_id)
+        ->group_start()
+            ->where('acl.creator_id', $creator_id)
+            ->or_where('acl.creator_username', $creator->username)
+        ->group_end()
         ->order_by('acl.created_at', 'DESC')
         ->get()
         ->result();
@@ -3377,7 +3391,11 @@ public function get_creator_affiliate_links() {
     if (!$creator_id) {
         return $this->output->set_output(json_encode(['success' => false, 'message' => 'Creator ID required']));
     }
-    
+
+    // Ambil username untuk fallback
+    $creator_row = $this->db->select('username')->where('id', $creator_id)->get('creators')->row();
+    $creator_username = $creator_row->username ?? '';
+
     $links = $this->db->select('
             acl.*,
             cp.campaign_name,
@@ -3385,7 +3403,10 @@ public function get_creator_affiliate_links() {
         ')
         ->from('affiliate_creator_links acl')
         ->join('affiliate_campaigns cp', 'cp.campaign_id = acl.campaign_id', 'left')
-        ->where('acl.creator_id', $creator_id)
+        ->group_start()
+            ->where('acl.creator_id', $creator_id)
+            ->or_where('acl.creator_username', $creator_username)
+        ->group_end()
         ->order_by('acl.created_at', 'DESC')
         ->get()
         ->result();
@@ -9682,6 +9703,80 @@ public function get_sample_keranjang_trigger() {
             'success' => true, 
             'message' => 'Cookie FastMoss berhasil diperbarui!',
             'cookie' => substr($cookie, 0, 30) . '...'
+        ]));
+    }
+
+
+    /**
+     * Batch populate tiktok_open_id untuk semua creator yang belum punya UID.
+     * Panggil sekali dari browser: /is/populate_tiktok_open_ids
+     * Bisa diakses oleh role IS atau ADMIN.
+     */
+    public function populate_tiktok_open_ids()
+    {
+        $this->output->set_content_type('application/json');
+
+        // Role IS sudah lolos constructor, tidak perlu cek tambahan
+
+        $this->load->model('Fastmoss_model');
+
+        // Ambil semua creator yang tiktok_open_id masih kosong, limit per-batch 50
+        $creators = $this->db
+            ->select('id, username')
+            ->group_start()
+                ->where('tiktok_open_id IS NULL', null, false)
+                ->or_where('tiktok_open_id', '')
+            ->group_end()
+            ->limit(50)
+            ->get('creators')
+            ->result();
+
+        $total    = count($creators);
+        $resolved = 0;
+        $failed   = [];
+
+        foreach ($creators as $c) {
+            if (empty($c->username)) {
+                $failed[] = ['id' => $c->id, 'reason' => 'username kosong'];
+                continue;
+            }
+
+            $uid = $this->Fastmoss_model->resolve_uid_by_username($c->username);
+
+            if ($uid) {
+                $this->db->where('id', $c->id)
+                         ->update('creators', [
+                             'tiktok_open_id' => $uid,
+                             'updated_at'     => date('Y-m-d H:i:s')
+                         ]);
+                $resolved++;
+                log_message('info', '[populate_tiktok_open_ids] Resolved: ' . $c->username . ' → ' . $uid);
+            } else {
+                $failed[] = ['id' => $c->id, 'username' => $c->username, 'reason' => 'tidak ditemukan di FastMoss'];
+                log_message('debug', '[populate_tiktok_open_ids] Not found: ' . $c->username);
+            }
+
+            // Jeda kecil agar tidak di-rate-limit FastMoss
+            usleep(300000); // 0.3 detik
+        }
+
+        // Hitung sisa yang belum ter-resolve
+        $remaining = $this->db
+            ->group_start()
+                ->where('tiktok_open_id IS NULL', null, false)
+                ->or_where('tiktok_open_id', '')
+            ->group_end()
+            ->count_all_results('creators');
+
+        return $this->output->set_output(json_encode([
+            'success'   => true,
+            'processed' => $total,
+            'resolved'  => $resolved,
+            'failed'    => count($failed),
+            'remaining' => $remaining,
+            'details'   => $failed,
+            'message'   => "Berhasil resolve $resolved dari $total creator. Sisa yang belum: $remaining. "
+                         . ($remaining > 0 ? 'Panggil endpoint ini lagi untuk batch berikutnya.' : 'Semua selesai!')
         ]));
     }
 

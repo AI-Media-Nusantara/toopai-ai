@@ -1822,19 +1822,19 @@
 <!-- MODAL UPDATE FASTMOSS COOKIE -->
 <!-- ============================================================ -->
 <div id="fastmossCookieModal" class="modal-overlay-dashboard" style="display:none; z-index: 9999;">
-    <div class="modal-glass-dashboard" style="max-width: 550px; width: 95; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 16px;">
-        <div class="modal-header-dashboard" style="border-bottom:1px solid var(--border); padding: 16px 20px;">
-            <h3 style="margin:0; font-size:16px; color:var(--text-primary); display:flex; align-items:center; gap:8px;"><i class="fas fa-key" style="color:var(--purple);"></i> Update FastMoss Cookie</h3>
-            <span class="modal-close-dashboard" onclick="closeCookieModal()" style="cursor:pointer; font-size:20px; color:var(--text-muted);">&times;</span>
+    <div class="modal-glass-dashboard" style="max-width: 550px; width: 95%; background: linear-gradient(160deg, #1e1b4b 0%, #0f172a 100%); border: 1px solid rgba(124, 60, 255, 0.45); border-radius: 20px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.95), 0 0 35px rgba(124, 60, 255, 0.2);">
+        <div class="modal-header-dashboard" style="border-bottom:1px solid rgba(255,255,255,0.08); padding: 16px 20px;">
+            <h3 style="margin:0; font-size:16px; color:#fff; display:flex; align-items:center; gap:8px;"><i class="fas fa-key" style="color:var(--purple, #7c3cff);"></i> Update FastMoss Cookie</h3>
+            <span class="modal-close-dashboard" onclick="closeCookieModal()" style="cursor:pointer; font-size:20px; color:#94a3b8; transition: 0.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#94a3b8'">&times;</span>
         </div>
         <div class="modal-body" style="padding: 20px;">
-            <div style="background: rgba(139,92,246,0.1); padding: 12px 16px; border-radius: 12px; border: 1px solid rgba(139,92,246,0.15); font-size: 11px; color: #a78bfa; margin-bottom: 16px; line-height: 1.5;">
+            <div style="background: rgba(139,92,246,0.1); padding: 12px 16px; border-radius: 12px; border: 1px solid rgba(139,92,246,0.15); font-size: 11.5px; color: #c084fc; margin-bottom: 16px; line-height: 1.5;">
                 <i class="fas fa-info-circle"></i> Tempel (Paste) perintah cURL request <strong>baseinfo</strong> FastMoss Anda di bawah ini. Sistem akan otomatis mengekstrak data session cookie baru Anda secara instan.
             </div>
-            <textarea id="fastmossCookieInput" rows="6" placeholder="Paste cURL command (curl 'https://www.fastmoss.com/api/author/v3/detail/baseInfo?...) di sini..." style="width:100%; background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:10px; padding:12px; color:var(--text-primary); font-size:11.5px; outline:none; font-family:monospace; resize:vertical; line-height: 1.4; box-sizing: border-box;"></textarea>
+            <textarea id="fastmossCookieInput" rows="6" placeholder="Paste cURL command (curl 'https://www.fastmoss.com/api/author/v3/detail/baseInfo?...) di sini..." style="width:100%; background:rgba(15, 23, 42, 0.6); border:1px solid rgba(124, 60, 255, 0.25); border-radius:10px; padding:12px; color:#fff; font-size:11.5px; outline:none; font-family:monospace; resize:vertical; line-height: 1.4; box-sizing: border-box; transition: 0.2s;" onfocus="this.style.borderColor='rgba(124, 60, 255, 0.6)';" onblur="this.style.borderColor='rgba(124, 60, 255, 0.25)';"></textarea>
             <div style="margin-top: 20px; display:flex; justify-content:flex-end; gap:10px;">
-                <button onclick="closeCookieModal()" style="padding: 8px 18px; background:var(--bg-elevated); border:1px solid var(--border); border-radius:8px; color:var(--text-primary); cursor:pointer; font-size:12px; font-weight: 500;">Batal</button>
-                <button onclick="saveFastmossCookie()" style="padding: 8px 22px; background:var(--purple); border:none; border-radius:8px; color:#fff; cursor:pointer; font-size:12px; font-weight:600; transition: 0.2s;">Simpan Cookie</button>
+                <button onclick="closeCookieModal()" style="padding: 8px 18px; background:rgba(255, 255, 255, 0.05); border:1px solid rgba(255, 255, 255, 0.12); border-radius:8px; color:#fff; cursor:pointer; font-size:12px; font-weight: 500; transition: 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.08)';" onmouseout="this.style.background='rgba(255, 255, 255, 0.05)';">Batal</button>
+                <button onclick="saveFastmossCookie()" style="padding: 8px 22px; background:linear-gradient(135deg, var(--purple, #7c3cff) 0%, #9333ea 100%); border:none; border-radius:8px; color:#fff; cursor:pointer; font-size:12px; font-weight:600; box-shadow: 0 4px 12px rgba(124, 60, 255, 0.25); transition: 0.2s;" onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 6px 16px rgba(124, 60, 255, 0.45)';" onmouseout="this.style.transform='none'; this.style.boxShadow='0 4px 12px rgba(124, 60, 255, 0.25)';">Simpan Cookie</button>
             </div>
         </div>
     </div>
@@ -5565,63 +5565,76 @@ document.getElementById('phoneDuplicateModal').addEventListener('click', functio
     }
 
     // Close overlay on background click
-    ['dbWillingOverlay','dbRecOverlay'].forEach(id => {
-        document.getElementById(id).addEventListener('click', function(e) {
-            if (e.target === this) this.classList.remove('active');
+    document.addEventListener('DOMContentLoaded', function() {
+        ['dbWillingOverlay','dbRecOverlay'].forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el) el.addEventListener('click', function(e) {
+                if (e.target === this) this.classList.remove('active');
+            });
         });
     });
 
-    // FastMoss Cookie Modal Handlers
-    window.openCookieModal = function() {
-        document.getElementById('fastmossCookieInput').value = '';
-        document.getElementById('fastmossCookieModal').style.display = 'flex';
-    };
-    window.closeCookieModal = function() {
-        document.getElementById('fastmossCookieModal').style.display = 'none';
-    };
-    window.saveFastmossCookie = function() {
-        const input = document.getElementById('fastmossCookieInput').value;
-        if (!input.trim()) {
-            showToastGlobal('Silakan paste cURL / cookie terlebih dahulu', 'error');
+})();
+</script>
+<script>
+/* FastMoss Cookie Modal — global scope agar bisa dipanggil dari onclick attribute */
+window.openCookieModal = function() {
+    var inp = document.getElementById('fastmossCookieInput');
+    if (inp) inp.value = '';
+    var modal = document.getElementById('fastmossCookieModal');
+    if (modal) {
+        modal.style.display = 'flex';
+        // Paksa reflow agar transisi CSS berjalan
+        void modal.offsetWidth;
+        modal.classList.add('active');
+    }
+};
+window.closeCookieModal = function() {
+    var modal = document.getElementById('fastmossCookieModal');
+    if (modal) {
+        modal.classList.remove('active');
+        setTimeout(function() {
+            if (!modal.classList.contains('active')) modal.style.display = 'none';
+        }, 220);
+    }
+};
+window.saveFastmossCookie = function() {
+    var inp = document.getElementById('fastmossCookieInput');
+    var input = inp ? inp.value : '';
+    if (!input.trim()) {
+        if (typeof showToastGlobal === 'function') showToastGlobal('Silakan paste cURL / cookie terlebih dahulu', 'error');
+        return;
+    }
+    fetch(BASE_URL + 'is/update_fastmoss_cookie', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'cookie_data=' + encodeURIComponent(input)
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (!data.success) {
+            if (typeof showToastGlobal === 'function') showToastGlobal(data.message, 'error');
             return;
         }
-        
-        fetch(BASE_URL + 'is/update_fastmoss_cookie', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-            body: 'cookie_data=' + encodeURIComponent(input)
-        })
-        .then(r => r.json())
-        .then(data => {
-            if (!data.success) {
-                showToastGlobal(data.message, 'error');
-                return;
-            }
-            showToastGlobal(data.message, 'success');
-            closeCookieModal();
-            setTimeout(() => {
-                const modal = document.getElementById('task1DetailModal');
-                if (modal && modal.style.display === 'flex') {
-                    const titleText = document.getElementById('task1ModalTitle').innerText;
-                    const unameMatch = titleText.match(/@([a-zA-Z0-9_\.]+)/);
-                    if (unameMatch && unameMatch[1]) {
-                        const card = document.querySelector(`.scouting-item-dashboard[data-creator-name="${unameMatch[1]}"]`);
-                        if (card) {
-                            card.click();
-                        } else {
-                            location.reload();
-                        }
-                    } else {
-                        location.reload();
-                    }
-                } else {
-                    location.reload();
-                }
-            }, 1000);
-        })
-        .catch(() => showToastGlobal('Gagal memperbarui cookie', 'error'));
-    };
-})();
+        if (typeof showToastGlobal === 'function') showToastGlobal(data.message, 'success');
+        window.closeCookieModal();
+        setTimeout(function() {
+            var modal = document.getElementById('task1DetailModal');
+            if (modal && modal.style.display === 'flex') {
+                var titleEl = document.getElementById('task1ModalTitle');
+                var titleText = titleEl ? titleEl.innerText : '';
+                var unameMatch = titleText.match(/@([a-zA-Z0-9_.]+)/);
+                if (unameMatch && unameMatch[1]) {
+                    var card = document.querySelector('.scouting-item-dashboard[data-creator-name="' + unameMatch[1] + '"]');
+                    if (card) { card.click(); } else { location.reload(); }
+                } else { location.reload(); }
+            } else { location.reload(); }
+        }, 1000);
+    })
+    .catch(function() {
+        if (typeof showToastGlobal === 'function') showToastGlobal('Gagal memperbarui cookie', 'error');
+    });
+};
 
     // ============================================================
     // SCOUTING CREATOR DETAIL MODAL — Brand Collaboration & GMV
