@@ -1549,13 +1549,22 @@
                         </span>
                     </div>
                     
-                    <!-- TOMBOL INPUT MANUAL (hanya jika tidak ada nomor) -->
-                    <?php if (empty($item->phone)): ?>
-                    <button onclick="event.stopPropagation(); window.openUpdatePhoneModal('<?= $item->id ?>', '<?= htmlspecialchars($item->username) ?>')"
-                            title="Input nomor WA manual"
-                            style="background:rgba(245,158,11,0.15); color:#f59e0b; border:1px solid rgba(245,158,11,0.3); padding:2px 8px; border-radius:10px; cursor:pointer; font-size:9px; font-weight:600; transition:var(--transition); display:inline-flex; align-items:center; gap:3px;">
-                        <i class="fas fa-keyboard" style="font-size:8px;"></i> Manual
-                    </button>
+                    <!-- TOMBOL FETCH WA DARI TAP / INPUT MANUAL -->
+                    <?php if (empty($item->phone) || $item->phone === 'no_phone'): ?>
+                    <div class="action-buttons-wa-wrapper" style="display:inline-flex; gap:4px; align-items:center;">
+                        <button class="resync-wa-btn"
+                                data-creator-id="<?= $item->id ?>"
+                                data-creator-name="<?= htmlspecialchars($item->username) ?>"
+                                title="Ambil nomor WA dari TAP API"
+                                style="background: linear-gradient(135deg,#0ea5e9,#2563eb); color:#fff; border:none; padding:2px 8px; border-radius:10px; cursor:pointer; font-size:9px; font-weight:600; transition:var(--transition); display:inline-flex; align-items:center; gap:3px;">
+                            <i class="fab fa-tiktok" style="font-size:8px;"></i> Fetch TAP
+                        </button>
+                        <button onclick="event.stopPropagation(); window.openUpdatePhoneModal('<?= $item->id ?>', '<?= htmlspecialchars($item->username) ?>')"
+                                title="Input nomor WA manual"
+                                style="background:rgba(245,158,11,0.15); color:#f59e0b; border:1px solid rgba(245,158,11,0.3); padding:2px 8px; border-radius:10px; cursor:pointer; font-size:9px; font-weight:600; transition:var(--transition); display:inline-flex; align-items:center; gap:3px;">
+                            <i class="fas fa-keyboard" style="font-size:8px;"></i> Manual
+                        </button>
+                    </div>
                     <?php endif; ?>
                 </div>
                 
@@ -4410,116 +4419,84 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // ============================================================
-    // 4. AUTO-FETCH WA PHONE ON PAGE LOAD (BATCH)
-    // Mengambil nomor WA semua creator di step 1 yang belum punya
-    // secara otomatis setiap kali halaman di-reload.
+    // 4. RESYNC WA BUTTON (fetch dari TAP API secara individual)
     // ============================================================
-    async function autoFetchPhonesBatch() {
-        // Kumpulkan semua creator yang belum punya nomor WA
-        const cards = document.querySelectorAll('.scouting-item-dashboard[data-no-phone="1"]');
-        if (cards.length === 0) return;
+    document.addEventListener('click', async function(e) {
+        const btnEl = e.target.closest('.resync-wa-btn');
+        if (!btnEl) return;
 
-        const creatorIds = [];
-        cards.forEach(card => {
-            const cid = card.getAttribute('data-creator-id');
-            if (cid) creatorIds.push(cid);
-        });
+        e.preventDefault();
+        e.stopPropagation(); // Mencegah card memicu click event lainnya
 
-        if (creatorIds.length === 0) return;
+        const creatorId   = btnEl.getAttribute('data-creator-id');
+        const creatorName = btnEl.getAttribute('data-creator-name');
 
-        // Tampilkan loading indicator di semua field WA yang kosong
-        creatorIds.forEach(cid => {
-            const phoneEl = document.getElementById('phoneDisplay_' + cid);
-            if (phoneEl) {
-                phoneEl.innerHTML = '<i class="fas fa-spinner fa-pulse" style="color:#6b7280; font-size:8px;"></i> <span style="color:#6b7280; font-size:9px;">Mengambil...</span>';
-            }
-        });
+        if (!creatorId) return;
 
-        // Batasi max 20 per batch (sesuai limit backend)
-        const batch = creatorIds.slice(0, 20);
+        const originalText = btnEl.innerHTML;
+        btnEl.disabled    = true;
+        btnEl.innerHTML   = '<i class="fas fa-spinner fa-pulse"></i> Fetching...';
+
+        const phoneDisplay = document.getElementById('phoneDisplay_' + creatorId);
+        const card         = btnEl.closest('.scouting-item-dashboard');
+
+        if (phoneDisplay) {
+            phoneDisplay.innerHTML = '<i class="fas fa-spinner fa-pulse" style="color:#6b7280; font-size:8px;"></i> <span style="color:#6b7280; font-size:9px;">Mengambil...</span>';
+        }
 
         try {
-            // Bangun form data dengan array creator_ids[]
-            const params = new URLSearchParams();
-            batch.forEach(id => params.append('creator_ids[]', id));
-
-            const response = await fetch(BASE_URL + 'is/batch_fetch_phones', {
+            const response = await fetch(BASE_URL + 'is/get_creator_phone_from_tap', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: params.toString()
+                body: new URLSearchParams({ creator_id: creatorId })
             });
 
-            const data = await response.json();
+            const result = await response.json();
 
-            if (!data.success) {
-                // Reset display jika error
-                batch.forEach(cid => {
-                    const phoneEl = document.getElementById('phoneDisplay_' + cid);
-                    if (phoneEl) {
-                        phoneEl.innerHTML = '<i class="fab fa-whatsapp" style="color: #25D366;"></i> <span style="color: #ef4444;">Tidak ada</span>';
-                    }
-                });
-                return;
+            if (result.success && result.phone && result.phone !== 'no_phone') {
+                showToastGlobal('✅ Nomor WA berhasil diambil dari TAP!', 'success');
+
+                if (phoneDisplay) {
+                    phoneDisplay.innerHTML = '<i class="fab fa-whatsapp" style="color: #25D366;"></i> ' 
+                        + escapeHtml(result.phone)
+                        + ' <span onclick="event.stopPropagation(); window.openUpdatePhoneModal(\'' + creatorId + '\', \'\')" title="Edit nomor WA" style="cursor:pointer; color:#6b7280; font-size:8px; margin-left:2px;"><i class="fas fa-pencil-alt"></i></span>';
+                }
+
+                // Sembunyikan pembungkus tombol karena nomor sudah ada
+                const wrapper = btnEl.closest('.action-buttons-wa-wrapper');
+                if (wrapper) wrapper.style.display = 'none';
+                if (card) card.setAttribute('data-no-phone', '0');
+
+            } else if (result.phone === 'no_phone' || (!result.success && result.phone === 'no_phone')) {
+                showToastGlobal('⚠️ Creator tidak mencantumkan nomor WA. Tim CA harus mencari & input manual.', 'warning');
+
+                if (phoneDisplay) {
+                    phoneDisplay.innerHTML = '<i class="fab fa-whatsapp" style="color: #25D366;"></i> '
+                        + '<span style="color: #d97706; font-size: 8.5px;" title="CA harus mencari nomor WA & input manual">Tidak mencantumkan nomor WA</span>'
+                        + ' <span onclick="event.stopPropagation(); window.openUpdatePhoneModal(\'' + creatorId + '\', \'\')" title="Input nomor WA manual" style="cursor:pointer; color:#d97706; font-size:8px; margin-left:2px;"><i class="fas fa-pencil-alt"></i></span>';
+                }
+
+                btnEl.innerHTML  = originalText;
+                btnEl.disabled   = false;
+                if (card) card.setAttribute('data-no-phone', '0');
+
+            } else {
+                showToastGlobal(result.message || 'Gagal mengambil nomor WA dari TAP.', 'error');
+                if (phoneDisplay) {
+                    phoneDisplay.innerHTML = '<i class="fab fa-whatsapp" style="color: #25D366;"></i> <span style="color: #ef4444;">Tidak ada</span>';
+                }
+                btnEl.innerHTML  = originalText;
+                btnEl.disabled   = false;
             }
-
-            let foundCount = 0;
-
-            // Update masing-masing card sesuai hasil
-            (data.results || []).forEach(r => {
-                const phoneEl = document.getElementById('phoneDisplay_' + r.id);
-                const card    = document.querySelector('.scouting-item-dashboard[data-creator-id="' + r.id + '"]');
-
-                if (r.found && r.phone) {
-                    foundCount++;
-                    if (phoneEl) {
-                        phoneEl.innerHTML = '<i class="fab fa-whatsapp" style="color: #25D366;"></i> '
-                            + escapeHtml(r.phone)
-                            + ' <span onclick="event.stopPropagation(); window.openUpdatePhoneModal(\'' + r.id + '\', \'\')" title="Edit nomor WA" style="cursor:pointer; color:#6b7280; font-size:8px; margin-left:2px;"><i class="fas fa-pencil-alt"></i></span>';
-                    }
-                    // Hapus tombol Manual karena sudah punya nomor
-                    if (card) {
-                        card.setAttribute('data-no-phone', '0');
-                        const manualBtn = card.querySelector('button[title="Input nomor WA manual"]');
-                        if (manualBtn) manualBtn.style.display = 'none';
-                    }
-                } else {
-                    // Tidak ditemukan — kembalikan ke tampilan "Tidak ada"
-                    if (phoneEl) {
-                        phoneEl.innerHTML = '<i class="fab fa-whatsapp" style="color: #25D366;"></i> <span style="color: #ef4444;">Tidak ada</span>';
-                    }
-                }
-            });
-
-            // Creator yang tidak ada di result (karena sudah punya phone di DB) — reset juga
-            batch.forEach(cid => {
-                const inResults = (data.results || []).some(r => String(r.id) === String(cid));
-                if (!inResults) {
-                    const phoneEl = document.getElementById('phoneDisplay_' + cid);
-                    if (phoneEl && phoneEl.querySelector('.fa-spinner')) {
-                        phoneEl.innerHTML = '<i class="fab fa-whatsapp" style="color: #25D366;"></i> <span style="color: #ef4444;">Tidak ada</span>';
-                    }
-                }
-            });
-
-            if (foundCount > 0) {
-                if (typeof showToastGlobal === 'function') {
-                    showToastGlobal('✅ ' + foundCount + ' nomor WA berhasil diambil dari TAP', 'success');
-                }
+        } catch (error) {
+            showToastGlobal('Error: ' + error.message, 'error');
+            if (phoneDisplay) {
+                phoneDisplay.innerHTML = '<i class="fab fa-whatsapp" style="color: #25D366;"></i> <span style="color: #ef4444;">Tidak ada</span>';
             }
-
-        } catch (err) {
-            // Gagal — reset semua ke "Tidak ada"
-            batch.forEach(cid => {
-                const phoneEl = document.getElementById('phoneDisplay_' + cid);
-                if (phoneEl) {
-                    phoneEl.innerHTML = '<i class="fab fa-whatsapp" style="color: #25D366;"></i> <span style="color: #ef4444;">Tidak ada</span>';
-                }
-            });
+            btnEl.innerHTML = originalText;
+            btnEl.disabled  = false;
         }
-    }
-
-    // Jalankan otomatis 1 detik setelah halaman selesai dirender
-    setTimeout(autoFetchPhonesBatch, 1000);
+    });
 
     // ============================================================
     // 5. ADD CREATOR BUTTONS

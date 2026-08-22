@@ -58,7 +58,8 @@ public function dashboard() {
         ->join('brands b', 'c.brand_id = b.id', 'left')
         ->join('users u', 'c.is_id = u.id', 'left')
         ->where_in('c.status', ['PENDING', 'LINK_SWAPPING'])
-        ->order_by('c.created_at', 'DESC')
+        ->order_by('(CASE WHEN c.phone IS NOT NULL AND c.phone != "" AND c.phone != "no_phone" THEN 1 ELSE 0 END)', 'DESC')
+        ->order_by('c.imported_gmv', 'DESC')
         ->limit(100)
         ->get()
         ->result();
@@ -8858,8 +8859,16 @@ public function get_creator_phone_from_tap() {
         if (empty($phone)) {
             $bio_preview = substr($tap_creator['bio_description'] ?? $tap_creator['bio'] ?? '', 0, 100);
             log_message('info', 'get_creator_phone_from_tap: no phone found. bio="' . $bio_preview . '" keys=' . implode(', ', array_keys($tap_creator)));
+            
+            // Simpan 'no_phone' ke DB agar CA team tahu harus mencari manual
+            $this->db->where('id', $creator_id)->update('creators', [
+                'phone'      => 'no_phone',
+                'updated_at' => date('Y-m-d H:i:s')
+            ]);
+
             return $this->output->set_output(json_encode([
                 'success'          => false,
+                'phone'            => 'no_phone',
                 'message'          => 'Nomor WA tidak ditemukan di profil TAP creator ini (tidak ada di bio/deskripsi)',
                 'tap_bio_preview'  => $bio_preview,
                 'tap_fields_found' => array_keys($tap_creator),
@@ -9063,7 +9072,14 @@ public function batch_fetch_phones() {
                 $result_item['found']  = true;
                 $result_item['source'] = 'tap_api';
             } else {
-                log_message('debug', 'batch_fetch_phones: no phone found for ' . $creator->username);
+                log_message('debug', 'batch_fetch_phones: no phone found for ' . $creator->username . ', saving "no_phone" to DB');
+                // Simpan 'no_phone' ke DB agar CA team tahu harus mencari manual
+                $this->db->where('id', $creator->id)->update('creators', [
+                    'phone'      => 'no_phone',
+                    'updated_at' => date('Y-m-d H:i:s')
+                ]);
+                $result_item['phone']  = 'no_phone';
+                $result_item['found']  = false;
                 $result_item['source'] = 'not_found';
             }
 
@@ -9073,6 +9089,9 @@ public function batch_fetch_phones() {
         }
 
         $results[] = $result_item;
+        
+        // Jeda 1.5 detik untuk menghindari rate limit API TikTok (Too many requests downstream)
+        usleep(1500000);
     }
 
     $found_count = count(array_filter($results, fn($r) => $r['found']));
