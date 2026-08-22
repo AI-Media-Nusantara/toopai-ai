@@ -8904,6 +8904,189 @@ public function get_creator_phone_from_tap() {
 // ========================================================================
 // SEND LINK TO CREATOR (TASK 1)
 // ========================================================================
+
+// ========================================================================
+// BATCH FETCH PHONE/WA FROM TAP API (AUTO ON PAGE LOAD)
+// POST: creator_ids[] — max 20 creator per request
+// ========================================================================
+public function batch_fetch_phones() {
+    $this->output->set_content_type('application/json');
+
+    if (!$this->session->userdata('logged_in')) {
+        return $this->output->set_output(json_encode([
+            'success' => false,
+            'message' => 'Session expired'
+        ]));
+    }
+
+    $creator_ids = $this->input->post('creator_ids');
+
+    if (empty($creator_ids) || !is_array($creator_ids)) {
+        return $this->output->set_output(json_encode([
+            'success' => true,
+            'results' => [],
+            'message' => 'No creator IDs provided'
+        ]));
+    }
+
+    // Batasi max 20 per request agar tidak timeout
+    $creator_ids = array_slice(array_map('intval', $creator_ids), 0, 20);
+
+    // Ambil semua creator sekaligus (1 query)
+    $creators = $this->db->select('id, username, phone, tiktok_open_id')
+        ->where_in('id', $creator_ids)
+        ->where('(phone IS NULL OR phone = \'\')', null, false)
+        ->get('creators')
+        ->result();
+
+    if (empty($creators)) {
+        return $this->output->set_output(json_encode([
+            'success' => true,
+            'results' => [],
+            'message' => 'All creators already have phone numbers'
+        ]));
+    }
+
+    $phone_fields = [
+        'phone_number', 'phone', 'mobile', 'whatsapp', 'wa_number',
+        'contact_phone', 'contact_number', 'telephone'
+    ];
+
+    $results = [];
+
+    foreach ($creators as $creator) {
+        $result_item = [
+            'id'       => $creator->id,
+            'username' => $creator->username,
+            'phone'    => null,
+            'found'    => false,
+            'source'   => null,
+        ];
+
+        $open_id = $creator->tiktok_open_id;
+
+        // Resolve tiktok_open_id jika kosong
+        if (empty($open_id) && !empty($creator->username)) {
+            try {
+                $search = $this->jsm_api->search_creators_by_is($creator->username, null, 20);
+                if ($search['success'] && !empty($search['data']['creators'])) {
+                    foreach ($search['data']['creators'] as $tc) {
+                        if (strtolower($tc['username'] ?? '') === strtolower($creator->username)) {
+                            if (!empty($tc['creator_open_id'])) {
+                                $open_id = $tc['creator_open_id'];
+                                $this->db->where('id', $creator->id)->update('creators', [
+                                    'tiktok_open_id' => $open_id,
+                                    'updated_at'     => date('Y-m-d H:i:s')
+                                ]);
+                                log_message('debug', 'batch_fetch_phones: resolved open_id for ' . $creator->username . ' → ' . $open_id);
+                                break;
+                            }
+                        }
+                    }
+                }
+            } catch (Exception $e) {
+                log_message('error', 'batch_fetch_phones: search open_id failed for ' . $creator->username . ': ' . $e->getMessage());
+            }
+        }
+
+        if (empty($open_id)) {
+            $result_item['source'] = 'no_open_id';
+            $results[] = $result_item;
+            continue;
+        }
+
+        // Ambil detail dari TAP API
+        try {
+            $tap_result = $this->jsm_api->get_creator_detail_by_id($open_id);
+
+            if (!$tap_result['success']) {
+                log_message('debug', 'batch_fetch_phones: TAP API failed for ' . $creator->username . ': ' . ($tap_result['message'] ?? ''));
+                $result_item['source'] = 'tap_error';
+                $results[] = $result_item;
+                continue;
+            }
+
+            $tap_data    = $tap_result['data'] ?? [];
+            $tap_creator = $tap_data['creator'] ?? $tap_data;
+
+            $phone = '';
+
+            // Prioritas 1: field phone langsung
+            foreach ($phone_fields as $field) {
+                if (!empty($tap_creator[$field])) {
+                    $phone = $tap_creator[$field];
+                    break;
+                }
+            }
+
+            // Prioritas 2: sub-object contact_info
+            if (empty($phone) && !empty($tap_creator['contact_info'])) {
+                foreach ($phone_fields as $field) {
+                    if (!empty($tap_creator['contact_info'][$field])) {
+                        $phone = $tap_creator['contact_info'][$field];
+                        break;
+                    }
+                }
+            }
+
+            // Prioritas 3: parse dari bio_description / teks bio
+            if (empty($phone)) {
+                $bio_text = $tap_creator['bio_description']
+                    ?? $tap_creator['bio']
+                    ?? $tap_creator['description']
+                    ?? '';
+                if (!empty($bio_text)) {
+                    $phone = $this->extractPhoneFromBio($bio_text);
+                }
+            }
+
+            if (!empty($phone)) {
+                // Format ke standar 62xxx
+                $phone = preg_replace('/[^0-9+]/', '', $phone);
+                if (preg_match('/^0/', $phone)) {
+                    $phone = '62' . substr($phone, 1);
+                } elseif (preg_match('/^\+/', $phone)) {
+                    $phone = substr($phone, 1);
+                } elseif (!preg_match('/^62/', $phone) && strlen($phone) > 0) {
+                    $phone = '62' . $phone;
+                }
+
+                // Simpan ke DB
+                $this->db->where('id', $creator->id)->update('creators', [
+                    'phone'      => $phone,
+                    'updated_at' => date('Y-m-d H:i:s')
+                ]);
+
+                log_message('info', 'batch_fetch_phones: saved phone=' . $phone . ' for creator_id=' . $creator->id);
+
+                $result_item['phone']  = $phone;
+                $result_item['found']  = true;
+                $result_item['source'] = 'tap_api';
+            } else {
+                log_message('debug', 'batch_fetch_phones: no phone found for ' . $creator->username);
+                $result_item['source'] = 'not_found';
+            }
+
+        } catch (Exception $e) {
+            log_message('error', 'batch_fetch_phones: exception for ' . $creator->username . ': ' . $e->getMessage());
+            $result_item['source'] = 'exception';
+        }
+
+        $results[] = $result_item;
+    }
+
+    $found_count = count(array_filter($results, fn($r) => $r['found']));
+
+    return $this->output->set_output(json_encode([
+        'success'     => true,
+        'processed'   => count($results),
+        'found'       => $found_count,
+        'results'     => $results,
+        'message'     => "Berhasil menemukan $found_count dari " . count($results) . " nomor WA"
+    ]));
+}
+
+
 public function send_link_task1() {
     $this->output->set_content_type('application/json');
     
