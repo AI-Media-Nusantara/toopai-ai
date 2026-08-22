@@ -1474,6 +1474,110 @@ public function get_creator_task1_detail() {
         }
 
         // ============================================================
+        // 8.7 AUTO-FETCH PHONE FROM TAP (jika phone masih kosong)
+        // Dilakukan secara silent di background — tidak memblokir response
+        // ============================================================
+        $phone_source = 'database';
+        if (empty($creator->phone)) {
+            $open_id_for_phone = $creator->tiktok_open_id ?? null;
+
+            // Pastikan tiktok_open_id tersedia
+            if (empty($open_id_for_phone) && !empty($creator->username)) {
+                try {
+                    $search_result = $this->jsm_api->search_creators_by_is($creator->username, null, 20);
+                    if ($search_result['success'] && !empty($search_result['data']['creators'])) {
+                        foreach ($search_result['data']['creators'] as $tc) {
+                            if (strtolower($tc['username'] ?? '') === strtolower($creator->username)) {
+                                if (!empty($tc['creator_open_id'])) {
+                                    $open_id_for_phone = $tc['creator_open_id'];
+                                    $this->db->where('id', $creator_id)->update('creators', [
+                                        'tiktok_open_id' => $open_id_for_phone,
+                                        'updated_at'     => date('Y-m-d H:i:s')
+                                    ]);
+                                    $creator->tiktok_open_id = $open_id_for_phone;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                } catch (Exception $e) {
+                    log_message('error', 'task1_detail auto-phone: search open_id failed: ' . $e->getMessage());
+                }
+            }
+
+            if (!empty($open_id_for_phone)) {
+                try {
+                    $tap_detail = $this->jsm_api->get_creator_detail_by_id($open_id_for_phone);
+                    if ($tap_detail['success']) {
+                        $tap_creator_raw = $tap_detail['data']['creator'] ?? $tap_detail['data'];
+                        // Prioritas 1: field phone langsung di response
+                        $phone_fields = [
+                            'phone_number', 'phone', 'mobile', 'whatsapp', 'wa_number',
+                            'contact_phone', 'contact_number', 'telephone'
+                        ];
+                        $fetched_phone = '';
+                        foreach ($phone_fields as $pf) {
+                            if (!empty($tap_creator_raw[$pf])) {
+                                $fetched_phone = $tap_creator_raw[$pf];
+                                log_message('debug', 'task1_detail auto-phone: found phone in field "' . $pf . '"');
+                                break;
+                            }
+                        }
+                        // Prioritas 2: sub-object contact_info
+                        if (empty($fetched_phone) && !empty($tap_creator_raw['contact_info'])) {
+                            foreach ($phone_fields as $pf) {
+                                if (!empty($tap_creator_raw['contact_info'][$pf])) {
+                                    $fetched_phone = $tap_creator_raw['contact_info'][$pf];
+                                    log_message('debug', 'task1_detail auto-phone: found phone in contact_info.' . $pf);
+                                    break;
+                                }
+                            }
+                        }
+                        // Prioritas 3: parse dari bio_description (Endorsement di TAP UI)
+                        if (empty($fetched_phone)) {
+                            $bio_text = $tap_creator_raw['bio_description']
+                                ?? $tap_creator_raw['bio']
+                                ?? $tap_creator_raw['description']
+                                ?? '';
+                            if (!empty($bio_text)) {
+                                $fetched_phone = $this->extractPhoneFromBio($bio_text);
+                                if (!empty($fetched_phone)) {
+                                    log_message('info', 'task1_detail auto-phone: found phone in bio_description: ' . $fetched_phone);
+                                }
+                            }
+                        }
+
+                        if (!empty($fetched_phone)) {
+                            // Format nomor ke standar 62xxx
+                            $fetched_phone = preg_replace('/[^0-9+]/', '', $fetched_phone);
+                            if (preg_match('/^0/', $fetched_phone)) {
+                                $fetched_phone = '62' . substr($fetched_phone, 1);
+                            } elseif (preg_match('/^\+/', $fetched_phone)) {
+                                $fetched_phone = substr($fetched_phone, 1);
+                            } elseif (!preg_match('/^62/', $fetched_phone) && strlen($fetched_phone) > 0) {
+                                $fetched_phone = '62' . $fetched_phone;
+                            }
+
+                            $creator->phone = $fetched_phone;
+                            $phone_source = 'tap_api';
+                            $this->db->where('id', $creator_id)->update('creators', [
+                                'phone'      => $fetched_phone,
+                                'updated_at' => date('Y-m-d H:i:s')
+                            ]);
+                            log_message('info', 'task1_detail auto-phone: saved phone=' . $fetched_phone . ' for creator_id=' . $creator_id);
+                        } else {
+                            log_message('debug', 'task1_detail auto-phone: no phone found. bio_desc="'
+                                . substr($tap_creator_raw['bio_description'] ?? '', 0, 100)
+                                . '" keys=' . implode(', ', array_keys($tap_creator_raw)));
+                        }
+                    }
+                } catch (Exception $e) {
+                    log_message('error', 'task1_detail auto-phone: TAP detail failed: ' . $e->getMessage());
+                }
+            }
+        }
+
+        // ============================================================
         // 9. KIRIM RESPONSE
         // ============================================================
         $response = [
@@ -1485,7 +1589,8 @@ public function get_creator_task1_detail() {
             'multi_links' => $multi_links,
             'total_gmv' => $total_gmv,
             'total_products' => count($products),
-            'total_brands' => count($brands)
+            'total_brands' => count($brands),
+            'phone_source' => $phone_source
         ];
         
         log_message('debug', '=== get_creator_task1_detail SUCCESS ===');
@@ -8590,6 +8695,208 @@ public function update_creator_phone_task1() {
         return $this->output->set_output(json_encode([
             'success' => false,
             'message' => 'Gagal update nomor WhatsApp'
+        ]));
+    }
+}
+
+// ========================================================================
+// FETCH PHONE/WA FROM TAP API (TASK 1) 
+// ========================================================================
+public function get_creator_phone_from_tap() {
+    $this->output->set_content_type('application/json');
+
+    if (!$this->session->userdata('logged_in')) {
+        return $this->output->set_output(json_encode([
+            'success' => false,
+            'message' => 'Session expired'
+        ]));
+    }
+
+    $creator_id = $this->input->post('creator_id');
+
+    if (!$creator_id) {
+        return $this->output->set_output(json_encode([
+            'success' => false,
+            'message' => 'Creator ID required'
+        ]));
+    }
+
+    // Ambil data creator dari DB
+    $creator = $this->db->select('id, username, phone, tiktok_open_id')
+        ->where('id', $creator_id)
+        ->get('creators')
+        ->row();
+
+    if (!$creator) {
+        return $this->output->set_output(json_encode([
+            'success' => false,
+            'message' => 'Creator not found'
+        ]));
+    }
+
+    // Jika sudah ada nomor WA, return langsung
+    if (!empty($creator->phone)) {
+        return $this->output->set_output(json_encode([
+            'success' => true,
+            'phone' => $creator->phone,
+            'source' => 'database',
+            'message' => 'Nomor WA sudah tersedia di database'
+        ]));
+    }
+
+    // Pastikan tiktok_open_id tersedia — coba resolve dulu jika kosong
+    $tiktok_open_id = $creator->tiktok_open_id;
+
+    if (empty($tiktok_open_id) && !empty($creator->username)) {
+        try {
+            $this->load->model('BrandCreator_model');
+            $fastmoss_uid = $this->BrandCreator_model->find_creator_in_fastmoss($creator->username);
+            if ($fastmoss_uid) {
+                $this->db->where('id', $creator_id)->update('creators', [
+                    'tiktok_open_id' => $fastmoss_uid,
+                    'updated_at'     => date('Y-m-d H:i:s')
+                ]);
+                $tiktok_open_id = $fastmoss_uid;
+                log_message('debug', 'get_creator_phone_from_tap: resolved tiktok_open_id=' . $tiktok_open_id);
+            }
+        } catch (Exception $e) {
+            log_message('error', 'get_creator_phone_from_tap: resolve open_id failed: ' . $e->getMessage());
+        }
+    }
+
+    if (empty($tiktok_open_id)) {
+        // Fallback: cari via TAP marketplace search dengan username
+        try {
+            $search_result = $this->jsm_api->search_creators_by_is($creator->username, null, 20);
+            if ($search_result['success'] && !empty($search_result['data']['creators'])) {
+                foreach ($search_result['data']['creators'] as $tap_creator) {
+                    if (strtolower($tap_creator['username'] ?? '') === strtolower($creator->username)) {
+                        if (!empty($tap_creator['creator_open_id'])) {
+                            $tiktok_open_id = $tap_creator['creator_open_id'];
+                            $this->db->where('id', $creator_id)->update('creators', [
+                                'tiktok_open_id' => $tiktok_open_id,
+                                'updated_at'     => date('Y-m-d H:i:s')
+                            ]);
+                            log_message('debug', 'get_creator_phone_from_tap: found open_id via search=' . $tiktok_open_id);
+                            break;
+                        }
+                    }
+                }
+            }
+        } catch (Exception $e) {
+            log_message('error', 'get_creator_phone_from_tap: search fallback failed: ' . $e->getMessage());
+        }
+    }
+
+    if (empty($tiktok_open_id)) {
+        return $this->output->set_output(json_encode([
+            'success'  => false,
+            'message'  => 'TikTok Open ID tidak ditemukan untuk creator ini. Nomor WA tidak bisa diambil dari TAP.',
+            'username' => $creator->username
+        ]));
+    }
+
+    // Ambil detail creator dari TAP API (v202509)
+    try {
+        $tap_result = $this->jsm_api->get_creator_detail_by_id($tiktok_open_id);
+
+        log_message('debug', 'get_creator_phone_from_tap TAP response: ' . json_encode($tap_result));
+
+        if (!$tap_result['success']) {
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'TAP API error: ' . ($tap_result['message'] ?? 'Unknown error'),
+                'tap_code' => $tap_result['code'] ?? null
+            ]));
+        }
+
+        $tap_data    = $tap_result['data'] ?? [];
+        $tap_creator = $tap_data['creator'] ?? $tap_data;
+
+        // Prioritas 1: field phone langsung di response
+        $phone = '';
+        $phone_fields = [
+            'phone_number', 'phone', 'mobile', 'whatsapp', 'wa_number',
+            'contact_phone', 'contact_number', 'telephone'
+        ];
+
+        foreach ($phone_fields as $field) {
+            if (!empty($tap_creator[$field])) {
+                $phone = $tap_creator[$field];
+                log_message('debug', 'get_creator_phone_from_tap: found phone in field "' . $field . '": ' . $phone);
+                break;
+            }
+        }
+
+        // Prioritas 2: sub-object contact_info
+        if (empty($phone) && !empty($tap_creator['contact_info'])) {
+            $contact = $tap_creator['contact_info'];
+            foreach ($phone_fields as $field) {
+                if (!empty($contact[$field])) {
+                    $phone = $contact[$field];
+                    log_message('debug', 'get_creator_phone_from_tap: found phone in contact_info.' . $field . ': ' . $phone);
+                    break;
+                }
+            }
+        }
+
+        // Prioritas 3: parse nomor telepon dari bio_description (tampil sebagai "Endorsement" di TAP UI)
+        // Creator sering menyimpan nomor WA, IG, dll di bio mereka dalam format teks bebas
+        if (empty($phone)) {
+            $bio_text = $tap_creator['bio_description']
+                ?? $tap_creator['bio']
+                ?? $tap_creator['description']
+                ?? '';
+            if (!empty($bio_text)) {
+                $phone = $this->extractPhoneFromBio($bio_text);
+                if (!empty($phone)) {
+                    log_message('info', 'get_creator_phone_from_tap: extracted phone from bio_description: ' . $phone);
+                }
+            }
+        }
+
+        if (empty($phone)) {
+            $bio_preview = substr($tap_creator['bio_description'] ?? $tap_creator['bio'] ?? '', 0, 100);
+            log_message('info', 'get_creator_phone_from_tap: no phone found. bio="' . $bio_preview . '" keys=' . implode(', ', array_keys($tap_creator)));
+            return $this->output->set_output(json_encode([
+                'success'          => false,
+                'message'          => 'Nomor WA tidak ditemukan di profil TAP creator ini (tidak ada di bio/deskripsi)',
+                'tap_bio_preview'  => $bio_preview,
+                'tap_fields_found' => array_keys($tap_creator),
+                'username'         => $creator->username
+            ]));
+        }
+
+        // Format nomor
+        $phone = preg_replace('/[^0-9+]/', '', $phone);
+        if (preg_match('/^0/', $phone)) {
+            $phone = '62' . substr($phone, 1);
+        } elseif (preg_match('/^\+/', $phone)) {
+            $phone = substr($phone, 1);
+        } elseif (!preg_match('/^62/', $phone) && strlen($phone) > 0) {
+            $phone = '62' . $phone;
+        }
+
+        // Simpan ke DB
+        $this->db->where('id', $creator_id)->update('creators', [
+            'phone'      => $phone,
+            'updated_at' => date('Y-m-d H:i:s')
+        ]);
+
+        log_message('info', 'get_creator_phone_from_tap: saved phone=' . $phone . ' for creator_id=' . $creator_id);
+
+        return $this->output->set_output(json_encode([
+            'success' => true,
+            'phone'   => $phone,
+            'source'  => 'tap_api',
+            'message' => 'Nomor WA berhasil diambil dari TAP API'
+        ]));
+
+    } catch (Exception $e) {
+        log_message('error', 'get_creator_phone_from_tap exception: ' . $e->getMessage());
+        return $this->output->set_output(json_encode([
+            'success' => false,
+            'message' => 'Exception: ' . $e->getMessage()
         ]));
     }
 }

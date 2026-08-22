@@ -2874,81 +2874,23 @@ public function get_product_performance_2($product_id, $params = []) {
  * Endpoint: GET /affiliate_seller/202508/marketplace_creators/{creator_user_id}
  */
 public function get_creator_detail_by_id($creator_open_id) {
-    // 🔥 Gunakan endpoint versi 202509
-    $path = "/affiliate_seller/202509/marketplace_creators/{$creator_open_id}";
+    // Gunakan endpoint versi 202508 (versi valid yang tersedia)
+    $path = "/affiliate_seller/202508/marketplace_creators/{$creator_open_id}";
     
     try {
-        $access_token = $this->get_valid_seller_token();
+        // Gunakan _api_request_seller yang sudah proven — konsisten dengan method lain
+        $result = $this->_api_request_seller($path, [], 'GET');
         
-        $seller_token = $this->CI->Jsm_token_model->get_latest_token_by_type(2);
-        $shop_cipher = $seller_token->shop_id ?? $this->default_cipher;
-        
-        $timestamp = time();
-        
-        $query = [
-            'app_key' => $this->app_key,
-            'timestamp' => $timestamp,
-            'shop_cipher' => $shop_cipher
-        ];
-        
-        ksort($query);
-        
-        $param_string = '';
-        foreach ($query as $key => $value) {
-            $param_string .= $key . $value;
+        if (!$result['success']) {
+            log_message('error', 'get_creator_detail_by_id failed: ' . json_encode($result));
+            return $result;
         }
         
-        $string_to_sign = $this->app_secret . $path . $param_string . $this->app_secret;
-        $query['sign'] = hash_hmac('sha256', $string_to_sign, $this->app_secret);
-        
-        $url = $this->openapi_base . $path . '?' . http_build_query($query);
-        
-        log_message('debug', 'Get Creator Detail URL (v202509): ' . $url);
-        
-        $headers = [
-            "x-tts-access-token: " . $access_token,
-            "Content-Type: application/json"
-        ];
-        
-        $ch = curl_init();
-        curl_setopt_array($ch, [
-            CURLOPT_URL => $url,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_HTTPHEADER => $headers,
-            CURLOPT_TIMEOUT => 60,
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_FOLLOWLOCATION => true
-        ]);
-        
-        $response = curl_exec($ch);
-        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        
-        if (curl_error($ch)) {
-            $error = curl_error($ch);
-            curl_close($ch);
-            return ['success' => false, 'message' => "cURL Error: {$error}"];
-        }
-        
-        curl_close($ch);
-        
-        $decoded = json_decode($response, true);
-        
-        if (!$decoded) {
-            return ['success' => false, 'message' => 'Invalid JSON response'];
-        }
-        
-        if (!isset($decoded['code']) || $decoded['code'] != 0) {
-            return [
-                'success' => false,
-                'message' => $decoded['message'] ?? 'Unknown API Error',
-                'code' => $decoded['code'] ?? 'unknown'
-            ];
-        }
+        log_message('debug', 'get_creator_detail_by_id raw data keys: ' . implode(', ', array_keys($result['data'] ?? [])));
         
         return [
             'success' => true,
-            'data' => $decoded['data'] ?? [],
-            'http_code' => $http_code
+            'data'    => $result['data'] ?? [],
         ];
         
     } catch (Exception $e) {

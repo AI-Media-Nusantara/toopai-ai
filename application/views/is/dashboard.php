@@ -1503,6 +1503,11 @@
                         <i class="fab fa-whatsapp" style="color: #25D366;"></i> 
                         <?php if (!empty($item->phone)): ?>
                             <?= htmlspecialchars($item->phone) ?>
+                            <span onclick="window.openUpdatePhoneModal('<?= $item->id ?>', '<?= htmlspecialchars($item->username) ?>')"
+                                  title="Edit nomor WA"
+                                  style="cursor:pointer; color:#6b7280; font-size:8px; margin-left:2px;">
+                                <i class="fas fa-pencil-alt"></i>
+                            </span>
                         <?php else: ?>
                             <span style="color: #ef4444;">Tidak ada</span>
                         <?php endif; ?>
@@ -1543,14 +1548,22 @@
                         </span>
                     </div>
                     
-                    <!-- TOMBOL RESYNC WA -->
+                    <!-- TOMBOL FETCH WA DARI TAP / INPUT MANUAL -->
                     <?php if (empty($item->phone)): ?>
-                    <button class="resync-wa-btn" 
-                            data-creator-id="<?= $item->id ?>" 
-                            data-creator-name="<?= htmlspecialchars($item->username) ?>"
-                            style="background: #fbbf24; color: #0a0e17; border: none; padding: 2px 10px; border-radius: 12px; cursor: pointer; font-size: 9px; font-weight: 600; transition: var(--transition);">
-                        <i class="fas fa-sync-alt"></i> Resync WA
-                    </button>
+                    <div style="display:inline-flex; gap:4px; align-items:center;">
+                        <button class="resync-wa-btn"
+                                data-creator-id="<?= $item->id ?>"
+                                data-creator-name="<?= htmlspecialchars($item->username) ?>"
+                                title="Ambil nomor WA dari TAP API"
+                                style="background: linear-gradient(135deg,#0ea5e9,#2563eb); color:#fff; border:none; padding:2px 8px; border-radius:10px; cursor:pointer; font-size:9px; font-weight:600; transition:var(--transition); display:inline-flex; align-items:center; gap:3px;">
+                            <i class="fab fa-tiktok" style="font-size:8px;"></i> Fetch TAP
+                        </button>
+                        <button onclick="window.openUpdatePhoneModal('<?= $item->id ?>', '<?= htmlspecialchars($item->username) ?>')"
+                                title="Input nomor WA manual"
+                                style="background:rgba(245,158,11,0.15); color:#f59e0b; border:1px solid rgba(245,158,11,0.3); padding:2px 8px; border-radius:10px; cursor:pointer; font-size:9px; font-weight:600; transition:var(--transition); display:inline-flex; align-items:center; gap:3px;">
+                            <i class="fas fa-keyboard" style="font-size:8px;"></i> Manual
+                        </button>
+                    </div>
                     <?php endif; ?>
                 </div>
                 
@@ -4405,79 +4418,62 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // ============================================================
-    // 4. RESYNC WA BUTTON
+    // 4. RESYNC WA BUTTON (fetch dari TAP API via endpoint baru)
     // ============================================================
     document.querySelectorAll('.resync-wa-btn').forEach(btn => {
         btn.addEventListener('click', async function(e) {
             e.stopPropagation();
-            
-            const creatorId = this.getAttribute('data-creator-id');
+
+            const creatorId   = this.getAttribute('data-creator-id');
             const creatorName = this.getAttribute('data-creator-name');
-            
+
             if (!creatorId) return;
-            
-            const btnEl = this;
+
+            const btnEl       = this;
             const originalText = btnEl.innerHTML;
-            btnEl.disabled = true;
-            btnEl.innerHTML = '<i class="fas fa-spinner fa-pulse"></i>';
-            
+            btnEl.disabled    = true;
+            btnEl.innerHTML   = '<i class="fas fa-spinner fa-pulse"></i> Fetching...';
+
             try {
-                const response = await fetch(BASE_URL + 'is/search_creators_by_is', {
+                const response = await fetch(BASE_URL + 'is/get_creator_phone_from_tap', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: new URLSearchParams({ keyword: creatorName })
+                    body: new URLSearchParams({ creator_id: creatorId })
                 });
-                
+
                 const result = await response.json();
-                
-                if (result.success && result.creators && result.creators.length > 0) {
-                    const found = result.creators.find(c => c.username === creatorName);
-                    if (found && found.phone) {
-                        const updateResponse = await fetch(BASE_URL + 'is/update_creator_phone', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                            body: new URLSearchParams({
-                                creator_id: creatorId,
-                                phone: found.phone
-                            })
-                        });
-                        
-                        const updateResult = await updateResponse.json();
-                        
-                        if (updateResult.success) {
-                            showToastGlobal('�7�3 Nomor WA berhasil di-resync!', 'success');
-                            const phoneDisplay = document.getElementById('phoneDisplay_' + creatorId);
-                            if (phoneDisplay) {
-                                phoneDisplay.innerHTML = `<i class="fab fa-whatsapp" style="color: #25D366;"></i> ${escapeHtml(found.phone)}`;
-                            }
-                            btnEl.innerHTML = '<i class="fas fa-check" style="color: #4ade80;"></i>';
-                            setTimeout(() => {
-                                btnEl.innerHTML = originalText;
-                                btnEl.disabled = false;
-                            }, 2000);
-                        } else {
-                            showToastGlobal(updateResult.message || 'Gagal update nomor', 'error');
-                            btnEl.innerHTML = originalText;
-                            btnEl.disabled = false;
-                        }
-                    } else {
-                        showToastGlobal('Nomor WA tidak ditemukan di API', 'warning');
-                        btnEl.innerHTML = originalText;
-                        btnEl.disabled = false;
+
+                if (result.success && result.phone) {
+                    showToastGlobal('✅ Nomor WA berhasil diambil dari TAP!', 'success');
+
+                    // Update phone display di card
+                    const phoneDisplay = document.getElementById('phoneDisplay_' + creatorId);
+                    if (phoneDisplay) {
+                        phoneDisplay.innerHTML = '<i class="fab fa-whatsapp" style="color: #25D366;"></i> ' + escapeHtml(result.phone);
                     }
+
+                    // Sembunyikan tombol resync karena nomor sudah ada
+                    btnEl.style.display = 'none';
+
                 } else {
-                    showToastGlobal('Creator tidak ditemukan di API', 'warning');
-                    btnEl.innerHTML = originalText;
-                    btnEl.disabled = false;
+                    // TAP tidak punya nomor WA — fallback ke input manual
+                    showToastGlobal(
+                        (result.message || 'Nomor WA tidak tersedia di TAP.') + ' Silakan isi manual.',
+                        'warning'
+                    );
+                    if (typeof window.openUpdatePhoneModal === 'function') {
+                        window.openUpdatePhoneModal(creatorId, creatorName || '');
+                    }
+                    btnEl.innerHTML  = originalText;
+                    btnEl.disabled   = false;
                 }
             } catch (error) {
                 showToastGlobal('Error: ' + error.message, 'error');
                 btnEl.innerHTML = originalText;
-                btnEl.disabled = false;
+                btnEl.disabled  = false;
             }
         });
     });
-    
     // ============================================================
     // 5. ADD CREATOR BUTTONS
     // ============================================================
