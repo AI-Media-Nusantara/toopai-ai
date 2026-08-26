@@ -467,9 +467,9 @@
 
 <!-- Campaign Tabs -->
 <div class="campaign-tabs" id="campaignTabs">
-    <button class="campaign-tab active" data-campaign-id="all">All Campaigns</button>
+    <button class="campaign-tab <?= ($campaign_filter === 'all') ? 'active' : '' ?>" data-campaign-id="all">All Campaigns</button>
     <?php foreach ($campaigns as $camp): ?>
-    <button class="campaign-tab" data-campaign-id="<?= $camp->campaign_id ?>" data-campaign-name="<?= htmlspecialchars($camp->campaign_name) ?>">
+    <button class="campaign-tab <?= ($campaign_filter === $camp->campaign_id) ? 'active' : '' ?>" data-campaign-id="<?= $camp->campaign_id ?>" data-campaign-name="<?= htmlspecialchars($camp->campaign_name) ?>">
         <?= htmlspecialchars(substr($camp->campaign_name, 0, 30)) ?>
     </button>
     <?php endforeach; ?>
@@ -478,11 +478,11 @@
 <!-- Search Section -->
 <div class="search-section">
     <div class="search-type" id="searchType">
-        <button class="search-type-btn active" data-type="shop">Shop Name</button>
-        <button class="search-type-btn" data-type="product_id">Product ID</button>
+        <button class="search-type-btn <?= ($search_type === 'shop') ? 'active' : '' ?>" data-type="shop">Shop Name</button>
+        <button class="search-type-btn <?= ($search_type === 'product_id') ? 'active' : '' ?>" data-type="product_id">Product ID</button>
     </div>
     <div class="search-input-group">
-        <input type="text" id="searchInput" placeholder="Search by shop name...">
+        <input type="text" id="searchInput" value="<?= htmlspecialchars($search ?? '') ?>" placeholder="<?= ($search_type === 'shop') ? 'Search by shop name...' : 'Search by product ID...' ?>">
         <button id="searchBtn"><i class="fas fa-search"></i> Search</button>
     </div>
 </div>
@@ -571,6 +571,48 @@
             <?php endif; ?>
         </tbody>
     </table>
+</div>
+
+<!-- Custom Pagination Styling & Markup -->
+<style>
+.pagination {
+    display: flex;
+    padding-left: 0;
+    list-style: none;
+    border-radius: 8px;
+    gap: 5px;
+}
+.pagination li a {
+    display: block;
+    padding: 8px 16px;
+    color: #9aaebe;
+    background-color: #0f1420;
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 8px;
+    text-decoration: none;
+    font-size: 13px;
+    transition: all 0.2s ease;
+}
+.pagination li a:hover {
+    color: #4ade80;
+    border-color: #4ade80;
+    background-color: rgba(74, 222, 128, 0.05);
+}
+.pagination li.active a {
+    color: #0c101b !important;
+    background-color: #4ade80 !important;
+    border-color: #4ade80 !important;
+    font-weight: 600;
+}
+.pagination li.disabled a {
+    color: #4b5563;
+    pointer-events: none;
+    background-color: transparent;
+    border-color: rgba(255,255,255,0.06);
+}
+</style>
+<div class="pagination-wrapper" style="margin-top: 25px; display: flex; justify-content: center; width: 100%;">
+    <?= $pagination_links ?>
 </div>
 
 <!-- Modal Create Link -->
@@ -693,78 +735,20 @@
 <script>
 const baseUrl = '<?= base_url() ?>';
 let searchTimeout;
-let currentSelectedCampaignId = 'all';
-let currentSearchType = 'shop';
-let allRowsData = [];
-
-// Store all rows data for filtering
-function storeRowsData() {
-    const rows = document.querySelectorAll('#linksTableBody tr');
-    allRowsData = [];
-    rows.forEach(row => {
-        if (row.querySelector('td')) {
-            allRowsData.push({
-                element: row,
-                campaignId: row.getAttribute('data-campaign-id'),
-                shopName: row.getAttribute('data-shop-name')?.toLowerCase() || '',
-                productName: row.querySelector('.product-name')?.innerText?.toLowerCase() || '',
-                productId: row.cells[0]?.innerText?.toLowerCase() || ''
-            });
-        }
-    });
-}
+let selectedProducts = [];
+let currentSelectedCampaignId = '<?= $campaign_filter ?>';
+let currentSearchType = '<?= $search_type ?>';
 
 // ========== CAMPAIGN TABS ==========
 document.querySelectorAll('.campaign-tab').forEach(tab => {
     tab.addEventListener('click', () => {
-        document.querySelectorAll('.campaign-tab').forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-        currentSelectedCampaignId = tab.getAttribute('data-campaign-id');
-        filterTable();
+        const campaignId = tab.getAttribute('data-campaign-id');
+        const url = new URL(window.location.href);
+        url.searchParams.set('campaign_id', campaignId);
+        url.searchParams.delete('page'); // Reset to page 0
+        window.location.href = url.toString();
     });
 });
-
-function filterTable() {
-    const keyword = document.getElementById('searchInput').value.trim().toLowerCase();
-    
-    allRowsData.forEach(rowData => {
-        let show = true;
-        
-        // Filter by campaign
-        if (currentSelectedCampaignId !== 'all' && rowData.campaignId !== currentSelectedCampaignId) {
-            show = false;
-        }
-        
-        // Filter by search
-        if (keyword !== '') {
-            if (currentSearchType === 'shop') {
-                if (!rowData.shopName.includes(keyword) && !rowData.productName.includes(keyword)) {
-                    show = false;
-                }
-            } else {
-                if (!rowData.productId.includes(keyword)) {
-                    show = false;
-                }
-            }
-        }
-        
-        rowData.element.style.display = show ? '' : 'none';
-    });
-    
-    // Show/hide no data message
-    const tbody = document.getElementById('linksTableBody');
-    const visibleRows = Array.from(tbody.querySelectorAll('tr')).filter(r => r.style.display !== 'none' && r.querySelector('td'));
-    
-    let noDataRow = tbody.querySelector('.no-data-row');
-    if (visibleRows.length === 0 && !noDataRow) {
-        const tr = document.createElement('tr');
-        tr.className = 'no-data-row';
-        tr.innerHTML = '<td colspan="10" class="text-center" style="padding: 40px;">Tidak ada link untuk filter ini</td>';
-        tbody.appendChild(tr);
-    } else if (noDataRow && visibleRows.length > 0) {
-        noDataRow.remove();
-    }
-}
 
 // ========== SEARCH FUNCTION ==========
 document.querySelectorAll('#searchType .search-type-btn').forEach(btn => {
@@ -775,20 +759,27 @@ document.querySelectorAll('#searchType .search-type-btn').forEach(btn => {
         
         const placeholder = currentSearchType === 'shop' ? 'Search by shop name...' : 'Search by product ID...';
         document.getElementById('searchInput').placeholder = placeholder;
-        
-        filterTable();
     });
 });
 
 document.getElementById('searchBtn')?.addEventListener('click', () => {
-    filterTable();
+    performSearch();
 });
 
 document.getElementById('searchInput')?.addEventListener('keyup', (e) => {
     if (e.key === 'Enter') {
-        filterTable();
+        performSearch();
     }
 });
+
+function performSearch() {
+    const keyword = document.getElementById('searchInput').value.trim();
+    const url = new URL(window.location.href);
+    url.searchParams.set('search', keyword);
+    url.searchParams.set('search_type', currentSearchType);
+    url.searchParams.delete('page'); // Reset to page 0
+    window.location.href = url.toString();
+}
 
 
 
@@ -901,6 +892,8 @@ function closeCreateModal() {
     if (productName) productName.value = '';
     if (productSearch) productSearch.value = '';
     if (commissionRate) commissionRate.value = 10;
+    
+    selectedProducts = [];
 }
 
 // ========== MODAL SEARCH TYPE ==========
@@ -1025,41 +1018,51 @@ document.getElementById('productSearch')?.addEventListener('input', function() {
                 searchResultsDiv.innerHTML = html;
                 
                 document.querySelectorAll('.search-result-item').forEach(item => {
-  item.addEventListener('click', () => {
-    const productId = item.getAttribute('data-id');
-    const productName = item.getAttribute('data-name');
-    const productPrice = item.getAttribute('data-price');
-    const productImage = item.getAttribute('data-image');
-    let openCommissionRaw = parseFloat(item.getAttribute('data-open-commission') || 0);
-    const shopName = item.getAttribute('data-shop');
-    
-    // 🔥 KONVERSI cents ke persen
-    let openCommissionPercent;
-    if (openCommissionRaw > 20) {
-        openCommissionPercent = openCommissionRaw / 100;
-    } else {
-        openCommissionPercent = openCommissionRaw;
-    }
-    
-    // 🔥 DEFAULT = Open Plan + 1% (BUKAN 10)
-    const defaultCommission = openCommissionPercent + 1;
-    
-    document.getElementById('productId').value = productId;
-    document.getElementById('productName').value = productName;
-    
-    const commissionInput = document.getElementById('commissionRate');
-    commissionInput.value = defaultCommission;  // 🔥 PAKAI Open Plan + 1%
-    commissionInput.readOnly = false;
-    commissionInput.style.backgroundColor = '';
-    commissionInput.style.color = '';
-    
-    // Tampilkan preview
-    updateSelectedProductPreview(productId, productName, productPrice, productImage, openCommissionPercent, defaultCommission, shopName);
-    
-    searchResultsDiv.style.display = 'none';
-    document.getElementById('productSearch').value = productName;
-});
-});
+                    item.addEventListener('click', () => {
+                        const productId = item.getAttribute('data-id');
+                        const productName = item.getAttribute('data-name');
+                        const productPrice = item.getAttribute('data-price');
+                        const productImage = item.getAttribute('data-image');
+                        let openCommissionRaw = parseFloat(item.getAttribute('data-open-commission') || 0);
+                        const shopName = item.getAttribute('data-shop');
+                        
+                        // Konversi cents ke persen
+                        let openCommissionPercent;
+                        if (openCommissionRaw > 20) {
+                            openCommissionPercent = openCommissionRaw / 100;
+                        } else {
+                            openCommissionPercent = openCommissionRaw;
+                        }
+                        
+                        // Cek apakah produk sudah ada di keranjang pilihan
+                        if (selectedProducts.some(p => p.id === productId)) {
+                            showToastGlobal('Produk sudah dipilih', 'info');
+                            return;
+                        }
+                        
+                        // Tambahkan ke array pilihan
+                        selectedProducts.push({
+                            id: productId,
+                            name: productName,
+                            price: productPrice,
+                            image: productImage,
+                            openCommission: openCommissionPercent,
+                            shopName: shopName
+                        });
+                        
+                        // Tampilkan preview daftar produk terpilih
+                        renderSelectedProducts();
+                        
+                        // Set default commission rate input based on recommended commission of first product (if not set)
+                        const commissionInput = document.getElementById('commissionRate');
+                        if (commissionInput && (!commissionInput.value || commissionInput.value === '10' || selectedProducts.length === 1)) {
+                            commissionInput.value = openCommissionPercent + 1; // Open Plan + 1%
+                        }
+                        
+                        searchResultsDiv.style.display = 'none';
+                        document.getElementById('productSearch').value = '';
+                    });
+                });
             } else {
                 searchResultsDiv.innerHTML = '<div class="search-result-item" style="justify-content:center;">Tidak ada produk ditemukan dalam campaign ini</div>';
             }
@@ -1070,72 +1073,59 @@ document.getElementById('productSearch')?.addEventListener('input', function() {
     }, 500);
 });
 
-function updateSelectedProductPreview(productId, productName, productPrice, productImage, openCommissionPercent, recommendedCommission, shopName) {
-    const selectedHtml = `
-        <div style="display:flex; align-items:center; gap:12px; padding:12px; background:#0f1420; border-radius:12px; margin-top:12px; border:1px solid #4ade80;">
-            <div style="width:60px; height:60px; background:#1e293b; border-radius:12px; display:flex; align-items:center; justify-content:center; overflow:hidden;">
-                ${productImage && productImage !== '' && productImage !== 'null' ? `<img src="${escapeHtml(productImage)}" style="width:100%; height:100%; object-fit:cover;" onerror="this.src=''; this.onerror=null; this.parentElement.innerHTML='<i class=\\'fas fa-box fa-2x\\' style=\\'color:#4ade80;\\'></i>'">` : '<i class="fas fa-box fa-2x" style="color:#4ade80;"></i>'}
+function renderSelectedProducts() {
+    const previewContainer = document.getElementById('selectedProductPreview');
+    if (!previewContainer) return;
+    
+    if (selectedProducts.length === 0) {
+        previewContainer.innerHTML = '';
+        return;
+    }
+    
+    let html = `
+        <div style="margin-top:15px; display:flex; flex-direction:column; gap:10px;">
+            <div style="font-size:11px; font-weight:700; color:var(--text-secondary); display:flex; justify-content:space-between; align-items:center;">
+                <span>PRODUK YANG DIPILIH (${selectedProducts.length})</span>
+                <button type="button" onclick="clearAllSelectedProducts()" style="background:transparent; border:none; color:#ef4444; cursor:pointer; font-size:11px; font-weight:600;">
+                    <i class="fas fa-trash"></i> Hapus Semua
+                </button>
             </div>
-            <div style="flex:1;">
-                <div style="color:#e2f0e8; font-size:14px; font-weight:600;">${escapeHtml(productName)}</div>
-                <div style="color:#4ade80; font-size:13px;"> Rp ${formatNumber(productPrice)}</div>
-                <div style="background: #1e293b; padding: 6px 10px; border-radius: 8px; margin-top: 6px;">
-                    <div style="color: #fbbf24; font-size: 12px;">
-                        <i class="fas fa-chart-line"></i> Open Plan Commission: ${openCommissionPercent}%
-                    </div>
-                    <div style="color: #4ade80; font-size: 13px; margin-top: 2px;">
-                        <i class="fas fa-link"></i> Rekomendasi Commission: ${recommendedCommission}% 
-                        <span style="color: #9aaebe; font-size: 10px;">(Open Plan + 1%)</span>
-                    </div>
-                    <div style="color: #9aaebe; font-size: 10px; margin-top: 2px;">
-                        <i class="fas fa-pen"></i> Anda dapat mengubah komisi di atas
-                    </div>
-                </div>
-                ${shopName ? `<div style="color:#9aaebe; font-size:11px; margin-top:6px;"><i class="fas fa-store"></i> Shop: ${escapeHtml(shopName)}</div>` : ''}
-            </div>
-            <button type="button" id="clearSelectedProduct" style="background:transparent; border:none; color:#ef4444; cursor:pointer; padding:8px;">
-                <i class="fas fa-times-circle"></i>
-            </button>
-        </div>
     `;
     
-    let selectedPreview = document.getElementById('selectedProductPreview');
-    if (!selectedPreview) {
-        const modalBody = document.querySelector('#createLinkModal .modal-body');
-        if (modalBody) {
-            const form = document.getElementById('createLinkForm');
-            if (form) {
-                const previewContainer = document.createElement('div');
-                previewContainer.id = 'selectedProductPreview';
-                previewContainer.style.marginTop = '12px';
-                form.appendChild(previewContainer);
-                selectedPreview = previewContainer;
-            }
-        }
-    }
+    selectedProducts.forEach((p, idx) => {
+        html += `
+            <div style="display:flex; align-items:center; gap:12px; padding:10px; background:#0f1420; border-radius:12px; border:1px solid rgba(74, 222, 128, 0.25);">
+                <div style="width:48px; height:48px; background:#1e293b; border-radius:8px; display:flex; align-items:center; justify-content:center; overflow:hidden; flex-shrink:0;">
+                    ${p.image && p.image !== '' && p.image !== 'null' ? `<img src="${escapeHtml(p.image)}" style="width:100%; height:100%; object-fit:cover;" onerror="this.src=''; this.onerror=null; this.parentElement.innerHTML='<i class=\\'fas fa-box\\' style=\\'color:#4ade80;\\'></i>'">` : '<i class="fas fa-box" style="color:#4ade80;"></i>'}
+                </div>
+                <div style="flex:1; min-width:0;">
+                    <div style="color:#e2f0e8; font-size:12px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(p.name)}</div>
+                    <div style="color:#4ade80; font-size:11px; font-weight:500;">Rp ${formatNumber(p.price)}</div>
+                    <div style="color:var(--text-secondary); font-size:10px; margin-top:2px;">
+                        Open Plan: ${p.openCommission}% ${p.shopName ? `| Toko: ${escapeHtml(p.shopName)}` : ''}
+                    </div>
+                </div>
+                <button type="button" onclick="removeSelectedProduct(${idx})" style="background:transparent; border:none; color:#ef4444; cursor:pointer; padding:6px; flex-shrink:0;">
+                    <i class="fas fa-times-circle"></i>
+                </button>
+            </div>
+        `;
+    });
     
-    if (selectedPreview) {
-        selectedPreview.innerHTML = selectedHtml;
-        
-        const clearBtn = document.getElementById('clearSelectedProduct');
-        if (clearBtn) {
-            clearBtn.addEventListener('click', () => {
-    if (selectedPreview) selectedPreview.innerHTML = '';
-    document.getElementById('productId').value = '';
-    document.getElementById('productName').value = '';
-    document.getElementById('productSearch').value = '';
-    const commissionInput = document.getElementById('commissionRate');
-    commissionInput.value = '';  // 🔥 KOSONGKAN, nanti akan terisi saat pilih produk
-    commissionInput.placeholder = 'Pilih produk terlebih dahulu';
-    commissionInput.readOnly = false;
-    commissionInput.style.backgroundColor = '';
-    commissionInput.style.color = '';
-    showToastGlobal('Product selection cleared', 'info');
-});
-        }
-    }
+    html += `</div>`;
+    previewContainer.innerHTML = html;
 }
-// Create form submit
+
+window.removeSelectedProduct = function(index) {
+    selectedProducts.splice(index, 1);
+    renderSelectedProducts();
+};
+
+window.clearAllSelectedProducts = function() {
+    selectedProducts = [];
+    renderSelectedProducts();
+    document.getElementById('productSearch').value = '';
+};
 document.getElementById('createLinkForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const canGenerateRes = await fetch(baseUrl + 'link_management/can_generate_link');
@@ -1145,9 +1135,17 @@ document.getElementById('createLinkForm')?.addEventListener('submit', async (e) 
         showToastGlobal(canGenerateData.message || 'Anda tidak memiliki akses untuk membuat link afiliasi. Hanya Head BA yang dapat generate link.', 'error');
         return;
     }
+    
     const submitBtn = document.getElementById('submitBtn');
     submitBtn.disabled = true;
     submitBtn.innerHTML = '<i class="fas fa-spinner fa-pulse"></i> Generating...';
+    
+    if (selectedProducts.length === 0) {
+        showToastGlobal('Pilih minimal satu produk terlebih dahulu', 'error');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fas fa-link"></i> Generate Link';
+        return;
+    }
     
     const specialCaseChecked = document.getElementById('specialCase')?.checked ? 1 : 0;
     
@@ -1156,11 +1154,10 @@ document.getElementById('createLinkForm')?.addEventListener('submit', async (e) 
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
             campaign_id: document.getElementById('campaignId').value,
-            product_id: document.getElementById('productId').value,
-            product_name: document.getElementById('productName').value,
+            product_ids: JSON.stringify(selectedProducts.map(p => p.id)),
             commission_rate: document.getElementById('commissionRate').value,
             notes: document.getElementById('notes').value,
-            special_case: specialCaseChecked  // 🔥 KIRIM SPECIAL CASE
+            special_case: specialCaseChecked
         })
     });
     
@@ -1373,7 +1370,6 @@ window.onclick = function(event) {
 
 // Initialize
 setTimeout(() => {
-    storeRowsData();
-    filterTable();
+    // Client-side initialization no-op (server-side pagination active)
 }, 200);
 </script>

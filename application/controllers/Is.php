@@ -8448,6 +8448,7 @@ public function get_creator_products_with_links() {
                 bal.open_commission_rate,
                 bal.created_by_name,
                 bal.campaign_name,
+                bal.link_type,
                 ap.price,
                 ap.image_url,
                 ap.sales_count,
@@ -8479,6 +8480,81 @@ public function get_creator_products_with_links() {
             ->result();
     }
     
+    // ============================================================
+    // 🔥 AMBIL DAFTAR BRAND YANG PERNAH BEKERJA SAMA (COLLABORATED BRANDS)
+    // ============================================================
+    $collaborated_shops = [];
+
+    // A. Dari affiliate_orders (berdasarkan history penjualan)
+    if (!empty($creator->username)) {
+        try {
+            $qOrders = $this->db->select('DISTINCT(ap.shop_name) as shop_name')
+                ->from('affiliate_orders o')
+                ->join('affiliate_products ap', 'o.product_id = ap.product_id AND o.campaign_id = ap.campaign_id', 'inner')
+                ->where('o.creator_username', $creator->username)
+                ->where('ap.shop_name !=', '')
+                ->get();
+            if ($qOrders) {
+                foreach ($qOrders->result() as $row) {
+                    $collaborated_shops[strtolower(trim($row->shop_name))] = true;
+                }
+            }
+        } catch (Exception $e) {
+            log_message('error', 'get_creator_products_with_links: Error getting brands from orders: ' . $e->getMessage());
+        }
+    }
+
+    // B. Dari affiliate_creator_links (ACTIVE)
+    try {
+        $qLinks = $this->db->select('DISTINCT(ap.shop_name) as shop_name')
+            ->from('affiliate_creator_links acl')
+            ->join('affiliate_products ap', 'acl.product_id = ap.product_id AND acl.campaign_id = ap.campaign_id', 'inner')
+            ->group_start()
+                ->where('acl.creator_id', $creator_id)
+                ->or_where('acl.creator_username', $creator->username)
+            ->group_end()
+            ->where('ap.shop_name !=', '')
+            ->get();
+        if ($qLinks) {
+            foreach ($qLinks->result() as $row) {
+                $collaborated_shops[strtolower(trim($row->shop_name))] = true;
+            }
+        }
+    } catch (Exception $e) {
+        log_message('error', 'get_creator_products_with_links: Error getting brands from links: ' . $e->getMessage());
+    }
+
+    // C. Dari creator_products (Data FastMoss)
+    if ($this->db->table_exists('creator_products')) {
+        try {
+            $qCreatorProds = $this->db->select('DISTINCT(shop_name) as shop_name')
+                ->from('creator_products')
+                ->where('creator_id', $creator_id)
+                ->where('shop_name !=', '')
+                ->get();
+            if ($qCreatorProds) {
+                foreach ($qCreatorProds->result() as $row) {
+                    $collaborated_shops[strtolower(trim($row->shop_name))] = true;
+                }
+            }
+        } catch (Exception $e) {
+            log_message('error', 'get_creator_products_with_links: Error getting brands from creator_products: ' . $e->getMessage());
+        }
+    }
+
+    // D. Dari creator's brand_id (Brand utama creator)
+    if (!empty($creator->brand_id)) {
+        try {
+            $brandObj = $this->db->select('name, shop_name')->where('id', $creator->brand_id)->get('brands')->row();
+            if ($brandObj) {
+                if (!empty($brandObj->shop_name)) $collaborated_shops[strtolower(trim($brandObj->shop_name))] = true;
+                if (!empty($brandObj->name)) $collaborated_shops[strtolower(trim($brandObj->name))] = true;
+            }
+        } catch (Exception $e) {
+            log_message('error', 'get_creator_products_with_links: Error getting brand by id: ' . $e->getMessage());
+        }
+    }
+
     // ============================================================
     // 🔥 GABUNGKAN SEMUA PRODUK
     // ============================================================
@@ -8529,6 +8605,9 @@ public function get_creator_products_with_links() {
     // ============================================================
     $formatted_products = [];
     foreach ($all_products as $p) {
+        $shop_key = strtolower(trim($p->shop_name ?? ''));
+        $has_collab = ($p->is_assigned ?? false) || (!empty($shop_key) && isset($collaborated_shops[$shop_key]));
+
         $formatted_products[] = [
             'product_id' => $p->product_id,
             'product_name' => $p->product_name,
@@ -8546,12 +8625,14 @@ public function get_creator_products_with_links() {
             'source_label' => $this->getSourceLabel($p->source ?? 'unknown'),
             'campaign_id' => $p->campaign_id ?? null,
             'affiliate_link' => $p->affiliate_link ?? null,
+            'link_type' => $p->link_type ?? null,
             'bd_created_by' => $p->created_by_name ?? null,
             'campaign_name' => $p->campaign_name ?? null,
             'is_matched' => isset($p->is_matched) ? intval($p->is_matched) : 0,
             'matched_product_id' => $p->matched_product_id ?? null,
             'handler_name' => $p->handler_name ?? null,
-            'created_by_user_id' => $p->created_by_user_id ?? null
+            'created_by_user_id' => $p->created_by_user_id ?? null,
+            'has_collaborated_brand' => $has_collab
         ];
     }
     

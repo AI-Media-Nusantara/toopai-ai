@@ -1504,7 +1504,7 @@
                         <i class="fab fa-whatsapp" style="color: #25D366;"></i> 
                         <?php if (!empty($item->phone)): ?>
                             <?= htmlspecialchars($item->phone) ?>
-                            <span onclick="window.openUpdatePhoneModal('<?= $item->id ?>', '<?= htmlspecialchars($item->username) ?>')"
+                            <span onclick="event.stopPropagation(); window.openUpdatePhoneModal('<?= $item->id ?>', '<?= htmlspecialchars($item->username) ?>')"
                                   title="Edit nomor WA"
                                   style="cursor:pointer; color:#6b7280; font-size:8px; margin-left:2px;">
                                 <i class="fas fa-pencil-alt"></i>
@@ -2669,11 +2669,6 @@ async function showTask1SendLinkModal(creatorId) {
                 </div>
             </div>
             
-            <div style="margin-bottom:12px;">
-                <input type="text" id="searchProductLink" placeholder="�9�3 Cari produk..." 
-                       style="width:100%; padding:8px 12px; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:10px; color:var(--text-primary); font-size:12px; outline:none;">
-            </div>
-            
             <div style="display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap;">
                 <button onclick="window.selectAllProducts()" style="background:rgba(139,92,246,0.15); color:#8b5cf6; border:1px solid rgba(139,92,246,0.3); padding:4px 14px; border-radius:16px; cursor:pointer; font-size:10px; font-weight:600;">
                     <i class="fas fa-check-double"></i> Select All
@@ -2687,100 +2682,136 @@ async function showTask1SendLinkModal(creatorId) {
             </div>
             
             <div id="productLinkList" style="max-height: 280px; overflow-y: auto; padding-right: 4px; margin-bottom: 12px; border: 1px solid var(--border); border-radius: 12px; padding: 8px;">
-                ${allProducts.map((p, index) => {
-                    let sourceClass = '';
-                    let sourceBadge = '';
-                    let borderColor = 'rgba(255,255,255,0.06)';
-                    let bgColor = 'rgba(255,255,255,0.03)';
-                    let leftBorder = '';
-                    
-                    if (p.is_assigned) {
-                        sourceClass = 'assigned';
-                        borderColor = 'rgba(16,185,129,0.4)';
-                        bgColor = 'rgba(16,185,129,0.12)';
-                        leftBorder = 'border-left: 3px solid #10b981;';
-                        sourceBadge = `<span style="background:rgba(16,185,129,0.2); color:#10b981; font-size:7px; padding:2px 10px; border-radius:12px; font-weight:700; white-space:nowrap; border:1px solid rgba(16,185,129,0.3);">
-                            <i class="fas fa-check-circle"></i> ASSIGNED
-                        </span>`;
-                    } else if (p.source === 'creator_product') {
-                        sourceClass = 'available';
-                        borderColor = 'rgba(74,222,128,0.3)';
-                        bgColor = 'rgba(74,222,128,0.08)';
-                        leftBorder = 'border-left: 3px solid #4ade80;';
-                        sourceBadge = `<span style="background:rgba(74,222,128,0.15); color:#4ade80; font-size:7px; padding:2px 10px; border-radius:12px; font-weight:600; white-space:nowrap; border:1px solid rgba(74,222,128,0.2);">
-                            <i class="fas fa-user"></i> FROM CREATOR
-                        </span>`;
-                    } else if (p.source === 'recommended') {
-                        sourceClass = 'recommended';
-                        borderColor = 'rgba(139,92,246,0.3)';
-                        bgColor = 'rgba(139,92,246,0.08)';
-                        leftBorder = 'border-left: 3px solid #8b5cf6;';
-                        sourceBadge = `<span style="background:rgba(139,92,246,0.15); color:#8b5cf6; font-size:7px; padding:2px 10px; border-radius:12px; font-weight:600; white-space:nowrap; border:1px solid rgba(139,92,246,0.2);">
-                            <i class="fas fa-star"></i> RECOMMENDED
-                        </span>`;
-                    } else {
-                        sourceClass = 'unmatched';
-                        borderColor = 'rgba(245,158,11,0.3)';
-                        bgColor = 'rgba(245,158,11,0.05)';
-                        leftBorder = 'border-left: 3px solid #f59e0b;';
-                        sourceBadge = `<span style="background:rgba(245,158,11,0.15); color:#f59e0b; font-size:7px; padding:2px 10px; border-radius:12px; font-weight:600; white-space:nowrap; border:1px solid rgba(245,158,11,0.2);">
-                            <i class="fas fa-clock"></i> UNMATCHED
-                        </span>`;
+                ${(() => {
+                    function renderProductRow(p) {
+                        let sourceClass = '';
+                        let sourceBadge = '';
+                        let borderColor = 'rgba(255,255,255,0.06)';
+                        let bgColor = 'rgba(255,255,255,0.03)';
+                        let leftBorder = '';
+                        
+                        const isPalette = p.link_type === 'palette' || p.link_type === 'multi' || (p.product_id && p.product_id.startsWith('palette_'));
+                        
+                        if (isPalette) {
+                            sourceClass = 'palette';
+                            borderColor = 'rgba(236,72,153,0.4)';
+                            bgColor = 'rgba(236,72,153,0.1)';
+                            leftBorder = 'border-left: 3px solid #ec4899;';
+                            sourceBadge = `<span style="background:rgba(236,72,153,0.2); color:#ec4899; font-size:7px; padding:2px 10px; border-radius:12px; font-weight:700; white-space:nowrap; border:1px solid rgba(236,72,153,0.3);">
+                                <i class="fas fa-folder-open"></i> PALETTE LINK
+                            </span>`;
+                        } else if (p.is_assigned) {
+                            sourceClass = 'assigned';
+                            borderColor = 'rgba(16,185,129,0.4)';
+                            bgColor = 'rgba(16,185,129,0.12)';
+                            leftBorder = 'border-left: 3px solid #10b981;';
+                            sourceBadge = `<span style="background:rgba(16,185,129,0.2); color:#10b981; font-size:7px; padding:2px 10px; border-radius:12px; font-weight:700; white-space:nowrap; border:1px solid rgba(16,185,129,0.3);">
+                                <i class="fas fa-check-circle"></i> ASSIGNED
+                            </span>`;
+                        } else if (p.source === 'creator_product') {
+                            sourceClass = 'available';
+                            borderColor = 'rgba(74,222,128,0.3)';
+                            bgColor = 'rgba(74,222,128,0.08)';
+                            leftBorder = 'border-left: 3px solid #4ade80;';
+                            sourceBadge = `<span style="background:rgba(74,222,128,0.15); color:#4ade80; font-size:7px; padding:2px 10px; border-radius:12px; font-weight:600; white-space:nowrap; border:1px solid rgba(74,222,128,0.2);">
+                                <i class="fas fa-user"></i> FROM CREATOR
+                            </span>`;
+                        } else if (p.source === 'recommended') {
+                            sourceClass = 'recommended';
+                            borderColor = 'rgba(139,92,246,0.3)';
+                            bgColor = 'rgba(139,92,246,0.08)';
+                            leftBorder = 'border-left: 3px solid #8b5cf6;';
+                            sourceBadge = `<span style="background:rgba(139,92,246,0.15); color:#8b5cf6; font-size:7px; padding:2px 10px; border-radius:12px; font-weight:600; white-space:nowrap; border:1px solid rgba(139,92,246,0.2);">
+                                <i class="fas fa-star"></i> RECOMMENDED
+                            </span>`;
+                        } else {
+                            sourceClass = 'unmatched';
+                            borderColor = 'rgba(245,158,11,0.3)';
+                            bgColor = 'rgba(245,158,11,0.05)';
+                            leftBorder = 'border-left: 3px solid #f59e0b;';
+                            sourceBadge = `<span style="background:rgba(245,158,11,0.15); color:#f59e0b; font-size:7px; padding:2px 10px; border-radius:12px; font-weight:600; white-space:nowrap; border:1px solid rgba(245,158,11,0.2);">
+                                <i class="fas fa-clock"></i> UNMATCHED
+                            </span>`;
+                        }
+                        
+                        return `
+                        <div class="product-link-item ${sourceClass}" 
+                             data-product-id="${p.product_id}"
+                             data-link="${escapeHtml(p.affiliate_link || '')}"
+                             data-campaign="${escapeHtml(p.campaign_id || '')}"
+                             data-name="${escapeHtml(p.product_name || '').toLowerCase()}"
+                             data-shop="${escapeHtml(p.shop_name || '').toLowerCase()}"
+                             style="background: ${bgColor}; 
+                                    border: 1px solid ${borderColor};
+                                    border-radius: 10px; 
+                                    padding: 8px 10px; 
+                                    margin-bottom: 6px; 
+                                    transition: all 0.2s ease;
+                                    display: flex;
+                                    align-items: center;
+                                    gap: 10px;
+                                    cursor: pointer;
+                                    ${leftBorder}">
+                            
+                            <input type="checkbox" class="product-checkbox" 
+                                   data-product-id="${p.product_id}"
+                                   data-link="${escapeHtml(p.affiliate_link || '')}"
+                                   data-campaign="${escapeHtml(p.campaign_id || '')}"
+                                   ${p.is_assigned ? 'checked' : ''}
+                                   style="width:16px; height:16px; cursor:pointer; accent-color:#8b5cf6; flex-shrink:0; pointer-events:none;">
+                            
+                            ${isPalette ? `<div style="width:36px; height:36px; border-radius:6px; background:rgba(236,72,153,0.2); display:flex; align-items:center; justify-content:center; flex-shrink:0;"><i class="fas fa-folder-open" style="color:#ec4899;"></i></div>` : p.image_url ? `<img src="${escapeHtml(p.image_url)}" style="width:36px; height:36px; border-radius:6px; object-fit:cover; flex-shrink:0;" onerror="this.src=''; this.onerror=null; this.parentElement.innerHTML='<div style=\\'width:36px;height:36px;border-radius:6px;background:var(--bg-elevated);display:flex;align-items:center;justify-content:center;flex-shrink:0;\\'><i class=\\'fas fa-box\\' style=\\'color:var(--text-muted);\\'></i></div>'">` : '<div style="width:36px; height:36px; border-radius:6px; background:var(--bg-elevated); display:flex; align-items:center; justify-content:center; flex-shrink:0;"><i class="fas fa-box" style="color:var(--text-muted);"></i></div>'}
+                            
+                            <div style="flex:1; min-width:0;">
+                                <div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
+                                    <span style="font-weight:500; color:var(--text-primary); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:200px;">
+                                        ${escapeHtml(p.product_name.substring(0, 50))}
+                                    </span>
+                                    ${sourceBadge}
+                                    ${p.shop_name ? `<span style="color:var(--text-muted); font-size:9px; white-space:nowrap;"><i class="fas fa-store"></i> ${escapeHtml(p.shop_name)}</span>` : ''}
+                                </div>
+                                <div style="display:flex; gap:8px; margin-top:2px; font-size:9px; color:var(--text-muted); flex-wrap:wrap;">
+                                    <span><i class="fas fa-tag"></i> ${p.commission_rate || 0}%</span>
+                                    ${p.sales_count ? `<span><i class="fas fa-chart-line"></i> ${formatNumber(p.sales_count)} sold</span>` : ''}
+                                    ${p.gmv ? `<span><i class="fas fa-dollar-sign"></i> Rp ${formatNumber(p.gmv)}</span>` : ''}
+                                    ${p.bd_created_by ? `<span><i class="fas fa-user"></i> ${escapeHtml(p.bd_created_by)}</span>` : ''}
+                                    ${p.is_matched ? `<span style="color:#4ade80;"><i class="fas fa-check"></i> Match</span>` : ''}
+                                    ${p.is_assigned ? `<span style="color:#10b981;"><i class="fas fa-check-circle"></i> Assigned</span>` : ''}
+                                </div>
+                            </div>
+                            
+                            <div style="text-align:right; flex-shrink:0;">
+                                <div style="font-size:10px; color:${isPalette ? '#ec4899' : p.is_assigned ? '#10b981' : p.source === 'creator_product' ? '#4ade80' : p.source === 'recommended' ? '#8b5cf6' : '#f59e0b'}; font-weight:600;">
+                                    ${isPalette ? '<i class="fas fa-folder-open"></i>' : p.is_assigned ? '<i class="fas fa-check-circle"></i>' : p.source === 'creator_product' ? '<i class="fas fa-user"></i>' : p.source === 'recommended' ? '<i class="fas fa-star"></i>' : '<i class="fas fa-clock"></i>'}
+                                </div>
+                            </div>
+                        </div>`;
                     }
-                    
+
+                    const colProducts = allProducts.filter(p => p.source !== 'recommended');
+                    const nonColProducts = allProducts.filter(p => p.source === 'recommended');
+
                     return `
-                    <div class="product-link-item ${sourceClass}" 
-                         data-product-id="${p.product_id}"
-                         data-link="${escapeHtml(p.affiliate_link || '')}"
-                         data-campaign="${escapeHtml(p.campaign_id || '')}"
-                         data-name="${escapeHtml(p.product_name || '').toLowerCase()}"
-                         data-shop="${escapeHtml(p.shop_name || '').toLowerCase()}"
-                         style="background: ${bgColor}; 
-                                border: 1px solid ${borderColor};
-                                border-radius: 10px; 
-                                padding: 8px 10px; 
-                                margin-bottom: 6px; 
-                                transition: all 0.2s ease;
-                                display: flex;
-                                align-items: center;
-                                gap: 10px;
-                                cursor: pointer;
-                                ${leftBorder}">
-                        
-                        <input type="checkbox" class="product-checkbox" 
-                               data-product-id="${p.product_id}"
-                               data-link="${escapeHtml(p.affiliate_link || '')}"
-                               data-campaign="${escapeHtml(p.campaign_id || '')}"
-                               ${p.is_assigned ? 'checked' : ''}
-                               style="width:16px; height:16px; cursor:pointer; accent-color:#8b5cf6; flex-shrink:0; pointer-events:none;">
-                        
-                        ${p.image_url ? `<img src="${escapeHtml(p.image_url)}" style="width:36px; height:36px; border-radius:6px; object-fit:cover; flex-shrink:0;" onerror="this.style.display='none'">` : '<div style="width:36px; height:36px; border-radius:6px; background:var(--bg-elevated); display:flex; align-items:center; justify-content:center; flex-shrink:0;"><i class="fas fa-box" style="color:var(--text-muted);"></i></div>'}
-                        
-                        <div style="flex:1; min-width:0;">
-                            <div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
-                                <span style="font-weight:500; color:var(--text-primary); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:200px;">
-                                    ${escapeHtml(p.product_name.substring(0, 50))}
-                                </span>
-                                ${sourceBadge}
-                                ${p.shop_name ? `<span style="color:var(--text-muted); font-size:9px; white-space:nowrap;"><i class="fas fa-store"></i> ${escapeHtml(p.shop_name)}</span>` : ''}
-                            </div>
-                            <div style="display:flex; gap:8px; margin-top:2px; font-size:9px; color:var(--text-muted); flex-wrap:wrap;">
-                                <span><i class="fas fa-tag"></i> ${p.commission_rate || 0}%</span>
-                                ${p.sales_count ? `<span><i class="fas fa-chart-line"></i> ${formatNumber(p.sales_count)} sold</span>` : ''}
-                                ${p.gmv ? `<span><i class="fas fa-dollar-sign"></i> Rp ${formatNumber(p.gmv)}</span>` : ''}
-                                ${p.bd_created_by ? `<span><i class="fas fa-user"></i> ${escapeHtml(p.bd_created_by)}</span>` : ''}
-                                ${p.is_matched ? `<span style="color:#4ade80;"><i class="fas fa-check"></i> Match</span>` : ''}
-                                ${p.is_assigned ? `<span style="color:#10b981;"><i class="fas fa-check-circle"></i> Assigned</span>` : ''}
-                            </div>
-                        </div>
-                        
-                        <div style="text-align:right; flex-shrink:0;">
-                            <div style="font-size:10px; color:${p.is_assigned ? '#10b981' : p.source === 'creator_product' ? '#4ade80' : p.source === 'recommended' ? '#8b5cf6' : '#f59e0b'}; font-weight:600;">
-                                ${p.is_assigned ? '<i class="fas fa-check-circle"></i>' : p.source === 'creator_product' ? '<i class="fas fa-user"></i>' : p.source === 'recommended' ? '<i class="fas fa-star"></i>' : '<i class="fas fa-clock"></i>'}
-                            </div>
-                        </div>
+                    <!-- Group 1: Brand Sudah Bekerja Sama (No Header) -->
+                    <div id="collaboratedProductsList" style="margin-bottom: 12px;">
+                        ${colProducts.length > 0 ? colProducts.map(p => renderProductRow(p)).join('') : `<div class="no-products-placeholder" style="padding:10px; text-align:center; color:var(--text-muted); font-size:10px; border:1px dashed rgba(255,255,255,0.06); border-radius:8px;">Tidak ada produk dari brand partner</div>`}
                     </div>
-                `}).join('')}
+
+                    <!-- Search bar in the middle -->
+                    <div id="searchBarMiddleWrapper" style="margin-top: 10px; margin-bottom: 10px;">
+                        <input type="text" id="searchProductLink" placeholder="🔍 Cari produk..." 
+                               style="width:100%; padding:8px 12px; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:10px; color:var(--text-primary); font-size:12px; outline:none;">
+                    </div>
+
+                    <!-- Group 2: Recommended Products -->
+                    <div class="product-group-header non-collaborated-header" style="font-size: 11px; font-weight: 700; color: #8b5cf6; margin-top: 8px; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                        <i class="fas fa-star"></i> Rekomendasi Produk (Recommended)
+                    </div>
+                    <div id="nonCollaboratedProductsList">
+                        ${nonColProducts.length > 0 ? nonColProducts.map(p => renderProductRow(p)).join('') : `<div class="no-products-placeholder" style="padding:10px; text-align:center; color:var(--text-muted); font-size:10px; border:1px dashed rgba(255,255,255,0.06); border-radius:8px;">Tidak ada rekomendasi produk baru</div>`}
+                    </div>
+                    `;
+                })()}
             </div>
             
             <div id="selectedLinksSummary" style="background:rgba(139,92,246,0.08); border-radius:10px; padding:10px 12px; margin-bottom:12px; border-left:3px solid #8b5cf6; display:none;">
@@ -2850,6 +2881,14 @@ Tim Toopai
                     const match = keyword === '' || name.includes(keyword) || shop.includes(keyword);
                     item.style.display = match ? 'flex' : 'none';
                 });
+
+                // Toggle group header visibility based on search results
+                const nonColList = document.getElementById('nonCollaboratedProductsList');
+                if (nonColList) {
+                    const visibleNonCol = Array.from(nonColList.querySelectorAll('.product-link-item')).some(el => el.style.display !== 'none');
+                    const nonColHeader = document.querySelector('.non-collaborated-header');
+                    if (nonColHeader) nonColHeader.style.display = visibleNonCol ? 'flex' : 'none';
+                }
             });
         }
         
@@ -4356,6 +4395,34 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
+    
+    // Klik di area card creator Step 1 Scouting untuk membuka detail modal
+    const scoutingContainer = document.getElementById('scoutingContainerDashboard');
+    if (scoutingContainer) {
+        scoutingContainer.addEventListener('click', function(e) {
+            // Cari card terdekat
+            const card = e.target.closest('.scouting-item-dashboard');
+            if (!card) return;
+
+            // Jika klik berasal dari elemen interaktif, abaikan agar tidak membuka detail modal
+            if (
+                e.target.closest('button') || 
+                e.target.closest('a') || 
+                e.target.closest('input') ||
+                e.target.closest('select') ||
+                e.target.closest('span[onclick]') ||
+                e.target.classList.contains('fa-pencil-alt') ||
+                e.target.closest('.action-buttons-wa-wrapper')
+            ) {
+                return;
+            }
+
+            const creatorId = card.getAttribute('data-creator-id');
+            if (creatorId) {
+                showTask1DetailModal(creatorId);
+            }
+        });
+    }
     
     // ============================================================
     // 3. TASK 1 BUTTONS - DETAIL, SEND LINK, FOLLOW UP

@@ -114,6 +114,20 @@ class Jsm_token_model extends CI_Model {
     public function save_token($data) {
         $user_type = $data['user_type'] ?? 0;
         
+        // Perbaiki Year 2083 bug jika data berasal dari hitungan time() + timestamp_absolut
+        if (isset($data['access_token_expire']) && $data['access_token_expire'] > 3000000000) {
+            $diff = $data['access_token_expire'] - time();
+            if ($diff > 1000000000) {
+                $data['access_token_expire'] = $diff;
+            }
+        }
+        if (isset($data['refresh_token_expire']) && $data['refresh_token_expire'] > 3000000000) {
+            $diff = $data['refresh_token_expire'] - time();
+            if ($diff > 1000000000) {
+                $data['refresh_token_expire'] = $diff;
+            }
+        }
+        
         $existing = $this->db->where('user_type', $user_type)
                             ->where('tap_type', $data['tap_type'] ?? 'TOOPAI')
                             ->get('tts_tokens')

@@ -206,12 +206,18 @@ class Jsm_api
     {
         $shop_cipher = $data['shop_cipher'] ?? $data['seller_id'] ?? $data['open_id'] ?? $data['shop_id'] ?? 'AFFILIATE_' . time();
         
+        $expire_in = $data['access_token_expire_in'] ?? 7200;
+        $access_expire = ($expire_in > 1000000000) ? $expire_in : time() + $expire_in;
+        
+        $refresh_in = $data['refresh_token_expire_in'] ?? 2592000;
+        $refresh_expire = ($refresh_in > 1000000000) ? $refresh_in : time() + $refresh_in;
+        
         $token_data = [
             'shop_id' => $shop_cipher,
             'access_token' => $data['access_token'],
             'refresh_token' => $data['refresh_token'],
-            'access_token_expire' => time() + ($data['access_token_expire_in'] ?? 7200),
-            'refresh_token_expire' => time() + ($data['refresh_token_expire_in'] ?? 2592000),
+            'access_token_expire' => $access_expire,
+            'refresh_token_expire' => $refresh_expire,
             'user_type' => $user_type,
             'scope' => $data['scope'] ?? '',
             'tap_type' => $this->api_type,
@@ -1402,6 +1408,7 @@ public function search_affiliate_orders_raw($filters = []) {
             
             if (curl_error($ch)) {
                 $error = curl_error($ch);
+                log_message('error', "TikTok API cURL Error for path {$path}: {$error}");
                 curl_close($ch);
                 return ['success' => false, 'message' => "cURL Error: {$error}"];
             }
@@ -1411,10 +1418,12 @@ public function search_affiliate_orders_raw($filters = []) {
             $decoded = json_decode($response, true);
             
             if (!$decoded) {
+                log_message('error', "TikTok API Invalid JSON response for path {$path}: Response=" . substr($response, 0, 1000));
                 return ['success' => false, 'message' => 'Invalid JSON response'];
             }
             
             if (!isset($decoded['code']) || $decoded['code'] != 0) {
+                log_message('error', "TikTok API Error for path {$path}: Code=" . ($decoded['code'] ?? 'N/A') . ", Message=" . ($decoded['message'] ?? 'Unknown API Error') . ", Response=" . json_encode($decoded));
                 return [
                     'success' => false,
                     'message' => $decoded['message'] ?? 'Unknown API Error',

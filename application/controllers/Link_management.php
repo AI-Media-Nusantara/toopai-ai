@@ -28,8 +28,73 @@ class Link_management extends CI_Controller {
     public function dashboard() {
         $user_id = $this->session->userdata('user_id');
         
-        // ðŸ”¥ AMBIL LINK DENGAN JOIN affiliate_products (untuk shop_name dan image_url)
-        $links = $this->db->select('
+        // Ambil filter dari request
+        $search = $this->input->get('search') ?: '';
+        $search_type = $this->input->get('search_type') ?: 'shop';
+        $campaign_filter = $this->input->get('campaign_id') ?: 'all';
+        
+        // Count total rows dengan filter yang aktif
+        $this->db->from('bd_affiliate_links l')
+                 ->join('affiliate_campaigns c', 'c.campaign_id = l.campaign_id', 'left')
+                 ->join('affiliate_products ap', 'ap.product_id = l.product_id AND ap.campaign_id = l.campaign_id', 'left');
+                 
+        if ($campaign_filter !== 'all') {
+            $this->db->where('l.campaign_id', $campaign_filter);
+        }
+        
+        if ($search !== '') {
+            if ($search_type === 'shop') {
+                $this->db->group_start()
+                         ->like('ap.shop_name', $search)
+                         ->or_like('l.product_name', $search)
+                         ->group_end();
+            } else {
+                $this->db->where('l.product_id', $search);
+            }
+        }
+        
+        $total_rows = $this->db->count_all_results();
+        
+        // Setup CodeIgniter Pagination
+        $this->load->library('pagination');
+        
+        $config['base_url'] = base_url('link_management/dashboard');
+        $config['total_rows'] = $total_rows;
+        $config['per_page'] = 10;
+        $config['page_query_string'] = TRUE;
+        $config['query_string_segment'] = 'page';
+        $config['reuse_query_string'] = TRUE;
+        
+        // Styling pagination Bootstrap
+        $config['full_tag_open'] = '<ul class="pagination">';
+        $config['full_tag_close'] = '</ul>';
+        $config['first_link'] = 'First';
+        $config['first_tag_open'] = '<li class="page-item">';
+        $config['first_tag_close'] = '</li>';
+        $config['last_link'] = 'Last';
+        $config['last_tag_open'] = '<li class="page-item">';
+        $config['last_tag_close'] = '</li>';
+        $config['next_link'] = '&raquo;';
+        $config['next_tag_open'] = '<li class="page-item">';
+        $config['next_tag_close'] = '</li>';
+        $config['prev_link'] = '&laquo;';
+        $config['prev_tag_open'] = '<li class="page-item">';
+        $config['prev_tag_close'] = '</li>';
+        $config['cur_tag_open'] = '<li class="page-item active"><a class="page-link" href="#">';
+        $config['cur_tag_close'] = '</a></li>';
+        $config['num_tag_open'] = '<li class="page-item">';
+        $config['num_tag_close'] = '</li>';
+        $config['attributes'] = array('class' => 'page-link');
+        
+        $this->pagination->initialize($config);
+        $pagination_links = $this->pagination->create_links();
+        
+        // Offset / Halaman aktif
+        $page = $this->input->get('page') ? intval($this->input->get('page')) : 0;
+        if ($page < 0) $page = 0;
+        
+        // Ambil data link terpaginasi
+        $this->db->select('
                 l.*, 
                 c.campaign_name,
                 ap.shop_name,
@@ -38,12 +103,29 @@ class Link_management extends CI_Controller {
             ')
             ->from('bd_affiliate_links l')
             ->join('affiliate_campaigns c', 'c.campaign_id = l.campaign_id', 'left')
-            ->join('affiliate_products ap', 'ap.product_id = l.product_id AND ap.campaign_id = l.campaign_id', 'left')
-            ->order_by('l.created_at', 'DESC')
-            ->get()
-            ->result();
+            ->join('affiliate_products ap', 'ap.product_id = l.product_id AND ap.campaign_id = l.campaign_id', 'left');
+            
+        if ($campaign_filter !== 'all') {
+            $this->db->where('l.campaign_id', $campaign_filter);
+        }
         
-        // Update statistik dari affiliate_orders
+        if ($search !== '') {
+            if ($search_type === 'shop') {
+                $this->db->group_start()
+                         ->like('ap.shop_name', $search)
+                         ->or_like('l.product_name', $search)
+                         ->group_end();
+            } else {
+                $this->db->where('l.product_id', $search);
+            }
+        }
+        
+        $links = $this->db->order_by('l.created_at', 'DESC')
+                          ->limit(10, $page)
+                          ->get()
+                          ->result();
+        
+        // Update statistik hanya untuk 10 data terpaginasi (hemat query!)
         foreach ($links as $link) {
             $stats = $this->db->select('
                     COUNT(DISTINCT order_id) as total_orders,
@@ -62,28 +144,44 @@ class Link_management extends CI_Controller {
             $link->total_commission = $stats->total_commission ?? 0;
         }
         
-        // Ambil daftar campaign untuk dropdown
+        // Ambil daftar campaign untuk dropdown filter
         $campaigns = $this->db->select('campaign_id, campaign_name, status')
                               ->from('affiliate_campaigns')
                               ->where('status', 'ONGOING')
                               ->order_by('created_at', 'DESC')
                               ->get()
                               ->result();
+                              
+        // Hitung total gmv & order global secara efisien
+        $global_stats = $this->db->select('
+                COALESCE(SUM(gmv), 0) as total_gmv,
+                COUNT(DISTINCT order_id) as total_orders
+            ')
+            ->from('affiliate_orders')
+            ->where('order_status NOT IN ("CANCELLED", "REFUNDED")')
+            ->where('product_id IN (SELECT DISTINCT product_id FROM bd_affiliate_links)')
+            ->get()
+            ->row();
         
         $data = [
             'title' => 'Link Management - Toopai BD',
             'active_menu' => 'link_management',
             'links' => $links,
             'campaigns' => $campaigns,
-            'total_links' => count($links),
-            'total_gmv' => array_sum(array_column($links, 'total_gmv')),
-            'total_orders' => array_sum(array_column($links, 'total_orders'))
+            'search' => $search,
+            'search_type' => $search_type,
+            'campaign_filter' => $campaign_filter,
+            'pagination_links' => $pagination_links,
+            'total_links' => $total_rows,
+            'total_gmv' => $global_stats->total_gmv ?? 0,
+            'total_orders' => $global_stats->total_orders ?? 0
         ];
         
         $this->load->view('templates/header', $data);
         $this->load->view('bd/link_management', $data);
         $this->load->view('templates/footer');
     }
+
     public function can_generate_link() {
     $this->output->set_content_type('application/json');
     
@@ -103,138 +201,237 @@ class Link_management extends CI_Controller {
 }
     // ========== CREATE NEW LINK ==========
     public function create_link() {
-    $this->output->set_content_type('application/json');
-     $user_id = $this->session->userdata('user_id');
-    $username = $this->session->userdata('username');
-    
-    // 🔥 HANYA USER ID = 1 (TIFFANY) YANG BISA GENERATE LINK
-    if ($user_id != 1) {
-        return $this->output->set_output(json_encode([
-            'success' => false,
-            'message' => 'Anda tidak memiliki akses untuk membuat link afiliasi. Hanya Head BA yang dapat generate link.',
-            'can_generate' => false
-        ]));
-    }
-    $campaign_id = $this->input->post('campaign_id');
-    $product_id = $this->input->post('product_id');
-    $product_name = $this->input->post('product_name');
-    $commission_rate = $this->input->post('commission_rate');
-    $notes = $this->input->post('notes');
-    $special_case = $this->input->post('special_case'); // ðŸ”¥ TAMBAHKAN special_case
-    
-    if (!$campaign_id || !$product_id || !$product_name) {
-        return $this->output->set_output(json_encode([
-            'success' => false,
-            'message' => 'Campaign, Product, and Product Name are required'
-        ]));
-    }
-    
-    // ðŸ”¥ VALIDASI: Pastikan product benar-benar berada di campaign yang dipilih
-    $product_check = $this->db->select('open_commission_rate, shop_name, image_url')
-                              ->where('product_id', $product_id)
-                              ->where('campaign_id', $campaign_id)
-                              ->get('affiliate_products')
-                              ->row();
-    
-    if (!$product_check) {
-        return $this->output->set_output(json_encode([
-            'success' => false,
-            'message' => 'Product not found in this campaign. Please select a valid product.'
-        ]));
-    }
-    
-    // ðŸ”¥ HAPUS VALIDASI "link already exists" - BOLEH MULTIPLE LINKS
-    // if ($existing) { ... } â†’ DIHAPUS
-    
-    // ðŸ”¥ VALIDASI: Pastikan commission rate tidak melebihi batas wajar
-    $submitted_commission = floatval($commission_rate);
-    
-    if ($submitted_commission < 1) {
-        return $this->output->set_output(json_encode([
-            'success' => false,
-            'message' => 'Commission rate minimal 1%'
-        ]));
-    }
-    
-    if ($submitted_commission > 50) {
-        return $this->output->set_output(json_encode([
-            'success' => false,
-            'message' => 'Commission rate cannot exceed 50%'
-        ]));
-    }
-    
-    try {
-        // ðŸ”¥ GENERATE LINK DENGAN COMMISSION RATE YANG DIINPUT USER
-        $link_result = $this->jsm_api->generate_promotion_link($campaign_id, $product_id, $submitted_commission);
-        
-        if (!$link_result['success']) {
-            return $this->output->set_output(json_encode([
-                'success' => false,
-                'message' => $link_result['message'] ?? 'Failed to generate link'
-            ]));
-        }
-        
+        $this->output->set_content_type('application/json');
         $user_id = $this->session->userdata('user_id');
         $username = $this->session->userdata('username');
         
-        // Konversi open_commission_rate ke persen
-        $openCommissionRaw = floatval($product_check->open_commission_rate ?? 0);
-        if ($openCommissionRaw > 20) {
-            $openCommissionPercent = $openCommissionRaw / 100;
-        } else {
-            $openCommissionPercent = $openCommissionRaw;
+        // 🔥 HANYA USER ID = 1 (TIFFANY) YANG BISA GENERATE LINK
+        if ($user_id != 1) {
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Anda tidak memiliki akses untuk membuat link afiliasi. Hanya Head BA yang dapat generate link.',
+                'can_generate' => false
+            ]));
         }
         
-        // ðŸ”¥ BUAT LINK ID UNIK (pakai timestamp + random)
-        $link_id = md5($campaign_id . $product_id . time() . rand(1000, 9999));
+        $campaign_id = $this->input->post('campaign_id');
+        $product_ids_raw = $this->input->post('product_ids');
+        $commission_rate = $this->input->post('commission_rate');
+        $notes = $this->input->post('notes');
+        $special_case = $this->input->post('special_case');
         
-        $data = [
-            'link_id' => $link_id,
-            'campaign_id' => $campaign_id,
-            'product_id' => $product_id,
-            'product_name' => $product_name,
-            'affiliate_link' => $link_result['link'],
-            'commission_rate' => $submitted_commission,
-            'open_commission_rate' => $openCommissionPercent,
-            'created_by' => $user_id,
-            'created_by_name' => $username,
-            'status' => 'ACTIVE',
-            'expire_at' => $link_result['expire_at'] ?? null,
-            'notes' => $notes,
-            'special_case' => $special_case ? 1 : 0,  // ðŸ”¥ TAMBAHKAN special_case flag
-            'created_at' => date('Y-m-d H:i:s'),
-            'updated_at' => date('Y-m-d H:i:s')
-        ];
+        // Parse product IDs
+        $product_ids = [];
+        if (is_string($product_ids_raw)) {
+            $decoded = json_decode($product_ids_raw, true);
+            if (is_array($decoded)) {
+                $product_ids = $decoded;
+            } else {
+                $product_ids = array_filter(explode(',', $product_ids_raw));
+            }
+        } elseif (is_array($product_ids_raw)) {
+            $product_ids = $product_ids_raw;
+        }
         
-        $this->db->insert('bd_affiliate_links', $data);
-        $insert_id = $this->db->insert_id();
+        if (!$campaign_id || empty($product_ids)) {
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Campaign and at least one Product are required'
+            ]));
+        }
         
-        $this->load->model('User_log_model');
-        $this->User_log_model->log(
-            $user_id,
-            $username,
-            'BD',
-            'CREATE_AFFILIATE_LINK',
-            "Created affiliate link for product: $product_name (Campaign: $campaign_id) with commission $submitted_commission% (Open: $openCommissionPercent%)" . ($special_case ? ' [SPECIAL CASE]' : '')
-        );
+        // Fetch products from database
+        $db_products = $this->db->select('product_id, product_name, open_commission_rate')
+                                ->where('campaign_id', $campaign_id)
+                                ->where_in('product_id', $product_ids)
+                                ->get('affiliate_products')
+                                ->result();
+                                
+        if (empty($db_products)) {
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'No valid products found in this campaign.'
+            ]));
+        }
         
-        return $this->output->set_output(json_encode([
-            'success' => true,
-            'message' => 'Link created successfully',
-            'link_id' => $insert_id,
-            'link' => $link_result['link'],
-            'commission_rate' => $submitted_commission,
-            'open_commission_rate' => $openCommissionPercent
-        ]));
+        // Validasi commission rate
+        $submitted_commission = floatval($commission_rate);
+        if ($submitted_commission < 1 || $submitted_commission > 50) {
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Commission rate must be between 1% and 50%'
+            ]));
+        }
         
-    } catch (Exception $e) {
-        log_message('error', 'Error in create_link: ' . $e->getMessage());
-        return $this->output->set_output(json_encode([
-            'success' => false,
-            'message' => $e->getMessage()
-        ]));
+        try {
+            // Jika HANYA 1 produk terpilih, jalankan proses link standard
+            if (count($db_products) === 1) {
+                $product = $db_products[0];
+                $link_result = $this->jsm_api->generate_promotion_link($campaign_id, $product->product_id, $submitted_commission);
+                
+                if (!$link_result['success']) {
+                    log_message('error', "create_link single failed for product_id={$product->product_id} ({$product->product_name}): " . json_encode($link_result));
+                    return $this->output->set_output(json_encode([
+                        'success' => false,
+                        'message' => $link_result['message'] ?? 'Failed to generate link'
+                    ]));
+                }
+                
+                // Konversi open_commission_rate ke persen
+                $openCommissionRaw = floatval($product->open_commission_rate ?? 0);
+                if ($openCommissionRaw > 20) {
+                    $openCommissionPercent = $openCommissionRaw / 100;
+                } else {
+                    $openCommissionPercent = $openCommissionRaw;
+                }
+                
+                $link_id = md5($campaign_id . $product->product_id . time() . rand(1000, 9999));
+                
+                $data = [
+                    'link_id' => $link_id,
+                    'campaign_id' => $campaign_id,
+                    'product_id' => $product->product_id,
+                    'product_name' => $product->product_name,
+                    'affiliate_link' => $link_result['link'],
+                    'commission_rate' => $submitted_commission,
+                    'open_commission_rate' => $openCommissionPercent,
+                    'created_by' => $user_id,
+                    'created_by_name' => $username,
+                    'status' => 'ACTIVE',
+                    'expire_at' => $link_result['expire_at'] ?? null,
+                    'notes' => $notes,
+                    'special_case' => $special_case ? 1 : 0,
+                    'created_at' => date('Y-m-d H:i:s'),
+                    'updated_at' => date('Y-m-d H:i:s')
+                ];
+                
+                $this->db->insert('bd_affiliate_links', $data);
+                $insert_id = $this->db->insert_id();
+                
+                $this->load->model('User_log_model');
+                $this->User_log_model->log(
+                    $user_id,
+                    $username,
+                    'BD',
+                    'CREATE_AFFILIATE_LINK',
+                    "Created affiliate link for product: {$product->product_name} (Campaign: $campaign_id) with commission $submitted_commission% (Open: $openCommissionPercent%)" . ($special_case ? ' [SPECIAL CASE]' : '')
+                );
+                
+                return $this->output->set_output(json_encode([
+                    'success' => true,
+                    'message' => 'Link created successfully',
+                    'link_id' => $insert_id,
+                    'link' => $link_result['link'],
+                    'commission_rate' => $submitted_commission,
+                    'open_commission_rate' => $openCommissionPercent
+                ]));
+            } else {
+                // MULTIPLE PRODUCTS: Buat satu Palette Link!
+                $palette_products = [];
+                $failed_products = [];
+                
+                foreach ($db_products as $product) {
+                    $link_result = $this->jsm_api->generate_promotion_link($campaign_id, $product->product_id, $submitted_commission);
+                    
+                    if ($link_result['success'] && !empty($link_result['link'])) {
+                        $palette_products[] = [
+                            'product_id' => $product->product_id,
+                            'product_name' => $product->product_name,
+                            'link' => $link_result['link']
+                        ];
+                    } else {
+                        $failed_products[] = $product->product_name;
+                        log_message('error', "create_link palette failed for product_id={$product->product_id} ({$product->product_name}): " . json_encode($link_result));
+                    }
+                }
+                
+                if (empty($palette_products)) {
+                    log_message('error', "create_link palette failed for all selected products. Failed list: " . implode(', ', $failed_products));
+                    return $this->output->set_output(json_encode([
+                        'success' => false,
+                        'message' => 'Failed to generate affiliate links for all selected products. ' . (!empty($failed_products) ? 'Error on: ' . implode(', ', $failed_products) : '')
+                    ]));
+                }
+                
+                // Buat unique link_id untuk palette
+                $palette_id = md5($campaign_id . implode('', array_column($palette_products, 'product_id')) . time() . rand(1000, 9999));
+                $palette_url = base_url('palette/v/' . $palette_id);
+                
+                // Cari nama brand dari produk pertama
+                $brand_name = 'Multiple Products';
+                $first_prod_check = $this->db->select('shop_name')
+                                             ->where('product_id', $palette_products[0]['product_id'])
+                                             ->where('campaign_id', $campaign_id)
+                                             ->get('affiliate_products')
+                                             ->row();
+                if ($first_prod_check && !empty($first_prod_check->shop_name)) {
+                    $brand_name = $first_prod_check->shop_name;
+                }
+                
+                // Simpan record utama ke bd_affiliate_links
+                $data = [
+                    'link_id' => $palette_id,
+                    'campaign_id' => $campaign_id,
+                    'product_id' => 'palette_' . $palette_id, // Demarkasi tipe palette
+                    'product_name' => 'Palette Link - ' . $brand_name,
+                    'affiliate_link' => $palette_url,
+                    'commission_rate' => $submitted_commission,
+                    'open_commission_rate' => $submitted_commission,
+                    'created_by' => $user_id,
+                    'created_by_name' => $username,
+                    'status' => 'ACTIVE',
+                    'link_type' => 'multi',
+                    'notes' => $notes,
+                    'special_case' => $special_case ? 1 : 0,
+                    'created_at' => date('Y-m-d H:i:s'),
+                    'updated_at' => date('Y-m-d H:i:s')
+                ];
+                
+                $this->db->insert('bd_affiliate_links', $data);
+                $insert_id = $this->db->insert_id();
+                
+                // Simpan daftar produk pemetaan ke bd_palette_products
+                foreach ($palette_products as $p) {
+                    $this->db->insert('bd_palette_products', [
+                        'link_id' => $palette_id,
+                        'product_id' => $p['product_id'],
+                        'product_name' => $p['product_name'],
+                        'affiliate_link' => $p['link'],
+                        'commission_rate' => $submitted_commission
+                    ]);
+                }
+                
+                // Log activity
+                $this->load->model('User_log_model');
+                $this->User_log_model->log(
+                    $user_id,
+                    $username,
+                    'BD',
+                    'CREATE_PALETTE_LINK',
+                    "Created Palette Link for brand $brand_name (Campaign: $campaign_id) containing " . count($palette_products) . " products."
+                );
+                
+                $msg = 'Palette link created successfully with ' . count($palette_products) . ' products.';
+                if (!empty($failed_products)) {
+                    $msg .= ' (Failed products: ' . implode(', ', $failed_products) . ')';
+                }
+                
+                return $this->output->set_output(json_encode([
+                    'success' => true,
+                    'message' => $msg,
+                    'link_id' => $insert_id,
+                    'link' => $palette_url,
+                    'commission_rate' => $submitted_commission
+                ]));
+            }
+        } catch (Exception $e) {
+            log_message('error', 'Error in create_link: ' . $e->getMessage());
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => $e->getMessage()
+            ]));
+        }
     }
-}
 
     
     // ========== UPDATE LINK COMMISSION ==========
