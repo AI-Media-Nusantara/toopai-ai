@@ -552,7 +552,7 @@
                     </td>
                     <td><?= date('d M Y', strtotime($link->created_at)) ?></td>
                     <td>
-                        <button class="btn-icon edit-link" data-id="<?= $link->id ?>" data-commission="<?= $link->commission_rate ?>" data-status="<?= $link->status ?>" data-notes="<?= htmlspecialchars($link->notes ?? '') ?>">
+                        <button class="btn-icon edit-link" data-id="<?= $link->id ?>" data-commission="<?= $link->commission_rate ?>" data-status="<?= $link->status ?>" data-notes="<?= htmlspecialchars($link->notes ?? '') ?>" data-link="<?= htmlspecialchars($link->affiliate_link ?? '') ?>">
                             <i class="fas fa-edit"></i>
                         </button>
                         <button class="btn-icon delete-link" data-id="<?= $link->id ?>">
@@ -674,6 +674,13 @@
                     <label>Notes (Optional)</label>
                     <textarea id="notes" class="form-control" rows="2" placeholder="Add notes about this link..."></textarea>
                 </div>
+                <div class="form-group" id="tiktokPaletteLinkGroup" style="display:none;">
+                    <label>TikTok/Tokopedia Campaign Link (Optional)</label>
+                    <input type="url" id="tiktokPaletteLink" class="form-control" placeholder="https://affiliate-id.tokopedia.com/api/v1/share/...">
+                    <small style="color: #fbbf24; font-size: 10px; display: block; margin-top: 4px; line-height: 1.3;">
+                        <i class="fas fa-info-circle"></i> Tempel tautan kampanye yang Anda salin dari halaman TAP (TikTok Shop Affiliate Partner Center) di sini agar kreator langsung diarahkan ke halaman resmi TikTok.
+                    </small>
+                </div>
                 <div id="selectedProductPreview" style="margin-top:12px;"></div>
                 <div id="linkPreview" class="link-preview" style="display:none;">
                     <strong>Generated Link:</strong>
@@ -711,6 +718,10 @@
             <div class="form-group">
                 <label>Notes</label>
                 <textarea id="editNotes" class="form-control" rows="2"></textarea>
+            </div>
+            <div class="form-group" id="editAffiliateLinkGroup">
+                <label>Affiliate / Campaign Link</label>
+                <input type="url" id="editAffiliateLink" class="form-control" placeholder="https://...">
             </div>
             <button id="updateLinkBtn" class="btn-create" style="width:100%;">
                 <i class="fas fa-save"></i> Update Link
@@ -1114,6 +1125,18 @@ function renderSelectedProducts() {
     
     html += `</div>`;
     previewContainer.innerHTML = html;
+    
+    // Tampilkan input link palette jika lebih dari 1 produk
+    const tiktokPaletteLinkGroup = document.getElementById('tiktokPaletteLinkGroup');
+    if (tiktokPaletteLinkGroup) {
+        if (selectedProducts.length > 1) {
+            tiktokPaletteLinkGroup.style.display = 'block';
+        } else {
+            tiktokPaletteLinkGroup.style.display = 'none';
+            const linkInput = document.getElementById('tiktokPaletteLink');
+            if (linkInput) linkInput.value = '';
+        }
+    }
 }
 
 window.removeSelectedProduct = function(index) {
@@ -1157,7 +1180,8 @@ document.getElementById('createLinkForm')?.addEventListener('submit', async (e) 
             product_ids: JSON.stringify(selectedProducts.map(p => p.id)),
             commission_rate: document.getElementById('commissionRate').value,
             notes: document.getElementById('notes').value,
-            special_case: specialCaseChecked
+            special_case: specialCaseChecked,
+            tiktok_palette_link: document.getElementById('tiktokPaletteLink')?.value || ''
         })
     });
     
@@ -1185,6 +1209,7 @@ document.querySelectorAll('.edit-link').forEach(btn => {
         document.getElementById('editCommissionRate').value = btn.getAttribute('data-commission');
         document.getElementById('editStatus').value = btn.getAttribute('data-status');
         document.getElementById('editNotes').value = btn.getAttribute('data-notes') || '';
+        document.getElementById('editAffiliateLink').value = btn.getAttribute('data-link') || '';
         document.getElementById('editLinkModal').style.display = 'flex';
     });
 });
@@ -1201,7 +1226,8 @@ document.getElementById('updateLinkBtn')?.addEventListener('click', async () => 
             link_id: document.getElementById('editLinkId').value,
             commission_rate: document.getElementById('editCommissionRate').value,
             status: document.getElementById('editStatus').value,
-            notes: document.getElementById('editNotes').value
+            notes: document.getElementById('editNotes').value,
+            affiliate_link: document.getElementById('editAffiliateLink').value
         })
     });
     

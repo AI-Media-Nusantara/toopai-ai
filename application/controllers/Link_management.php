@@ -355,7 +355,11 @@ class Link_management extends CI_Controller {
                 
                 // Buat unique link_id untuk palette
                 $palette_id = md5($campaign_id . implode('', array_column($palette_products, 'product_id')) . time() . rand(1000, 9999));
-                $palette_url = base_url('palette/v/' . $palette_id);
+                
+                // Jika user menginput link kampanye dari TikTok (TAP), gunakan link tersebut.
+                // Jika tidak, fallback ke local landing page Toopai.
+                $tiktok_palette_link = $this->input->post('tiktok_palette_link');
+                $palette_url = (!empty($tiktok_palette_link)) ? $tiktok_palette_link : base_url('palette/v/' . $palette_id);
                 
                 // Cari nama brand dari produk pertama
                 $brand_name = 'Multiple Products';
@@ -442,6 +446,7 @@ class Link_management extends CI_Controller {
         $commission_rate = $this->input->post('commission_rate');
         $status = $this->input->post('status');
         $notes = $this->input->post('notes');
+        $affiliate_link = $this->input->post('affiliate_link');
         
         if (!$link_id) {
             return $this->output->set_output(json_encode([
@@ -454,6 +459,7 @@ class Link_management extends CI_Controller {
         if ($commission_rate !== null) $update_data['commission_rate'] = $commission_rate;
         if ($status !== null) $update_data['status'] = $status;
         if ($notes !== null) $update_data['notes'] = $notes;
+        if ($affiliate_link !== null) $update_data['affiliate_link'] = $affiliate_link;
         $update_data['updated_at'] = date('Y-m-d H:i:s');
         
         $this->db->where('id', $link_id)->update('bd_affiliate_links', $update_data);

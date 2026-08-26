@@ -86,7 +86,7 @@ public function dashboard() {
             b.shop_name,
             (SELECT COUNT(DISTINCT acl.id) 
              FROM affiliate_creator_links acl 
-             WHERE acl.creator_id = c.id 
+             WHERE (acl.creator_id = c.id OR LOWER(TRIM(acl.creator_username)) = LOWER(TRIM(c.username)))
                AND acl.status = 'ACTIVE') as total_active_links,
             (SELECT COALESCE(SUM(o.gmv), 0) 
              FROM affiliate_orders o 
@@ -112,7 +112,7 @@ public function dashboard() {
                 WHEN c.is_id IS NOT NULL AND c.is_id > 0 THEN 'claimed'
                 WHEN c.is_id IS NULL AND EXISTS (
                     SELECT 1 FROM affiliate_creator_links acl2
-                    WHERE acl2.creator_id = c.id
+                    WHERE (acl2.creator_id = c.id OR LOWER(TRIM(acl2.creator_username)) = LOWER(TRIM(c.username)))
                       AND acl2.status = 'ACTIVE'
                 ) THEN 'ready'
                 WHEN c.is_id IS NULL THEN 'no_handler'
@@ -449,66 +449,85 @@ public function get_task3_creators() {
 }
 
 // ========================================================================
-// CLAIM DEAL - TANPA KOMENTAR
+// CLAIM DEAL
 // ========================================================================
 public function claim_deal() {
     $this->output->set_content_type('application/json');
-    
-    $creator_id = $this->input->post('creator_id');
+
+    // 🔒 Validasi session
+    if (!$this->session->userdata('logged_in')) {
+        return $this->output->set_output(json_encode([
+            'success' => false,
+            'message' => 'Session expired. Silakan login ulang.'
+        ]));
+    }
+
+    $creator_id       = $this->input->post('creator_id');
     $creator_username = $this->input->post('creator_username');
-    $user_id = $this->session->userdata('user_id');
-    $full_name = $this->session->userdata('full_name');
-    $username = $this->session->userdata('username');
-    
+    $user_id          = $this->session->userdata('user_id');
+    $full_name        = $this->session->userdata('full_name');
+    $username         = $this->session->userdata('username');
+
     // 🔥 Jika creator_id kosong dan ada username, coba auto-register
     if (empty($creator_id) && !empty($creator_username)) {
         $existing = $this->db->where('username', $creator_username)->get('creators')->row();
-        
+
         if (!$existing) {
-            // Auto-register creator
+            // 🚫 Blokir auto-register untuk creator tanpa link aktif maupun order
+            // (creator "no_handler" murni yang tidak pernah diberi link oleh CA)
+            $has_order = $this->db
+                ->where('creator_username', $creator_username)
+                ->where('order_status NOT IN (\'CANCELLED\', \'REFUNDED\')')
+                ->count_all_results('affiliate_orders') > 0;
+
+            if (!$has_order) {
+                return $this->output->set_output(json_encode([
+                    'success' => false,
+                    'message' => 'Creator belum menggunakan link dari CA. DEAL hanya bisa dilakukan setelah creator menggunakan link yang diberikan.'
+                ]));
+            }
+
+            // Auto-register creator yang sudah ada order
             $insert_data = [
-                'username' => $creator_username,
-                'full_name' => $creator_username,
-                'is_id' => $user_id,
-                'status' => 'ACTIVE',
-                'source' => 'auto_register',
+                'username'   => $creator_username,
+                'full_name'  => $creator_username,
+                'is_id'      => $user_id,
+                'status'     => 'ACTIVE',
+                'source'     => 'auto_register',
                 'created_at' => date('Y-m-d H:i:s'),
                 'updated_at' => date('Y-m-d H:i:s')
             ];
-            
+
             $this->db->insert('creators', $insert_data);
             $new_id = $this->db->insert_id();
-            
-            // Log aktivitas
+
             $this->load->model('User_log_model');
             $this->User_log_model->log(
-                $user_id,
-                $username,
-                'IS',
+                $user_id, $username, 'IS',
                 'AUTO_REGISTER_CLAIM',
                 "Auto-register and claim creator @{$creator_username} (ID: {$new_id})"
             );
-            
+
             return $this->output->set_output(json_encode([
-                'success' => true,
-                'message' => "✅ Berhasil register dan claim @{$creator_username}! Creator pindah ke Monitoring (Task 3).",
-                'creator_id' => $new_id,
+                'success'          => true,
+                'message'          => "✅ Berhasil register dan claim @{$creator_username}! Creator pindah ke Monitoring (Task 3).",
+                'creator_id'       => $new_id,
                 'creator_username' => $creator_username,
-                'claimed_by' => $full_name ?: $username,
-                'auto_registered' => true
+                'claimed_by'       => $full_name ?: $username,
+                'auto_registered'  => true
             ]));
         }
-        
+
         $creator_id = $existing->id;
     }
-    
+
     if (empty($creator_id)) {
         return $this->output->set_output(json_encode([
             'success' => false,
             'message' => 'Creator ID atau username required'
         ]));
     }
-    
+
     // 🔥 CEK APAKAH CREATOR VALID DAN BELUM DI-CLAIM
     $check = $this->db->select('c.id, c.username, c.is_id')
         ->from('creators c')
@@ -516,29 +535,51 @@ public function claim_deal() {
         ->where('c.is_id IS NULL')
         ->get()
         ->row();
-    
+
     if (!$check) {
         return $this->output->set_output(json_encode([
             'success' => false,
             'message' => 'Creator sudah di-claim oleh IS lain atau tidak valid'
         ]));
     }
-    
+
+    // 🔥 VALIDASI: Creator harus sudah menggunakan link dari CA
+    // (ditandai dengan affiliate_creator_links AKTIF atau ada order di affiliate_orders)
+    $has_active_link = $this->db
+        ->where('creator_id', $creator_id)
+        ->where('status', 'ACTIVE')
+        ->count_all_results('affiliate_creator_links') > 0;
+
+    $has_order = false;
+    if (!$has_active_link) {
+        $has_order = $this->db
+            ->where('LOWER(TRIM(creator_username))', 'LOWER(TRIM(\'' . $check->username . '\'))', false)
+            ->where('order_status NOT IN (\'CANCELLED\', \'REFUNDED\')')
+            ->count_all_results('affiliate_orders') > 0;
+    }
+
+    if (!$has_active_link && !$has_order) {
+        return $this->output->set_output(json_encode([
+            'success' => false,
+            'message' => '⚠️ DEAL tidak bisa dilakukan. Creator @' . $check->username . ' belum menggunakan link dari tim CA (belum ada link aktif atau order yang masuk).'
+        ]));
+    }
+
     // 🔥 LOCK TABLE untuk mencegah race condition
     $this->db->trans_start();
-    
+
     $this->db->where('id', $creator_id)
         ->where('is_id IS NULL')
         ->update('creators', [
-            'is_id' => $user_id,
-            'status' => 'ACTIVE',
+            'is_id'       => $user_id,
+            'status'      => 'ACTIVE',
             'approved_at' => date('Y-m-d H:i:s'),
             'approved_by' => $user_id,
-            'updated_at' => date('Y-m-d H:i:s')
+            'updated_at'  => date('Y-m-d H:i:s')
         ]);
-    
+
     $affected = $this->db->affected_rows();
-    
+
     if ($affected == 0) {
         $this->db->trans_rollback();
         return $this->output->set_output(json_encode([
@@ -546,25 +587,30 @@ public function claim_deal() {
             'message' => 'Maaf, creator sudah di-claim oleh IS lain! Silakan refresh halaman.'
         ]));
     }
-    
+
     $this->db->trans_complete();
-    
+
+    if ($this->db->trans_status() === FALSE) {
+        return $this->output->set_output(json_encode([
+            'success' => false,
+            'message' => 'Terjadi kesalahan sistem saat melakukan DEAL.'
+        ]));
+    }
+
     // Log aktivitas
     $this->load->model('User_log_model');
     $this->User_log_model->log(
-        $user_id,
-        $username,
-        'IS',
+        $user_id, $username, 'IS',
         'CLAIM_DEAL',
         "Claimed creator @{$check->username} (ID: {$creator_id})"
     );
-    
+
     return $this->output->set_output(json_encode([
-        'success' => true,
-        'message' => "✅ Berhasil claim @{$check->username}! Creator pindah ke Monitoring (Task 3).",
-        'creator_id' => $creator_id,
+        'success'          => true,
+        'message'          => "✅ Berhasil claim @{$check->username}! Creator pindah ke Monitoring (Task 3).",
+        'creator_id'       => $creator_id,
         'creator_username' => $check->username,
-        'claimed_by' => $full_name ?: $username
+        'claimed_by'       => $full_name ?: $username
     ]));
 }
 public function add_creator_task3() {
@@ -7537,7 +7583,7 @@ public function get_sample_products() {
             $campaign = $campaign_map[$link->campaign_id] ?? null;
             
             $brands[$brand_key]['products'][] = [
-                'product_id' => $link->product_id,
+'product_id' => $link->product_id,
                 'product_name' => $link->product_name,
                 'campaign_id' => $link->campaign_id,
                 'commission_rate' => $link->commission_rate,
@@ -7584,7 +7630,7 @@ public function search_creators_by_task() {
     try {
         $keyword = $this->input->post('keyword');
         $task = $this->input->post('task'); // '2' atau '3'
-        $limit = intval($this->input->post('limit') ?: 50); // 🔥 PASTIKAN INTEGER
+        $limit = intval($this->input->post('limit') ?: 50);
         
         log_message('debug', 'search_creators_by_task - keyword: ' . $keyword . ', task: ' . $task . ', limit: ' . $limit);
         
@@ -7626,7 +7672,19 @@ public function search_creators_by_task() {
                     b.name as brand_name,
                     b.shop_name,
                     "registered" as source_type,
-                    "no_handler" as deal_status
+                    (SELECT COUNT(DISTINCT acl.id) 
+                     FROM affiliate_creator_links acl 
+                     WHERE (acl.creator_id = c.id OR LOWER(TRIM(acl.creator_username)) = LOWER(TRIM(c.username)))
+                       AND acl.status = "ACTIVE") as total_active_links,
+                    CASE 
+                        WHEN c.is_id IS NOT NULL AND c.is_id > 0 THEN "claimed"
+                        WHEN c.is_id IS NULL AND EXISTS (
+                            SELECT 1 FROM affiliate_creator_links acl2
+                            WHERE (acl2.creator_id = c.id OR LOWER(TRIM(acl2.creator_username)) = LOWER(TRIM(c.username)))
+                              AND acl2.status = "ACTIVE"
+                        ) THEN "ready"
+                        ELSE "no_handler"
+                    END as deal_status
                 ')
                 ->from('creators c')
                 ->join('brands b', 'c.brand_id = b.id', 'left')
@@ -7642,7 +7700,6 @@ public function search_creators_by_task() {
                 ->result();
             
             // 🔥 PART 2: Cari creator yang belum terdaftar (unregistered)
-            // 🔥 PERBAIKAN: Gunakan intval untuk limit
             $unregistered_sql = "
                 SELECT 
                     NULL as id,
@@ -7676,13 +7733,12 @@ public function search_creators_by_task() {
                 LIMIT ?
             ";
             
-            // 🔥 PERBAIKAN: Pastikan limit adalah integer
             $unregistered = $this->db->query($unregistered_sql, [$like_keyword, intval($limit)])->result();
             
             // Gabungkan hasil
             $results = array_merge($registered, $unregistered);
             
-            // Tambahkan total_gmv_30d untuk registered
+            // Tambahkan data detail untuk registered & unregistered
             foreach ($results as $item) {
                 if ($item->source_type == 'registered' && !empty($item->id)) {
                     $gmv_query = "
@@ -7691,13 +7747,10 @@ public function search_creators_by_task() {
                         WHERE LOWER(TRIM(creator_username)) = LOWER(TRIM(?))
                           AND order_date_local >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
                           AND order_status NOT IN ('CANCELLED', 'REFUNDED')
-                    ";
+                     ";
                     $gmv = $this->db->query($gmv_query, [$item->username])->row();
-                    
+                     
                     $item->total_gmv_30d = floatval($gmv->total ?? 0);
-                    $item->total_active_links = 0;
-                    $item->top_product = '';
-                    $item->top_product_image = '';
                 } else {
                     // Unregistered: hitung dari orders
                     $gmv_query = "

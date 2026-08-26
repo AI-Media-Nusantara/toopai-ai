@@ -1633,6 +1633,9 @@
     <div class="is-item" 
              data-creator-id="<?= $creator->id ?? '' ?>" 
              data-creator-username="<?= htmlspecialchars($creator->username ?? '') ?>"
+             data-deal-status="<?= $creator->deal_status ?? '' ?>"
+             data-gmv="<?= $creator->total_gmv_30d ?? 0 ?>"
+             data-links="<?= $creator->total_active_links ?? 0 ?>"
              data-task="2">
 
         <div class="is-item-header">
@@ -1640,7 +1643,7 @@
                 <?php if ($creator->source_type == 'unregistered'): ?>
                     <i class="fas fa-user-plus" style="color: #f59e0b;"></i>
                 <?php elseif (!empty($creator->avatar_url)): ?>
-                    <img src="<?= htmlspecialchars($creator->avatar_url) ?>" alt="<?= htmlspecialchars($creator->username) ?>" onerror="this.parentElement.innerHTML='<i class=\\'fas fa-user\\'></i>'">
+                    <img src="<?= htmlspecialchars($creator->avatar_url) ?>" alt="<?= htmlspecialchars($creator->username) ?>" onerror="this.parentElement.innerHTML='<i class=\'fas fa-user\'></i>'">
                 <?php else: ?>
                     <i class="fas fa-user"></i>
                 <?php endif; ?>
@@ -1673,22 +1676,34 @@
                 </div>
                 <?php if (!empty($creator->top_product)): ?>
                 <div class="is-item-product">
-                    <span>�0�6 <?= htmlspecialchars(substr($creator->top_product, 0, 40)) ?>...</span>
+                    <span>📦 <?= htmlspecialchars(substr($creator->top_product, 0, 40)) ?>...</span>
                 </div>
                 <?php endif; ?>
                 <?php if ($creator->deal_status == 'no_handler'): ?>
-                <div class="is-item-detail" style="font-size:9px; color: #ef4444;">
-                    <i class="fas fa-exclamation-triangle"></i> 
-                    <?= $creator->source_type == 'unregistered' ? 'Creator belum terdaftar di sistem! Klik CLAIM untuk register otomatis.' : 'Creator belum punya handler! Siapa cepat dia dapat.' ?>
+                <div class="is-item-detail" style="font-size:9px; color: #f59e0b;">
+                    <i class="fas fa-info-circle"></i> 
+                    <?= $creator->source_type == 'unregistered' 
+                        ? 'Creator punya order tapi belum diberi link oleh CA manapun.' 
+                        : 'Creator punya order tapi belum ada link aktif dari CA.' ?>
+                    DEAL tidak dapat dilakukan.
                 </div>
                 <?php endif; ?>
             </div>
             <div class="is-item-actions">
-                <?php if ($creator->deal_status == 'ready' || $creator->deal_status == 'no_handler'): ?>
-                  <button class="btn-claim" onclick="claimDeal('<?= $creator->id ?? '' ?>', '<?= htmlspecialchars($creator->username ?? '') ?>')" 
-                        style="background: <?= $creator->deal_status == 'no_handler' ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'var(--is-green)' ?>;">
-                    <i class="fas fa-hand-holding-heart"></i> DEAL
-                </button>
+                <?php if ($creator->deal_status == 'ready'): ?>
+                    <button class="btn-claim" 
+                            onclick="openDealConfirmModal('<?= $creator->id ?? '' ?>', '<?= htmlspecialchars($creator->username ?? '') ?>', '<?= number_format($creator->total_gmv_30d ?? 0, 0, ',', '.') ?>', '<?= $creator->total_active_links ?? 0 ?>')"
+                            title="Creator sudah menggunakan link dari CA. Klik untuk klaim."
+                            style="background: linear-gradient(135deg, #10b981, #059669);">
+                        <i class="fas fa-handshake"></i> DEAL
+                    </button>
+                <?php elseif ($creator->deal_status == 'no_handler'): ?>
+                    <button class="btn-claim" 
+                            disabled
+                            title="DEAL tidak tersedia. Creator belum menggunakan link dari CA (belum ada link aktif atau order yang tertrack)."
+                            style="background: rgba(107,114,128,0.3); color: #6b7280; cursor: not-allowed; border: 1px solid rgba(107,114,128,0.3);">
+                        <i class="fas fa-lock"></i> DEAL
+                    </button>
                 <?php endif; ?>
                 <button class="btn-detail" onclick="showCreatorDetail(<?= $creator->id ?>)">
                     <i class="fas fa-eye"></i>
@@ -1703,9 +1718,8 @@
         <p>Belum ada creator siap claim</p>
         <span style="font-size: 11px; color: var(--is-muted);">Creator akan muncul di sini saat:</span>
         <ul style="text-align: left; font-size: 11px; color: var(--is-muted); margin-top: 8px;">
-            <li>�7�3 Ada link aktif & belum di-claim</li>
-            <li>�7�3 Ada order tapi belum punya handler</li>
-            <li>�7�3 Ada creator baru dengan order</li>
+            <li>✅ Ada link aktif dari CA & belum di-claim</li>
+            <li>✅ Ada order dari creator yang sudah pakai link CA</li>
         </ul>
     </div>
 <?php endif; ?>
@@ -1814,6 +1828,49 @@
 
     </div>
 </div>
+<!-- ============================================================ -->
+<!-- MODAL KONFIRMASI DEAL TASK 2 -->
+<!-- ============================================================ -->
+<div id="dealConfirmModal" class="modal-overlay-dashboard" style="display:none;">
+    <div class="modal-glass-dashboard" style="max-width: 500px; width: 95%; border-color: var(--is-green);">
+        <div class="modal-header-dashboard">
+            <h3><i class="fas fa-handshake" style="color: var(--is-green);"></i> Konfirmasi DEAL Creator</h3>
+            <span class="modal-close-dashboard" onclick="closeDealConfirmModal()">&times;</span>
+        </div>
+        <div class="modal-body" style="padding-top: 10px;">
+            <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); padding: 14px; border-radius: 14px; margin-bottom: 16px;">
+                <p style="font-size: 13px; color: var(--text-primary); margin: 0; line-height: 1.5;">
+                    Apakah Anda yakin ingin melakukan <strong>DEAL (Claim Ownering)</strong> untuk creator berikut? Setelah di-claim, creator ini akan terasosiasi dengan Anda secara permanen.
+                </p>
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; padding: 8px 12px; background: rgba(255,255,255,0.03); border-radius: 10px; border: 1px solid var(--border);">
+                    <span style="color: var(--text-secondary); font-size: 12px;">Username TikTok</span>
+                    <strong id="dealModalUsername" style="color: var(--text-primary); font-size: 13px;">@username</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; padding: 8px 12px; background: rgba(255,255,255,0.03); border-radius: 10px; border: 1px solid var(--border);">
+                    <span style="color: var(--text-secondary); font-size: 12px;">Total GMV (30 Hari)</span>
+                    <strong id="dealModalGmv" style="color: var(--is-green); font-size: 13px;">Rp 0</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; padding: 8px 12px; background: rgba(255,255,255,0.03); border-radius: 10px; border: 1px solid var(--border);">
+                    <span style="color: var(--text-secondary); font-size: 12px;">Link Terkirim</span>
+                    <strong id="dealModalLinks" style="color: var(--text-primary); font-size: 13px;">0 link aktif</strong>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 12px; margin-top: 20px;">
+                <button id="dealConfirmExecuteBtn" onclick="executeDeal()" style="flex: 1; background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 12px; border-radius: 40px; border: none; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 13px;">
+                    <i class="fas fa-handshake"></i> Ya, Konfirmasi DEAL
+                </button>
+                <button onclick="closeDealConfirmModal()" style="flex: 1; background: rgba(255,255,255,0.05); color: var(--text-secondary); padding: 12px; border-radius: 40px; border: 1px solid var(--border); font-weight: 600; cursor: pointer; font-size: 13px;">
+                    Batal
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- ============================================================ -->
 <!-- MODAL DETAIL TASK 1 (SCOUTING) -->
 <!-- ============================================================ -->
@@ -3600,54 +3657,78 @@ async function showTask1DetailModal(creatorId) {
 }
 
 // ============================================================
-// CLAIM DEAL FUNCTION - GLOBAL
+// CLAIM DEAL — MODAL KONFIRMASI & EKSEKUSI
 // ============================================================
 
+window.openDealConfirmModal = function(creatorId, creatorUsername, gmv, activeLinks) {
+    const modal = document.getElementById('dealConfirmModal');
+    if (!modal) return;
+
+    // Isi data ke dalam modal
+    document.getElementById('dealModalUsername').textContent  = '@' + creatorUsername;
+    document.getElementById('dealModalGmv').textContent       = 'Rp ' + (gmv || '0');
+    document.getElementById('dealModalLinks').textContent     = (activeLinks || '0') + ' link aktif';
+    document.getElementById('dealConfirmExecuteBtn').setAttribute('data-creator-id',       creatorId       || '');
+    document.getElementById('dealConfirmExecuteBtn').setAttribute('data-creator-username', creatorUsername || '');
+
+    modal.style.display = 'flex';
+    setTimeout(() => modal.classList.add('active'), 10);
+};
+
+window.closeDealConfirmModal = function() {
+    const modal = document.getElementById('dealConfirmModal');
+    if (!modal) return;
+    modal.classList.remove('active');
+    setTimeout(() => { modal.style.display = 'none'; }, 200);
+};
+
+// Backward-compat: tombol lama (no_handler) yang mungkin masih memanggil claimDeal
 window.claimDeal = async function(creatorId, creatorUsername) {
-    console.log('claimDeal called - ID:', creatorId, 'Username:', creatorUsername);
-    
-    const isUnregistered = !creatorId || creatorId === '0' || creatorId === 'null' || creatorId === '';
-    
-    if (isUnregistered && !creatorUsername) {
-        showToastGlobal('Data creator tidak valid', 'error');
-        return;
-    }
-    
-    let confirmMessage = isUnregistered 
-        ? `Claim dan register @${creatorUsername}?` 
-        : `Claim @${creatorUsername}?`;
-    
-    if (!confirm(confirmMessage)) return;
-    
+    openDealConfirmModal(creatorId, creatorUsername, '—', '—');
+};
+
+// Eksekusi DEAL setelah user konfirmasi di modal
+window.executeDeal = async function() {
+    const btn           = document.getElementById('dealConfirmExecuteBtn');
+    const creatorId     = btn.getAttribute('data-creator-id');
+    const creatorUsername = btn.getAttribute('data-creator-username');
+
+    btn.disabled     = true;
+    btn.innerHTML    = '<i class="fas fa-spinner fa-pulse"></i> Memproses...';
+
     try {
         const formData = new FormData();
-        if (!isUnregistered) {
+        if (creatorId && creatorId !== '' && creatorId !== '0') {
             formData.append('creator_id', creatorId);
         }
         if (creatorUsername) {
             formData.append('creator_username', creatorUsername);
         }
-        
+
         const response = await fetch(BASE_URL + 'is/claim_deal', {
             method: 'POST',
-            body: formData
+            body:   formData
         });
-        
+
         const result = await response.json();
-        
+
         if (result.success) {
+            closeDealConfirmModal();
             showToastGlobal(result.message, 'success');
-            setTimeout(function() {
-                location.reload();
-            }, 1500);
+            setTimeout(function() { location.reload(); }, 1500);
         } else {
             showToastGlobal(result.message || 'Gagal claim', 'error');
+            btn.disabled  = false;
+            btn.innerHTML = '<i class="fas fa-handshake"></i> Ya, Konfirmasi DEAL';
         }
     } catch (error) {
         console.error('Claim deal error:', error);
         showToastGlobal('Error: ' + error.message, 'error');
+        btn.disabled  = false;
+        btn.innerHTML = '<i class="fas fa-handshake"></i> Ya, Konfirmasi DEAL';
     }
 };
+
 
 // ============================================================
 // SHOW CREATOR DETAIL - TASK 2 & 3
@@ -3986,7 +4067,7 @@ function renderWaitingHandlerDetail(data, title, body) {
                 ` : `
                 <div style="margin-top:8px; background:rgba(245,158,11,0.1); padding:6px 12px; border-radius:8px; border-left:3px solid #f59e0b; font-size:11px; color:#f59e0b;">
                     <i class="fas fa-info-circle"></i> 
-                    Creator belum punya handler. Siapa cepat dia dapat!
+                    Creator belum memiliki handler resmi.
                 </div>
                 `}
                 ${c.top_product && c.top_product != '-' ? `
@@ -4212,17 +4293,29 @@ function renderSearchResults(task, creators, container) {
                         </div>
                         ` : ''}
                         ${isTask2 && dealStatus === 'no_handler' ? `
-                        <div class="is-item-detail" style="font-size:9px; color: #ef4444;">
-                            <i class="fas fa-exclamation-triangle"></i> 
-                            ${sourceType === 'unregistered' ? 'Creator belum terdaftar di sistem! Klik CLAIM untuk register otomatis.' : 'Creator belum punya handler! Siapa cepat dia dapat.'}
+                        <div class="is-item-detail" style="font-size:9px; color: #f59e0b;">
+                            <i class="fas fa-info-circle"></i> 
+                            ${sourceType === 'unregistered' 
+                                ? 'Creator punya order tapi belum diberi link oleh CA manapun. DEAL tidak dapat dilakukan.' 
+                                : 'Creator punya order tapi belum ada link aktif dari CA. DEAL tidak dapat dilakukan.'}
                         </div>
                         ` : ''}
                     </div>
                     <div class="is-item-actions">
-                        ${isTask2 && (dealStatus === 'ready' || dealStatus === 'no_handler') ? `
-                            <button class="btn-claim" onclick="claimDeal('${creator.id || ''}', '${escapeHtml(creator.username)}')" 
-                                    style="background: ${dealStatus === 'no_handler' ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'var(--is-green)'};">
-                                <i class="fas fa-hand-holding-heart"></i> CLAIM
+                        ${isTask2 && dealStatus === 'ready' ? `
+                            <button class="btn-claim" 
+                                    onclick="openDealConfirmModal('${creator.id || ''}', '${escapeHtml(creator.username)}', '${formatNumber(creator.total_gmv_30d || 0)}', '${creator.total_active_links || 0}')" 
+                                    title="Creator sudah menggunakan link dari CA. Klik untuk klaim."
+                                    style="background: linear-gradient(135deg, #10b981, #059669);">
+                                <i class="fas fa-handshake"></i> DEAL
+                            </button>
+                        ` : ''}
+                        ${isTask2 && dealStatus === 'no_handler' ? `
+                            <button class="btn-claim" 
+                                    disabled
+                                    title="DEAL tidak tersedia. Creator belum menggunakan link dari CA."
+                                    style="background: rgba(107,114,128,0.3); color: #6b7280; cursor: not-allowed; border: 1px solid rgba(107,114,128,0.3);">
+                                <i class="fas fa-lock"></i> DEAL
                             </button>
                         ` : ''}
                         <button class="btn-detail" onclick="showCreatorDetail('${creator.id || ''}', '${escapeHtml(creator.username)}', ${taskNum})">
