@@ -33,6 +33,9 @@ class Palette extends CI_Controller {
             return;
         }
 
+        // Increment clicks in affiliate_creator_links
+        $this->db->where('link_id', $link_id)->set('total_clicks', 'total_clicks + 1', FALSE)->update('affiliate_creator_links');
+
         // Fetch products inside this palette using a fail-safe two-step query to bypass collation mismatch errors
         $palette_items = $this->db->where('link_id', $link_id)->get('bd_palette_products')->result();
         

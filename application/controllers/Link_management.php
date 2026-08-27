@@ -32,6 +32,8 @@ class Link_management extends CI_Controller {
         $search = $this->input->get('search') ?: '';
         $search_type = $this->input->get('search_type') ?: 'shop';
         $campaign_filter = $this->input->get('campaign_id') ?: 'all';
+        $start_date = $this->input->get('start_date') ?: '';
+        $end_date = $this->input->get('end_date') ?: '';
         
         // Count total rows dengan filter yang aktif
         $this->db->from('bd_affiliate_links l')
@@ -40,6 +42,13 @@ class Link_management extends CI_Controller {
                  
         if ($campaign_filter !== 'all') {
             $this->db->where('l.campaign_id', $campaign_filter);
+        }
+        
+        if ($start_date !== '') {
+            $this->db->where('DATE(l.created_at) >=', $start_date);
+        }
+        if ($end_date !== '') {
+            $this->db->where('DATE(l.created_at) <=', $end_date);
         }
         
         if ($search !== '') {
@@ -109,6 +118,13 @@ class Link_management extends CI_Controller {
             $this->db->where('l.campaign_id', $campaign_filter);
         }
         
+        if ($start_date !== '') {
+            $this->db->where('DATE(l.created_at) >=', $start_date);
+        }
+        if ($end_date !== '') {
+            $this->db->where('DATE(l.created_at) <=', $end_date);
+        }
+        
         if ($search !== '') {
             if ($search_type === 'shop') {
                 $this->db->group_start()
@@ -171,6 +187,8 @@ class Link_management extends CI_Controller {
             'search' => $search,
             'search_type' => $search_type,
             'campaign_filter' => $campaign_filter,
+            'start_date' => $start_date,
+            'end_date' => $end_date,
             'pagination_links' => $pagination_links,
             'total_links' => $total_rows,
             'total_gmv' => $global_stats->total_gmv ?? 0,

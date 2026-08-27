@@ -78,6 +78,10 @@ $route['tts/refresh']              = 'tts/refresh';
 $route['link_management'] = 'link_management/dashboard';
 $route['link_management/(:any)'] = 'link_management/$1';
 
+// Redirect Tracker Route
+$route['r/(:any)'] = 'r/index/$1';
+
+
 
 // Di config/routes.php
 $route['creator'] = 'creator/dashboard';

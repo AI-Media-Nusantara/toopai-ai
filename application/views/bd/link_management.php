@@ -483,8 +483,14 @@
     </div>
     <div class="search-input-group">
         <input type="text" id="searchInput" value="<?= htmlspecialchars($search ?? '') ?>" placeholder="<?= ($search_type === 'shop') ? 'Search by shop name...' : 'Search by product ID...' ?>">
-        <button id="searchBtn"><i class="fas fa-search"></i> Search</button>
     </div>
+    <div class="date-filter-group" style="display: flex; gap: 8px; align-items: center; background: var(--bg-elevated); padding: 4px 12px; border-radius: 40px; border: 1px solid var(--border);">
+        <span style="font-size: 12px; color: var(--text-muted);"><i class="fas fa-calendar-alt"></i> Date:</span>
+        <input type="date" id="startDateInput" value="<?= htmlspecialchars($start_date ?? '') ?>" style="background: transparent; border: none; color: var(--text-primary); font-size: 12px; outline: none; padding: 4px; color-scheme: dark;">
+        <span style="font-size: 12px; color: var(--text-muted);">to</span>
+        <input type="date" id="endDateInput" value="<?= htmlspecialchars($end_date ?? '') ?>" style="background: transparent; border: none; color: var(--text-primary); font-size: 12px; outline: none; padding: 4px; color-scheme: dark;">
+    </div>
+    <button id="searchBtn" style="background: linear-gradient(135deg, var(--purple), var(--blue)); border: none; border-radius: 40px; color: white; padding: 10px 24px; cursor: pointer; font-size: 12px; font-weight: 600; transition: var(--transition); display: flex; align-items: center; gap: 8px;"><i class="fas fa-search"></i> Search</button>
 </div>
 
 <div style="overflow-x: auto;">
@@ -785,9 +791,25 @@ document.getElementById('searchInput')?.addEventListener('keyup', (e) => {
 
 function performSearch() {
     const keyword = document.getElementById('searchInput').value.trim();
+    const startDate = document.getElementById('startDateInput').value;
+    const endDate = document.getElementById('endDateInput').value;
+    
     const url = new URL(window.location.href);
     url.searchParams.set('search', keyword);
     url.searchParams.set('search_type', currentSearchType);
+    
+    if (startDate) {
+        url.searchParams.set('start_date', startDate);
+    } else {
+        url.searchParams.delete('start_date');
+    }
+    
+    if (endDate) {
+        url.searchParams.set('end_date', endDate);
+    } else {
+        url.searchParams.delete('end_date');
+    }
+    
     url.searchParams.delete('page'); // Reset to page 0
     window.location.href = url.toString();
 }

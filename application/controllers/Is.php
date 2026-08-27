@@ -114,6 +114,7 @@ public function dashboard() {
                     SELECT 1 FROM affiliate_creator_links acl2
                     WHERE (acl2.creator_id = c.id OR LOWER(TRIM(acl2.creator_username)) = LOWER(TRIM(c.username)))
                       AND acl2.status = 'ACTIVE'
+                      AND (acl2.total_clicks > 0 OR acl2.total_orders > 0)
                 ) THEN 'ready'
                 WHEN c.is_id IS NULL THEN 'no_handler'
                 ELSE 'no_link'
@@ -7682,6 +7683,7 @@ public function search_creators_by_task() {
                             SELECT 1 FROM affiliate_creator_links acl2
                             WHERE (acl2.creator_id = c.id OR LOWER(TRIM(acl2.creator_username)) = LOWER(TRIM(c.username)))
                               AND acl2.status = "ACTIVE"
+                              AND (acl2.total_clicks > 0 OR acl2.total_orders > 0)
                         ) THEN "ready"
                         ELSE "no_handler"
                     END as deal_status
@@ -9287,33 +9289,17 @@ public function send_link_task1() {
     }
     $cleanPhone = ltrim($phone, '+');
     
-    // Log WhatsApp
-    $this->db->insert('whatsapp_logs', [
-        'creator_id' => $creator_id,
-        'user_id' => $this->session->userdata('user_id'),
-        'user_name' => $this->session->userdata('full_name') ?: $this->session->userdata('username'),
-        'phone_number' => $phone,
-        'message' => $message,
-        'link' => $link,
-        'link_type' => 'task1_send_link',
-        'status' => 'SENT',
-        'sent_at' => date('Y-m-d H:i:s')
-    ]);
-    
-    // Update status creator ke LINK_SENT jika masih PENDING
-    if ($creator->status == 'PENDING') {
-        $this->db->where('id', $creator_id)->update('creators', [
-            'status' => 'LINK_SENT',
-            'updated_at' => date('Y-m-d H:i:s')
-        ]);
-    }
-    
-    // Simpan ke affiliate_creator_links jika belum ada
+    // Simpan/Dapatkan link_id untuk link saat ini
     $existing = $this->db->where('creator_id', $creator_id)
         ->where('product_id', $product_id)
         ->where('campaign_id', $campaign_id)
         ->get('affiliate_creator_links')
         ->row();
+    
+    $link_id = $existing ? $existing->link_id : md5($creator->username . $campaign_id . $product_id);
+    if (empty($link_id)) {
+        $link_id = md5($creator->username . $campaign_id . $product_id);
+    }
     
     if (!$existing) {
         $product = $this->db->select('product_name')
@@ -9322,6 +9308,7 @@ public function send_link_task1() {
             ->row();
         
         $link_data = [
+            'link_id' => $link_id,
             'creator_id' => $creator_id,
             'creator_username' => $creator->username,
             'campaign_id' => $campaign_id,
@@ -9334,6 +9321,44 @@ public function send_link_task1() {
             'updated_at' => date('Y-m-d H:i:s')
         ];
         $this->db->insert('affiliate_creator_links', $link_data);
+    } else if (empty($existing->link_id)) {
+        $this->db->where('id', $existing->id)->update('affiliate_creator_links', [
+            'link_id' => $link_id,
+            'updated_at' => date('Y-m-d H:i:s')
+        ]);
+    }
+    
+    // Ganti raw link dengan redirect link di dalam pesan WhatsApp
+    $creator_links = $this->db->where('creator_id', $creator_id)->get('affiliate_creator_links')->result();
+    foreach ($creator_links as $cl) {
+        if (!empty($cl->link_id)) {
+            $redirect_url = base_url('r/' . $cl->link_id);
+            $message = str_replace($cl->affiliate_link, $redirect_url, $message);
+        }
+    }
+    // Backup: Ganti link saat ini juga jika belum masuk DB
+    $redirect_url = base_url('r/' . $link_id);
+    $message = str_replace($link, $redirect_url, $message);
+
+    // Log WhatsApp
+    $this->db->insert('whatsapp_logs', [
+        'creator_id' => $creator_id,
+        'user_id' => $this->session->userdata('user_id'),
+        'user_name' => $this->session->userdata('full_name') ?: $this->session->userdata('username'),
+        'phone_number' => $phone,
+        'message' => $message,
+        'link' => $redirect_url,
+        'link_type' => 'task1_send_link',
+        'status' => 'SENT',
+        'sent_at' => date('Y-m-d H:i:s')
+    ]);
+    
+    // Update status creator ke LINK_SENT jika masih PENDING
+    if ($creator->status == 'PENDING') {
+        $this->db->where('id', $creator_id)->update('creators', [
+            'status' => 'LINK_SENT',
+            'updated_at' => date('Y-m-d H:i:s')
+        ]);
     }
     
     $whatsapp_url = "https://wa.me/{$cleanPhone}?text=" . urlencode($message);
