@@ -109,22 +109,21 @@ public function dashboard() {
              ORDER BY SUM(o3.gmv) DESC 
              LIMIT 1) as top_product_image,
             CASE 
-                WHEN c.is_id IS NOT NULL AND c.is_id > 0 THEN 'claimed'
-                WHEN c.is_id IS NULL AND EXISTS (
+                WHEN c.is_id IS NOT NULL AND c.is_id != {$user_id} THEN 'claimed'
+                WHEN (c.is_id IS NULL OR c.is_id = {$user_id}) AND EXISTS (
                     SELECT 1 FROM affiliate_creator_links acl2
                     WHERE (acl2.creator_id = c.id OR LOWER(TRIM(acl2.creator_username)) = LOWER(TRIM(c.username)))
                       AND acl2.status = 'ACTIVE'
                       AND (acl2.total_clicks > 0 OR acl2.total_orders > 0 OR acl2.showcase_status = 'added')
                 ) THEN 'ready'
-                WHEN c.is_id IS NULL THEN 'no_handler'
+                WHEN c.is_id IS NULL OR c.is_id = {$user_id} THEN 'no_handler'
                 ELSE 'no_link'
             END AS deal_status,
             'registered' as source_type
         FROM creators c
         LEFT JOIN brands b ON c.brand_id = b.id
         LEFT JOIN users u ON c.is_id = u.id
-        WHERE c.is_id IS NULL
-          AND c.status = 'LINK_SENT'
+        WHERE c.status = 'LINK_SENT'
         
         UNION ALL
         
@@ -7674,8 +7673,8 @@ public function search_creators_by_task() {
                      WHERE (acl.creator_id = c.id OR LOWER(TRIM(acl.creator_username)) = LOWER(TRIM(c.username)))
                        AND acl.status = "ACTIVE") as total_active_links,
                     CASE 
-                        WHEN c.is_id IS NOT NULL AND c.is_id > 0 THEN "claimed"
-                        WHEN c.is_id IS NULL AND EXISTS (
+                        WHEN c.is_id IS NOT NULL AND c.is_id != ' . intval($user_id) . ' THEN "claimed"
+                        WHEN (c.is_id IS NULL OR c.is_id = ' . intval($user_id) . ') AND EXISTS (
                             SELECT 1 FROM affiliate_creator_links acl2
                             WHERE (acl2.creator_id = c.id OR LOWER(TRIM(acl2.creator_username)) = LOWER(TRIM(c.username)))
                               AND acl2.status = "ACTIVE"
@@ -7692,7 +7691,7 @@ public function search_creators_by_task() {
                     ->or_like('c.full_name', $keyword, 'both')
                     ->or_like('c.category', $keyword, 'both')
                 ->group_end()
-                ->where('c.is_id IS NULL')
+                ->where('c.status', 'LINK_SENT')
                 ->limit($limit)
                 ->get()
                 ->result();
