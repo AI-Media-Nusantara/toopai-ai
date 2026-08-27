@@ -114,7 +114,7 @@ public function dashboard() {
                     SELECT 1 FROM affiliate_creator_links acl2
                     WHERE (acl2.creator_id = c.id OR LOWER(TRIM(acl2.creator_username)) = LOWER(TRIM(c.username)))
                       AND acl2.status = 'ACTIVE'
-                      AND (acl2.total_clicks > 0 OR acl2.total_orders > 0)
+                      AND (acl2.total_clicks > 0 OR acl2.total_orders > 0 OR acl2.showcase_status = 'added')
                 ) THEN 'ready'
                 WHEN c.is_id IS NULL THEN 'no_handler'
                 ELSE 'no_link'
@@ -7683,7 +7683,7 @@ public function search_creators_by_task() {
                             SELECT 1 FROM affiliate_creator_links acl2
                             WHERE (acl2.creator_id = c.id OR LOWER(TRIM(acl2.creator_username)) = LOWER(TRIM(c.username)))
                               AND acl2.status = "ACTIVE"
-                              AND (acl2.total_clicks > 0 OR acl2.total_orders > 0)
+                              AND (acl2.total_clicks > 0 OR acl2.total_orders > 0 OR acl2.showcase_status = "added")
                         ) THEN "ready"
                         ELSE "no_handler"
                     END as deal_status

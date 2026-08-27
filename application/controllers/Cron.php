@@ -81,6 +81,10 @@ private function get_utc_range_from_local_date($local_date, $timezone = 'Asia/Ja
     // 8. Auto-detect creator link usage
     echo "\n[8/7] Running auto-detection of creator link usage...\n";
     $this->auto_detect_creator_link_usage();
+    
+    // 9. Check creator showcases via FastMoss
+    echo "\n[9/7] Running check on creator showcases...\n";
+    $this->check_creator_showcases();
 
     echo "\n[" . date('Y-m-d H:i:s') . "] ========== FULL SYNC COMPLETED ==========\n";
 }
@@ -95,6 +99,17 @@ public function auto_detect_creator_link_usage() {
     echo "  Processed " . $results['scouting_onboarded'] . " new onboardings from contacted Scouting List.\n";
     echo "  Activated " . $results['creators_activated'] . " creators in creators table.\n";
     echo "[" . date('Y-m-d H:i:s') . "] Auto-detection completed.\n";
+}
+
+/**
+ * Trigger showcase checking for creators with active links
+ */
+public function check_creator_showcases() {
+    echo "[" . date('Y-m-d H:i:s') . "] Starting check of creator showcases...\n";
+    require_once(APPPATH . 'controllers/Showcase_checker.php');
+    $checker = new Showcase_checker();
+    $checker->check_all_pending();
+    echo "[" . date('Y-m-d H:i:s') . "] Showcase check completed.\n";
 }
     
     /**

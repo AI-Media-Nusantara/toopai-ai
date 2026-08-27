@@ -80,6 +80,16 @@
         <div class="status-success">
             <div class="status-main"><i class="fas fa-check-circle"></i> Authorized</div>
             <div class="status-detail">Token expires: <?= date('Y-m-d H:i:s', $affiliate_token->access_token_expire) ?></div>
+            <?php if (!empty($affiliate_token->scope)): ?>
+                <div class="status-detail" style="margin-top:6px;font-size:11px;word-break:break-all;">Scope: <?= htmlspecialchars($affiliate_token->scope) ?></div>
+            <?php else: ?>
+                <div class="status-detail" style="margin-top:6px;color:#fbbf24;"><i class="fas fa-exclamation-triangle"></i> Scope belum tersimpan — perlu re-authorize untuk update scope.</div>
+            <?php endif; ?>
+        </div>
+        <div class="action-area" style="margin-top:12px;">
+            <a href="<?= base_url('tts/authorize_affiliate') ?>" class="btn-primary" style="background:linear-gradient(135deg,#7c3aed,#4f46e5);" onclick="return confirm('Re-authorize Affiliate Partner? Token lama akan digantikan.')">
+                <i class="fas fa-sync-alt"></i> Re-authorize Affiliate Partner
+            </a>
         </div>
     <?php else: ?>
         <div class="status-warning">

@@ -44,7 +44,8 @@ class Tts extends CI_Controller {
         $redirect_uri = base_url('tts/callback_affiliate');
         
         // Scope untuk Affiliate Partner
-        $scope = urlencode('affiliate.product.search,affiliate.order.list,affiliate.campaign.read,affiliate.creator.read,affiliate.sample_application,partner.tap_campaign.read');
+        // creator.showcase.read diperlukan untuk cek produk showcase/keranjang kuning creator
+        $scope = urlencode('affiliate.product.search,affiliate.order.list,affiliate.campaign.read,affiliate.creator.read,affiliate.creator.search,affiliate.sample_application,partner.tap_campaign.read,creator.showcase.read');
         
         $auth_url = "https://partner.tiktokshop.com/open/authorize?"
                   . "service_id=" . $this->service_id
@@ -110,6 +111,16 @@ class Tts extends CI_Controller {
             }
             
             // Simpan token
+            // Ambil scope dari response — bisa berada di data.scope atau data.auth_scope
+            $scope_value = $result['data']['scope'] 
+                        ?? $result['data']['auth_scope'] 
+                        ?? $result['data']['scopes'] 
+                        ?? '';
+            // Jika scope array, ubah ke string
+            if (is_array($scope_value)) {
+                $scope_value = implode(',', $scope_value);
+            }
+            
             $token_data = [
                 'shop_id' => $result['data']['shop_cipher'] ?? $result['data']['seller_id'] ?? $result['data']['open_id'] ?? 'AFFILIATE_' . time(),
                 'access_token' => $result['data']['access_token'],
@@ -117,10 +128,12 @@ class Tts extends CI_Controller {
                 'access_token_expire' => time() + ($result['data']['access_token_expire_in'] ?? 7200),
                 'refresh_token_expire' => time() + ($result['data']['refresh_token_expire_in'] ?? 2592000),
                 'user_type' => $result['data']['user_type'] ?? 3, // Affiliate Partner
-                'scope' => $result['data']['scope'] ?? '',
+                'scope' => $scope_value,
                 'tap_type' => 'TOOPAI',
                 'updated_at' => date('Y-m-d H:i:s')
             ];
+            
+            log_message('info', 'Affiliate scope saved: ' . $scope_value);
             
             $this->Jsm_token_model->save_token($token_data);
             

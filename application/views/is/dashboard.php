@@ -4027,18 +4027,22 @@ function renderMonitoringDetail(data, title, body) {
 
 function renderWaitingHandlerDetail(data, title, body) {
     const isUnregistered = data.is_unregistered || false;
-    const c = data;
+    // Handle both formats: direct object (unregistered) or nested result.data format (registered)
+    const c = data.creator ? data.creator : data;
+    const links = data.links || [];
+    const gmvVal = data.performance ? ('Rp ' + formatNumber(data.performance.total_gmv || 0)) : (c.gmv || 'Rp 0');
+    const orderVal = data.performance ? (data.performance.total_orders || 0) : (c.orders || c.total_orders || 0);
     
     title.innerHTML = `<i class="fas fa-handshake" style="color: #f59e0b;"></i> @${escapeHtml(c.username || 'Unknown')} - Waiting Handler`;
     
     let html = `
-        <div style="display:flex; gap:16px; margin-bottom:16px; background:rgba(245,158,11,0.08); padding:16px; border-radius:12px; border: 1px solid rgba(245,158,11,0.2);">
+        <div style="display:flex; gap:16px; margin-bottom:16px; background:rgba(245,158,11,0.08); padding:16px; border-radius:12px; border: 1px solid rgba(245,158,11,0.2);" data-creator-id="${c.id || ''}">
             <div style="width:64px; height:64px; border-radius:50%; overflow:hidden; flex-shrink:0; background:var(--bg-elevated); border: 2px solid #f59e0b; display:flex; align-items:center; justify-content:center;">
                 ${c.avatar_url ? `<img src="${escapeHtml(c.avatar_url)}" style="width:100%; height:100%; object-fit:cover;" onerror="this.parentElement.innerHTML='<i class=\\'fas fa-user\\' style=\\'font-size:32px; color: var(--text-muted);\\'></i>'">` : `<i class="fas ${isUnregistered ? 'fa-user-plus' : 'fa-user'}" style="font-size:32px; color: ${isUnregistered ? '#f59e0b' : 'var(--text-muted)'};"></i>`}
             </div>
             <div style="flex:1; min-width:0;">
                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap: 8px;">
-                    <div>
+                    <div class="is-item-name">
                         <div style="font-size:18px; font-weight:700; color:var(--text-primary);">${escapeHtml(c.full_name || c.username || 'Unknown')}</div>
                         <div style="color:#f59e0b; font-size:13px;">@${escapeHtml(c.username || 'Unknown')}</div>
                     </div>
@@ -4048,7 +4052,7 @@ function renderWaitingHandlerDetail(data, title, body) {
                         </span>
                         ${isUnregistered ? `<span style="background:rgba(239,68,68,0.15); color:#ef4444; padding:4px 8px; border-radius:12px; font-size:9px; font-weight:600;"> NEW</span>` : ''}
                         <div style="text-align:right; background: rgba(245,158,11,0.1); padding: 8px 16px; border-radius: 12px; border: 1px solid rgba(245,158,11,0.2);">
-                            <div style="color:#f59e0b; font-size:16px; font-weight:700;">${c.gmv || 'Rp 0'}</div>
+                            <div style="color:#f59e0b; font-size:16px; font-weight:700;">${gmvVal}</div>
                             <div style="font-size:10px; color:var(--text-muted);">Total GMV</div>
                         </div>
                     </div>
@@ -4057,7 +4061,7 @@ function renderWaitingHandlerDetail(data, title, body) {
                     <span style="display:inline-flex; align-items:center; gap:4px;"><i class="fas fa-tag" style="color: var(--purple);"></i> ${escapeHtml(c.category || '-')}</span>
                     <span style="display:inline-flex; align-items:center; gap:4px;"><i class="fas fa-phone" style="color: #25D366;"></i> ${escapeHtml(c.phone || '-')}</span>
                     ${c.brand_name && c.brand_name != '-' ? `<span style="display:inline-flex; align-items:center; gap:4px;"><i class="fas fa-store" style="color: #4ade80;"></i> ${escapeHtml(c.brand_name)}</span>` : ''}
-                    <span style="display:inline-flex; align-items:center; gap:4px;"><i class="fas fa-box" style="color: #fbbf24;"></i> ${c.orders || c.total_orders || 0} orders</span>
+                    <span style="display:inline-flex; align-items:center; gap:4px;"><i class="fas fa-box" style="color: #fbbf24;"></i> ${orderVal} orders</span>
                 </div>
                 ${isUnregistered ? `
                 <div style="margin-top:8px; background:rgba(239,68,68,0.1); padding:6px 12px; border-radius:8px; border-left:3px solid #ef4444; font-size:11px; color:#ef4444;">
@@ -4077,7 +4081,55 @@ function renderWaitingHandlerDetail(data, title, body) {
                 ` : ''}
             </div>
         </div>
+    `;
+
+    // Render active links with showcase checker if available
+    if (links && links.length > 0) {
+        html += `
+            <div style="margin-bottom:16px; margin-top: 16px;">
+                <h4 style="color:var(--text-primary); font-size:13px; margin-bottom:8px; display:flex; align-items:center;">
+                    <i class="fas fa-link" style="color: #f59e0b; margin-right:8px;"></i> Active Links (${links.length})
+                </h4>
+                <div style="max-height:180px; overflow-y:auto; background:var(--bg-elevated); border-radius:8px; padding:8px; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px;">
+        `;
         
+        links.forEach(link => {
+            let showcaseBadge = '';
+            if (link.showcase_status === 'added') {
+                showcaseBadge = '<span style="background: rgba(16,185,129,0.15); color: #10b981; padding: 2px 8px; border-radius: 12px; font-size: 9px; font-weight: 600;"><i class="fas fa-check-circle"></i> Keranjang Kuning</span>';
+            } else if (link.showcase_status === 'not_added') {
+                showcaseBadge = '<span style="background: rgba(239,68,68,0.15); color: #ef4444; padding: 2px 8px; border-radius: 12px; font-size: 9px; font-weight: 600;"><i class="fas fa-times-circle"></i> Belum Masuk</span>';
+            } else {
+                showcaseBadge = '<span style="background: rgba(156,163,175,0.15); color: #9ca3af; padding: 2px 8px; border-radius: 12px; font-size: 9px; font-weight: 600;"><i class="fas fa-question-circle"></i> Belum Dicek</span>';
+            }
+
+            html += `
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:8px; background: rgba(255,255,255,0.02); border-radius: 6px; border: 1px solid rgba(255,255,255,0.05); font-size: 11px;" id="link-item-${link.id}">
+                    <div style="flex:1; min-width:0; padding-right:8px;">
+                        <div style="color:var(--text-primary); font-weight:600; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;" title="${escapeHtml(link.product_name || '-')}">${escapeHtml(link.product_name || '-')}</div>
+                        <div style="color:var(--text-muted); font-size:9px; display: flex; gap: 8px; margin-top: 2px; flex-wrap: wrap;">
+                            <span>Clicks: <strong>${link.total_clicks || 0}</strong></span>
+                            <span>Orders: <strong>${link.total_orders || 0}</strong></span>
+                            ${link.showcase_checked_at ? `<span>Checked: <strong>${new Date(link.showcase_checked_at).toLocaleDateString('id-ID')}</strong></span>` : ''}
+                        </div>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+                        ${showcaseBadge}
+                        <button class="btn-check-showcase" onclick="checkShowcaseSingle(${link.id}, this)" style="background:var(--bg-elevated); border:1px solid var(--border); border-radius:50%; width:24px; height:24px; display:flex; align-items:center; justify-content:center; color:var(--text-primary); cursor:pointer; transition:all 0.2s;" title="Cek Keranjang Kuning via FastMoss">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += `
+                </div>
+            </div>
+        `;
+    }
+
+    html += `
         <div style="display:flex; gap:10px; margin-top:16px; padding-top:12px; border-top: 1px solid var(--border);">
             <button onclick="closeCreatorModal()" style="flex:1; background:var(--bg-elevated); color:var(--text-secondary); padding:10px; border-radius:40px; border:1px solid var(--border); cursor:pointer; font-weight:600; font-size:13px; transition: var(--transition);">Tutup</button>
             <button onclick="claimDeal(${c.id || 0}, '${escapeHtml(c.username)}')" style="flex:1; background:linear-gradient(135deg, #f59e0b, #d97706); color:#0a0e17; padding:10px; border-radius:40px; border:none; cursor:pointer; font-weight:600; font-size:13px; transition: var(--transition);">
@@ -4117,6 +4169,54 @@ function renderMinimalCreatorDetail(username, title, body, task) {
     
     body.innerHTML = html;
 }
+
+window.checkShowcaseSingle = async function(linkId, btn) {
+    if (!linkId || !btn) return;
+    
+    const icon = btn.querySelector('i');
+    if (icon.classList.contains('fa-spin')) return; // already running
+    
+    icon.className = 'fas fa-spinner fa-spin';
+    btn.style.cursor = 'wait';
+    
+    try {
+        const formData = new FormData();
+        formData.append('link_id', linkId);
+        
+        const response = await fetch(BASE_URL + 'showcase_checker/check_single', {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            if (result.success) {
+                showToastGlobal('Berhasil mengecek keranjang kuning', 'success');
+                // Refresh modal content to show updated status
+                const modal = document.getElementById('creatorModal');
+                const creatorCard = modal.querySelector('[data-creator-id]');
+                const creatorId = creatorCard ? creatorCard.getAttribute('data-creator-id') : '';
+                // Get username from class is-item-name
+                const usernameEl = modal.querySelector('.is-item-name div:nth-child(2)') || modal.querySelector('.is-item-name');
+                const creatorUsername = usernameEl ? usernameEl.textContent.trim().replace('@', '') : '';
+                
+                if (window.showCreatorDetail) {
+                    window.showCreatorDetail(creatorId, creatorUsername, 2);
+                }
+            } else {
+                showToastGlobal(result.message || 'Gagal mengecek keranjang kuning', 'error');
+            }
+        } else {
+            showToastGlobal('Gagal menghubungi server', 'error');
+        }
+    } catch (err) {
+        console.error('Error checking showcase:', err);
+        showToastGlobal('Terjadi kesalahan sistem', 'error');
+    } finally {
+        icon.className = 'fas fa-sync-alt';
+        btn.style.cursor = 'pointer';
+    }
+};
 
 // ============================================================
 // FILTER TASK FUNCTIONS - AJAX
