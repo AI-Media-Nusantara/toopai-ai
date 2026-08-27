@@ -1705,7 +1705,7 @@
                         <i class="fas fa-lock"></i> DEAL
                     </button>
                 <?php endif; ?>
-                <button class="btn-detail" onclick="showCreatorDetail(<?= $creator->id ?>)">
+                <button class="btn-detail" onclick="showCreatorDetail('<?= $creator->id ?>', '<?= htmlspecialchars($creator->username) ?>', 2)">
                     <i class="fas fa-eye"></i>
                 </button>
             </div>
@@ -1794,7 +1794,7 @@
                                 <?php endif; ?>
                             </div>
                             <div class="is-item-actions">
-                                <button class="btn-detail" onclick="showCreatorDetail(<?= $creator->id ?>)"
+                                <button class="btn-detail" onclick="showCreatorDetail('<?= $creator->id ?>', '<?= htmlspecialchars($creator->username) ?>', 3)"
                                     title="Lihat Detail">
                                     <i class="fas fa-eye"></i>
                                 </button>
@@ -3750,7 +3750,17 @@ window.showCreatorDetail = async function(creatorId, creatorUsername, task) {
         if (items.length > 0) {
             const item = items[0];
             creatorId = item.getAttribute('data-creator-id') || '';
+            task = task || parseInt(item.getAttribute('data-task')) || 2;
+        }
+    }
+    
+    if (!task) {
+        const selector = creatorId ? `[data-creator-id="${creatorId}"]` : `[data-creator-username="${creatorUsername}"]`;
+        const item = document.querySelector(`.is-item${selector}`);
+        if (item) {
             task = parseInt(item.getAttribute('data-task')) || 2;
+        } else {
+            task = 2; // default fallback
         }
     }
     
