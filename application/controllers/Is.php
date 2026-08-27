@@ -124,10 +124,18 @@ public function dashboard() {
         LEFT JOIN brands b ON c.brand_id = b.id
         LEFT JOIN users u ON c.is_id = u.id
         WHERE c.is_id IS NULL
-          AND EXISTS (
-              SELECT 1 FROM affiliate_orders o 
-              WHERE LOWER(TRIM(o.creator_username)) = LOWER(TRIM(c.username))
-                AND o.order_status NOT IN ('CANCELLED', 'REFUNDED')
+          AND (
+              EXISTS (
+                  SELECT 1 FROM affiliate_orders o 
+                  WHERE LOWER(TRIM(o.creator_username)) = LOWER(TRIM(c.username))
+                    AND o.order_status NOT IN ('CANCELLED', 'REFUNDED')
+              )
+              OR EXISTS (
+                  SELECT 1 FROM affiliate_creator_links acl3
+                  WHERE (acl3.creator_id = c.id OR LOWER(TRIM(acl3.creator_username)) = LOWER(TRIM(c.username)))
+                    AND acl3.status = 'ACTIVE'
+                    AND (acl3.total_clicks > 0 OR acl3.total_orders > 0 OR acl3.showcase_status = 'added')
+              )
           )
         
         UNION ALL
