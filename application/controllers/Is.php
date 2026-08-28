@@ -58,6 +58,7 @@ public function dashboard() {
         ->join('brands b', 'c.brand_id = b.id', 'left')
         ->join('users u', 'c.is_id = u.id', 'left')
         ->where_in('c.status', ['PENDING', 'LINK_SWAPPING'])
+        ->order_by('(CASE WHEN c.is_id = ' . intval($user_id) . ' THEN 1 ELSE 0 END)', 'DESC')
         ->order_by('(CASE WHEN c.phone IS NOT NULL AND c.phone != "" AND c.phone != "no_phone" THEN 1 ELSE 0 END)', 'DESC')
         ->order_by('c.imported_gmv', 'DESC')
         ->limit(100)
@@ -8487,47 +8488,128 @@ public function get_creator_products_with_links() {
     // ============================================================
     $recommended_products = [];
     if ($this->db->table_exists('bd_affiliate_links')) {
-        // 🔥 PERBAIKAN: Hapus bal.shop_name karena kolom tidak ada di bd_affiliate_links
-        // Gunakan ap.shop_name dari affiliate_products
-        $this->db->select('
-                bal.product_id,
-                bal.product_name,
-                bal.campaign_id,
-                bal.affiliate_link,
-                bal.commission_rate,
-                bal.open_commission_rate,
-                bal.created_by_name,
-                bal.campaign_name,
-                bal.link_type,
-                ap.price,
-                ap.image_url,
-                ap.sales_count,
-                ap.category as product_category,
-                ap.shop_name as product_shop_name
-            ')
-            ->from('bd_affiliate_links bal')
-            ->join('affiliate_products ap', 'bal.product_id = ap.product_id AND bal.campaign_id = ap.campaign_id', 'left')
-            ->where('bal.status', 'ACTIVE');
-        
-        // Filter berdasarkan kategori dari affiliate_products
-        $category = $creator->category ?: 'Lifestyle';
+        // Prioritize brand's category if available (Fetched first to avoid Query Builder state pollution)
+        $brand_category = null;
+        if (!empty($creator->brand_id)) {
+            $brand = $this->db->select('category')->where('id', $creator->brand_id)->get('brands')->row();
+            if ($brand && !empty($brand->category)) {
+                $brand_category = $brand->category;
+            }
+        }
+
+        // Determine effective category for keyword filtering:
+        // 1. Try brand category first
+        // 2. If brand category gives no usable keywords (e.g. 'OTHER'), fall back to creator's own category
+        // 3. Final fallback: 'Lifestyle'
+        $category = null;
+        if (!empty($brand_category)) {
+            $test_keywords = $this->getCategoryKeywords($brand_category);
+            if (!empty($test_keywords)) {
+                $category = $brand_category;
+            }
+        }
+        if (empty($category)) {
+            $category = $creator->category ?: 'Lifestyle';
+        }
+
         $category_keywords = $this->getCategoryKeywords($category);
         
-        if (!empty($category_keywords)) {
+        // Also get the brand's shop_name for precise brand-based filtering
+        $brand_shop_name = null;
+        if (!empty($creator->brand_id)) {
+            $brand_shop = $this->db->select('shop_name')->where('id', $creator->brand_id)->get('brands')->row();
+            if ($brand_shop && !empty($brand_shop->shop_name)) {
+                $brand_shop_name = $brand_shop->shop_name;
+            }
+        }
+
+        if (!empty($brand_shop_name)) {
+            // PRIORITY FILTER: Products from the exact brand shop come first
+            // Use a UNION: brand shop products first, then keyword-matched products
+            $brand_sql = "
+                SELECT bal.product_id, bal.product_name, bal.campaign_id, bal.affiliate_link,
+                       bal.commission_rate, bal.open_commission_rate, bal.created_by_name,
+                       bal.campaign_name, bal.link_type, ap.price, ap.image_url, ap.sales_count,
+                       ap.category as product_category, ap.shop_name as product_shop_name,
+                       1 as priority_order
+                FROM bd_affiliate_links bal
+                LEFT JOIN affiliate_products ap ON bal.product_id = ap.product_id AND bal.campaign_id = ap.campaign_id
+                WHERE bal.status = 'ACTIVE'
+                  AND LOWER(ap.shop_name) = LOWER(?)
+            ";
+            
+            $keyword_conditions = [];
+            $keyword_binds = [];
+            foreach ($category_keywords as $kw) {
+                $kw_lower = strtolower($kw);
+                $keyword_conditions[] = "LOWER(ap.category) LIKE ?";
+                $keyword_conditions[] = "LOWER(bal.product_name) LIKE ?";
+                $keyword_conditions[] = "LOWER(ap.shop_name) LIKE ?";
+                $keyword_binds[] = "%{$kw_lower}%";
+                $keyword_binds[] = "%{$kw_lower}%";
+                $keyword_binds[] = "%{$kw_lower}%";
+            }
+
+            if (!empty($keyword_conditions)) {
+                $keyword_where = implode(' OR ', $keyword_conditions);
+                $other_sql = "
+                    SELECT bal.product_id, bal.product_name, bal.campaign_id, bal.affiliate_link,
+                           bal.commission_rate, bal.open_commission_rate, bal.created_by_name,
+                           bal.campaign_name, bal.link_type, ap.price, ap.image_url, ap.sales_count,
+                           ap.category as product_category, ap.shop_name as product_shop_name,
+                           2 as priority_order
+                    FROM bd_affiliate_links bal
+                    LEFT JOIN affiliate_products ap ON bal.product_id = ap.product_id AND bal.campaign_id = ap.campaign_id
+                    WHERE bal.status = 'ACTIVE'
+                      AND LOWER(ap.shop_name) != LOWER(?)
+                      AND ({$keyword_where})
+                ";
+                $combined_sql = "({$brand_sql}) UNION ({$other_sql}) ORDER BY priority_order ASC, product_shop_name ASC LIMIT 50";
+                $binds = array_merge([$brand_shop_name], [$brand_shop_name], $keyword_binds);
+                $recommended_products = $this->db->query($combined_sql, $binds)->result();
+            } else {
+                // No keyword filter available, just show brand shop products
+                $recommended_products = $this->db->query($brand_sql . " LIMIT 50", [$brand_shop_name])->result();
+            }
+        } elseif (!empty($category_keywords)) {
+            // No specific brand shop, filter by category keywords only
+            $this->db->select('
+                    bal.product_id, bal.product_name, bal.campaign_id, bal.affiliate_link,
+                    bal.commission_rate, bal.open_commission_rate, bal.created_by_name,
+                    bal.campaign_name, bal.link_type, ap.price, ap.image_url, ap.sales_count,
+                    ap.category as product_category, ap.shop_name as product_shop_name
+                ')
+                ->from('bd_affiliate_links bal')
+                ->join('affiliate_products ap', 'bal.product_id = ap.product_id AND bal.campaign_id = ap.campaign_id', 'left')
+                ->where('bal.status', 'ACTIVE');
             $this->db->group_start();
             foreach ($category_keywords as $keyword) {
                 $this->db->or_like('LOWER(ap.category)', strtolower($keyword));
                 $this->db->or_like('LOWER(bal.product_name)', strtolower($keyword));
-                // 🔥 HAPUS bal.shop_name karena tidak ada, gunakan ap.shop_name
                 $this->db->or_like('LOWER(ap.shop_name)', strtolower($keyword));
             }
             $this->db->group_end();
+
+            $recommended_products = $this->db->order_by('bal.created_at', 'DESC')
+                ->limit(50)
+                ->get()
+                ->result();
+        } else {
+            // Fallback: no filter, return latest 50 active products
+            $recommended_products = $this->db->select('
+                    bal.product_id, bal.product_name, bal.campaign_id, bal.affiliate_link,
+                    bal.commission_rate, bal.open_commission_rate, bal.created_by_name,
+                    bal.campaign_name, bal.link_type, ap.price, ap.image_url, ap.sales_count,
+                    ap.category as product_category, ap.shop_name as product_shop_name
+                ')
+                ->from('bd_affiliate_links bal')
+                ->join('affiliate_products ap', 'bal.product_id = ap.product_id AND bal.campaign_id = ap.campaign_id', 'left')
+                ->where('bal.status', 'ACTIVE')
+                ->order_by('bal.created_at', 'DESC')
+                ->limit(50)
+                ->get()
+                ->result();
         }
-        
-        $recommended_products = $this->db->order_by('bal.created_at', 'DESC')
-            ->limit(50)
-            ->get()
-            ->result();
     }
     
     // ============================================================
@@ -8747,20 +8829,92 @@ private function getSourceLabel($source) {
  */
 private function getCategoryKeywords($category) {
     $category_map = [
-        'Beauty' => ['beauty', 'makeup', 'skincare', 'cosmetic', 'lipstick', 'foundation', 'perfume', 'hair', 'face', 'cream', 'serum', 'toner', 'moisturizer', 'hanasui', 'dorskin', 'skincare', 'glow', 'brightening'],
-        'Fashion' => ['fashion', 'clothing', 'apparel', 'wear', 'dress', 'shirt', 'pants', 'jacket', 'bag', 'shoes', 'accessories', 'hijab', 'pashmina', 'sepatu', 'tas', 'baju'],
-        'Tech' => ['tech', 'electronics', 'gadget', 'phone', 'laptop', 'computer', 'camera', 'audio', 'accessories', 'smartphone', 'charger', 'headset'],
-        'Lifestyle' => ['lifestyle', 'home', 'living', 'decor', 'furniture', 'kitchen', 'household', 'organizer', 'storage'],
-        'Gaming' => ['gaming', 'game', 'console', 'controller', 'headset', 'keyboard', 'mouse', 'gamer'],
-        'Food' => ['food', 'snack', 'beverage', 'drink', 'meal', 'cooking', 'bakery', 'candy', 'chocolate', 'coffee', 'tea', 'makanan', 'minuman'],
-        'Travel' => ['travel', 'journey', 'tour', 'vacation', 'luggage', 'backpack', 'travel'],
-        'Sports' => ['sport', 'fitness', 'workout', 'gym', 'exercise', 'yoga', 'running', 'training', 'olahraga'],
-        'Home & Living' => ['home', 'living', 'decor', 'furniture', 'kitchen', 'household', 'rumah', 'dekorasi'],
-        'Health' => ['health', 'wellness', 'vitamin', 'supplement', 'medical', 'pharmacy', 'kesehatan'],
-        'Baby & Kids' => ['baby', 'kids', 'children', 'toy', 'infant', 'parenting', 'bayi', 'anak']
+        'Beauty' => [
+            // Brand/shop names yang pasti beauty
+            'hanasui', 'somethinc', 'scarlett', 'wardah', 'emina', 'ms glow', 'makeupuccino',
+            'whitelab', 'npure', 'hiqween', 'lumiwhite', 'purbasari', 'skintific',
+            // Kategori produk beauty (bahasa Indonesia)
+            'skincare', 'makeup', 'kosmetik', 'kecantikan', 'perawatan wajah', 'perawatan kulit',
+            'serum', 'toner', 'moisturizer', 'sunscreen', 'pelembab', 'pembersih wajah',
+            'lipstik', 'lipstick', 'cushion', 'foundation', 'bedak', 'blush', 'eyeshadow',
+            'maskara', 'mascara', 'eyeliner', 'alis', 'lipliner', 'lulur', 'scrub badan',
+            'micellar', 'face wash', 'face mask', 'sheet mask', 'retinol', 'niacinamide',
+            'brightening', 'whitening', 'glowing', 'acne', 'jerawat',
+            // Kategori TikTok shop yang umum untuk beauty
+            'suplemen kecantikan', 'serum & essence', 'facial sunscreen', 'perawatan jerawat',
+            'pembersih wajah', 'makeup remover', 'moisturiser', 'concealer', 'lipstick',
+            'pensil & gel alis', 'perawatan mata', 'blusher', 'eyeshadow', 'toner',
+            'kit perawatan kulit', 'perawatan bibir', 'semprotan fixer', 'face scrub',
+        ],
+        'Fashion' => [
+            // Kategori fashion (Indonesian context)
+            'fashion', 'pakaian', 'busana', 'baju', 'kemeja', 'dress', 'rok', 'celana',
+            'jaket', 'hoodie', 'sweater', 'kaos', 'blouse', 'gamis', 'hijab', 'pashmina',
+            'kerudung', 'jilbab', 'abaya', 'tunik', 'kaftan',
+            // Alas kaki
+            'sepatu', 'sandal', 'sneakers', 'heels', 'boots', 'flat shoes', 'wedges',
+            // Aksesori fashion
+            'tas wanita', 'tas pria', 'dompet', 'ikat pinggang', 'topi', 'kacamata',
+            'anting', 'kalung', 'gelang', 'cincin', 'jam tangan',
+            // Kategori TikTok shop
+            'sepatu kasual', 'sepatu mary jane', 'sandal & sandal jepit', 'ransel', 'tote bag',
+            'tas selempang', 'tas perjalanan', 'setelan pakaian', 'bra', 'knicker',
+        ],
+        'Tech' => [
+            'elektronik', 'gadget', 'smartphone', 'handphone', 'laptop', 'tablet', 'komputer',
+            'kamera', 'speaker', 'earphone', 'headphone', 'headset', 'charger', 'powerbank',
+            'smartwatch', 'gaming', 'peripheral', 'keyboard', 'mouse', 'monitor',
+            'earphone & headphone', 'aksesoris hp', 'casing hp',
+        ],
+        'Lifestyle' => [
+            'lifestyle', 'dekorasi', 'rumah', 'interior', 'furnitur', 'lampu',
+            'peralatan rumah', 'perlengkapan rumah', 'storage', 'organizer', 'rak',
+            'wewangian rumah', 'lilin aromaterapi', 'diffuser',
+        ],
+        'Gaming' => ['gaming', 'game', 'console', 'controller', 'headset gaming', 'keyboard gaming', 'mouse gaming', 'gamer'],
+        'Food' => [
+            'makanan', 'minuman', 'snack', 'camilan', 'kopi', 'teh', 'coklat', 'biskuit',
+            'keripik', 'mie', 'bumbu', 'saus', 'kecap', 'minyak goreng', 'tepung',
+            'susu', 'jus', 'minuman kesehatan', 'suplemen makanan',
+            'makanan beku', 'frozen food', 'bakery', 'roti', 'kue',
+            'pasta & bumbu masak', 'penambah rasa', 'saus masak', 'kacang-kacangan',
+            'alat pemroses kopi', 'pewarna makanan',
+        ],
+        'Travel' => [
+            'travel', 'wisata', 'liburan', 'koper', 'backpack ransel', 'travel bag',
+            'luggage', 'paspor', 'dompet travel',
+        ],
+        'Sports' => [
+            'olahraga', 'sport', 'fitness', 'gym', 'yoga', 'lari', 'sepeda', 'renang',
+            'sepatu olahraga', 'sepatu lari', 'baju olahraga', 'peralatan olahraga',
+            'suplemen olahraga', 'protein', 'whey', 'dumbbell', 'matras yoga',
+        ],
+        'Home & Living' => [
+            'peralatan dapur', 'peralatan masak', 'kitchen', 'dapur',
+            'panci', 'wajan', 'pisau dapur', 'talenan', 'spatula', 'sodet',
+            'botol minum', 'tumbler', 'termos', 'gelas', 'piring', 'mangkuk',
+            'pembersih rumah', 'pembersih lantai', 'sabun cuci', 'pel',
+            'set blok pisau', 'peralatan memasak', 'botol air', 'talenan', 'termos vakum',
+            'sikat & kop sedot toilet', 'pembersih rumah tangga', 'pelindung percikan',
+        ],
+        'Health' => [
+            'kesehatan', 'vitamin', 'suplemen', 'obat', 'herbal', 'apotek',
+            'masker medis', 'sarung tangan', 'termometer', 'tensimeter',
+            'vitamin, mineral & suplemen', 'suplemen kesehatan',
+        ],
+        'Baby & Kids' => [
+            'bayi', 'anak', 'balita', 'baby', 'kids', 'mainan anak', 'popok', 'susu bayi',
+            'mpasi', 'perlengkapan bayi', 'stroller', 'gendongan',
+            'perawatan kulit bayi', 'sabun bayi', 'lotion bayi', 'bedak bayi',
+        ],
     ];
     
     $category_lower = strtolower($category);
+    if ($category_lower === 'electronics') {
+        $category_lower = 'tech';
+    } elseif ($category_lower === 'mom_baby') {
+        $category_lower = 'baby & kids';
+    }
     
     foreach ($category_map as $key => $keywords) {
         if (strpos($category_lower, strtolower($key)) !== false || $category_lower == strtolower($key)) {

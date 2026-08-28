@@ -2156,7 +2156,7 @@
                 
                 <div style="display:flex; gap:10px; margin-top:20px; padding-top:16px; border-top:1px solid var(--border);">
                     <button type="button" onclick="closeModalIS()" style="flex:1; background:rgba(255,255,255,0.05); color:var(--text-secondary); padding:12px; border-radius:40px; border:1px solid var(--border); cursor:pointer; font-weight:600; font-size:13px;">Batal</button>
-                    <button type="submit" id="saveCreatorBtnIS" style="flex:1; background:linear-gradient(135deg, var(--purple), var(--blue)); color:white; padding:12px; border-radius:40px; border:none; cursor:pointer; font-weight:600; font-size:13px;">
+                    <button type="submit" id="saveCreatorBtnIS" style="flex:1; background:linear-gradient(135deg, #10b981, #059669); color:white; padding:12px; border-radius:40px; border:none; cursor:pointer; font-weight:600; font-size:13px;">
                         <i class="fas fa-save"></i> Tambah ke Task 1
                     </button>
                 </div>
