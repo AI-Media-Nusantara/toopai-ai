@@ -1441,6 +1441,7 @@
     <!-- Search input -->
     <div style="flex-shrink: 0; padding: 8px 12px;">
         <input type="text" id="searchScoutingDashboard" placeholder=" Cari creator atau brand..." 
+               onkeyup="filterTaskAjax('task1', this.value)"
                style="width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; font-size: 12px; background: rgba(255,255,255,0.05); color: var(--text-primary); outline: none; transition: var(--transition);">
     </div>
     
@@ -4238,9 +4239,9 @@ let searchTimer = null;
 const _taskOriginalContent = {};
 const _taskOriginalCount = {};
 function _cacheTaskOriginals() {
-    ['task2', 'task3'].forEach(function(task) {
-        const container = document.getElementById(task + 'Items');
-        const countBadge = document.getElementById(task + 'Count');
+    ['task1', 'task2', 'task3'].forEach(function(task) {
+        const container = (task === 'task1') ? document.getElementById('scoutingContainerDashboard') : document.getElementById(task + 'Items');
+        const countBadge = (task === 'task1') ? document.getElementById('scoutingCountDashboard') : document.getElementById(task + 'Count');
         if (container) _taskOriginalContent[task] = container.innerHTML;
         if (countBadge) _taskOriginalCount[task] = countBadge.textContent;
     });
@@ -4268,10 +4269,11 @@ function filterTaskAjax(task, keyword) {
         clearTimeout(searchTimer);
     }
     
+    const container = (task === 'task1') ? document.getElementById('scoutingContainerDashboard') : document.getElementById(task + 'Items');
+    const countBadge = (task === 'task1') ? document.getElementById('scoutingCountDashboard') : document.getElementById(task + 'Count');
+    
     // Jika keyword kosong, restore data awal tanpa reload halaman
     if (!keyword || keyword.trim() === '') {
-        const container = document.getElementById(task + 'Items');
-        const countBadge = document.getElementById(task + 'Count');
         if (container && _taskOriginalContent[task] !== undefined) {
             container.innerHTML = _taskOriginalContent[task];
         }
@@ -4281,7 +4283,6 @@ function filterTaskAjax(task, keyword) {
         return;
     }
     
-    const container = document.getElementById(task + 'Items');
     if (container) {
         container.innerHTML = `
             <div style="text-align:center; padding:40px;">
@@ -4297,8 +4298,8 @@ function filterTaskAjax(task, keyword) {
 }
 
 async function performSearch(task, keyword) {
-    const container = document.getElementById(task + 'Items');
-    const countBadge = document.getElementById(task + 'Count');
+    const container = (task === 'task1') ? document.getElementById('scoutingContainerDashboard') : document.getElementById(task + 'Items');
+    const countBadge = (task === 'task1') ? document.getElementById('scoutingCountDashboard') : document.getElementById(task + 'Count');
     
     if (!container) return;
     
@@ -4358,10 +4359,144 @@ async function performSearch(task, keyword) {
 function renderSearchResults(task, creators, container) {
     let html = '';
     const taskNum = parseInt(task.replace('task', ''));
+    const isTask1 = (taskNum === 1);
     const isTask2 = (taskNum === 2);
     const isTask3 = (taskNum === 3);
     
     creators.forEach(function(creator) {
+        if (isTask1) {
+            const phone = creator.phone || '';
+            const shopOrBrandName = creator.shop_name || creator.brand_name || '';
+            
+            html += `
+                <div class="stage-item-dashboard scouting-item-dashboard" 
+                     data-creator-id="${escapeHtml(creator.id || '')}" 
+                     data-creator-name="${escapeHtml(creator.username || '')}"
+                     data-creator-phone="${escapeHtml(phone)}"
+                     data-no-phone="${!phone ? '1' : '0'}"
+                     data-searchable="${escapeHtml(creator.username.toLowerCase())}"
+                     style="padding: 12px; margin-bottom: 8px; border-radius: 13px; border: 1px solid rgba(112,136,185,0.14); background: rgba(9,17,34,0.56); cursor: pointer; transition: var(--transition);">
+                    
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap: 8px;">
+                        <strong style="font-size: 12px; line-height: 1.25; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                            <i class="fab fa-tiktok" style="color: #8b5cf6;"></i> 
+                            ${escapeHtml(creator.username)}
+                        </strong>
+                        <div style="display:flex; gap:4px; align-items:center; flex-shrink: 0;">
+                            ${creator.follow_up_count > 0 ? `
+                            <span style="background:rgba(245,158,11,0.15); color:#f59e0b; font-size:8px; padding:2px 6px; border-radius:10px; display:inline-flex; align-items:center; gap:3px;">
+                                <i class="fas fa-clock"></i> ${creator.follow_up_count}x
+                            </span>
+                            ` : ''}
+                            <span class="badge-dashboard badge-pending" style="font-size:8px; padding:3px 8px; display:inline-flex; align-items:center; gap:3px;">
+                                <i class="fas fa-clock"></i> ${escapeHtml(creator.status || 'PENDING')}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <!-- SHOP/BRAND NAME -->
+                    <div class="item-details-dashboard" style="margin-top: 4px; display: flex; flex-wrap: wrap; gap: 5px 9px; font-size: 9.5px; color: var(--is-muted-2);">
+                        ${shopOrBrandName ? `
+                        <span class="brand-badge" style="background: rgba(74,222,128,0.15); padding: 2px 8px; border-radius: 20px; display: inline-flex; align-items: center; gap: 4px; font-size: 9.5px; color: #4ade80;">
+                            <i class="fas fa-store" style="font-size: 8px;"></i> ${escapeHtml(shopOrBrandName)}
+                        </span>
+                        ` : `
+                        <span style="color: #9aaebe; font-size: 10px; display: inline-flex; align-items: center; gap: 4px;">
+                            <i class="fas fa-store" style="font-size: 8px;"></i> Belum ada brand
+                        </span>
+                        `}
+                    </div>
+                    
+                    <!-- WhatsApp & GMV -->
+                    <div class="item-details-dashboard" style="display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 9.5px; color: var(--is-muted-2); margin-top: 2px;">
+                        <span id="phoneDisplay_${creator.id}" style="display: inline-flex; align-items: center; gap: 4px;">
+                            <i class="fab fa-whatsapp" style="color: #25D366;"></i> 
+                            ${phone ? `
+                                ${escapeHtml(phone)}
+                                <span onclick="event.stopPropagation(); window.openUpdatePhoneModal('${creator.id}', '${escapeHtml(creator.username)}')"
+                                      title="Edit nomor WA"
+                                      style="cursor:pointer; color:#6b7280; font-size:8px; margin-left:2px;">
+                                    <i class="fas fa-pencil-alt"></i>
+                                </span>
+                            ` : `
+                                <span style="color: #ef4444;">Tidak ada</span>
+                            `}
+                        </span>
+                        
+                        ${creator.imported_gmv > 0 ? `
+                        <span style="color: #fbbf24; display: inline-flex; align-items: center; gap: 4px;">
+                            <i class="fas fa-chart-line" style="font-size: 8px;"></i> GMV: Rp ${formatNumber(creator.imported_gmv)}
+                        </span>
+                        ` : ''}
+                    </div>
+                    
+                    <!-- Multiple Link -->
+                    ${creator.total_links > 0 ? `
+                    <div class="item-details-dashboard" style="margin-top:4px; display: flex; gap: 4px;">
+                        <span style="color:#8b5cf6; font-size:9px; display: inline-flex; align-items: center; gap: 4px;">
+                            <i class="fas fa-layer-group"></i> ${creator.total_links} Multiple Link tersedia
+                        </span>
+                    </div>
+                    ` : ''}
+                    
+                    <!-- SUMBER DATA & TANGGAL INPUT -->
+                    <div class="item-details-dashboard" style="font-size: 9px; margin-top: 6px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px; color: var(--is-muted);">
+                        <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                            ${creator.source === 'imported' ? `
+                            <span style="color: #fbbf24; display: inline-flex; align-items: center; gap: 3px;">
+                                <i class="fas fa-file-import" style="font-size: 8px;"></i> Imported
+                            </span>
+                            ` : `
+                            <span style="color: #4ade80; display: inline-flex; align-items: center; gap: 3px;">
+                                <i class="fas fa-user-plus" style="font-size: 8px;"></i> Manual
+                            </span>
+                            `}
+                            
+                            <span style="display: inline-flex; align-items: center; gap: 3px;">
+                                <i class="fas fa-calendar-alt" style="font-size: 8px;"></i> 
+                                ${creator.created_at_formatted || '-'}
+                            </span>
+                        </div>
+                        
+                        <!-- TOMBOL FETCH WA DARI TAP / INPUT MANUAL -->
+                        ${!phone || phone === 'no_phone' ? `
+                        <div class="action-buttons-wa-wrapper" style="display:inline-flex; gap:4px; align-items:center;">
+                            <button class="resync-wa-btn"
+                                    data-creator-id="${creator.id}"
+                                    data-creator-name="${escapeHtml(creator.username)}"
+                                    title="Ambil nomor WA dari TAP API"
+                                    style="background: linear-gradient(135deg,#0ea5e9,#2563eb); color:#fff; border:none; padding:2px 8px; border-radius:10px; cursor:pointer; font-size:9px; font-weight:600; transition:var(--transition); display:inline-flex; align-items:center; gap:3px;">
+                                <i class="fab fa-tiktok" style="font-size:8px;"></i> Fetch TAP
+                            </button>
+                            <button onclick="event.stopPropagation(); window.openUpdatePhoneModal('${creator.id}', '${escapeHtml(creator.username)}')"
+                                    title="Input nomor WA manual"
+                                    style="background:rgba(245,158,11,0.15); color:#f59e0b; border:1px solid rgba(245,158,11,0.3); padding:2px 8px; border-radius:10px; cursor:pointer; font-size:9px; font-weight:600; transition:var(--transition); display:inline-flex; align-items:center; gap:3px;">
+                                <i class="fas fa-keyboard" style="font-size:8px;"></i> Manual
+                            </button>
+                        </div>
+                        ` : ''}
+                    </div>
+                    
+                    <!-- ACTION BUTTONS -->
+                    <div style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
+                        <button class="task1-detail-btn" data-creator-id="${creator.id}"
+                                style="background: linear-gradient(135deg, var(--purple-glow), rgba(59,130,246,0.1)); color: var(--purple); border: 1px solid rgba(139,92,246,0.3); padding: 4px 12px; border-radius: 20px; cursor: pointer; font-size: 9px; font-weight: 600; transition: var(--transition); display: inline-flex; align-items: center; gap: 4px;">
+                            <i class="fas fa-info-circle"></i> Detail
+                        </button>
+                        <button class="task1-send-link-btn" data-creator-id="${creator.id}"
+                            style="background: linear-gradient(135deg, #10b981, #059669); color: white; border: none; padding: 4px 12px; border-radius: 20px; cursor: pointer; font-size: 9px; font-weight: 600; transition: var(--transition); display: inline-flex; align-items: center; gap: 4px;">
+                            <i class="fas fa-paper-plane"></i> Send Link
+                        </button>
+                        <button class="task1-followup-btn" data-creator-id="${creator.id}"
+                                style="background: linear-gradient(135deg, #f59e0b, #d97706); color: white; border: none; padding: 4px 12px; border-radius: 20px; cursor: pointer; font-size: 9px; font-weight: 600; transition: var(--transition); display: inline-flex; align-items: center; gap: 4px;">
+                            <i class="fas fa-comment"></i> Follow Up
+                        </button>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+        
         const dealStatus = creator.deal_status || 'no_handler';
         const sourceType = creator.source_type || 'registered';
         
@@ -4529,48 +4664,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     console.log('Dashboard DOM loaded');
     
-    // ============================================================
-    // 1. SEARCH / FILTER SCOUTING
-    // ============================================================
-    const searchInput = document.getElementById('searchScoutingDashboard');
-    if (searchInput) {
-        searchInput.addEventListener('keyup', function() {
-            const keyword = this.value.toLowerCase().trim();
-            const items = document.querySelectorAll('#scoutingContainerDashboard .scouting-item-dashboard');
-            let visibleCount = 0;
-            
-            items.forEach(item => {
-                const searchable = item.getAttribute('data-searchable') || '';
-                const matches = keyword === '' || searchable.includes(keyword);
-                item.style.display = matches ? '' : 'none';
-                if (matches) visibleCount++;
-            });
-            
-            const countBadge = document.getElementById('scoutingCountDashboard');
-            if (countBadge) {
-                countBadge.textContent = visibleCount;
-            }
-            
-            const container = document.getElementById('scoutingContainerDashboard');
-            if (visibleCount === 0 && items.length > 0) {
-                const existingEmpty = container.querySelector('.empty-search-result');
-                if (!existingEmpty) {
-                    const msg = document.createElement('div');
-                    msg.className = 'empty-search-result';
-                    msg.style.cssText = 'padding: 30px 20px; text-align: center; color: var(--text-secondary); font-size: 12px;';
-                    msg.innerHTML = `
-                        <i class="fas fa-search" style="font-size: 24px; opacity: 0.3; display: block; margin-bottom: 10px;"></i>
-                        Tidak ada creator yang cocok dengan pencarian "${keyword}"
-                    `;
-                    container.appendChild(msg);
-                }
-            } else {
-                const existingEmpty = container.querySelector('.empty-search-result');
-                if (existingEmpty) existingEmpty.remove();
-            }
-        });
-    }
-    
+
     // ============================================================
     // 2. BUTTON DETAIL - TASK 2 & 3
     // ============================================================

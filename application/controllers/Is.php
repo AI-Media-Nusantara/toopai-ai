@@ -58,7 +58,6 @@ public function dashboard() {
         ->join('brands b', 'c.brand_id = b.id', 'left')
         ->join('users u', 'c.is_id = u.id', 'left')
         ->where_in('c.status', ['PENDING', 'LINK_SWAPPING'])
-        ->order_by('(CASE WHEN c.is_id = ' . intval($user_id) . ' THEN 1 ELSE 0 END)', 'DESC')
         ->order_by('(CASE WHEN c.phone IS NOT NULL AND c.phone != "" AND c.phone != "no_phone" THEN 1 ELSE 0 END)', 'DESC')
         ->order_by('c.imported_gmv', 'DESC')
         ->limit(100)
@@ -7647,7 +7646,57 @@ public function search_creators_by_task() {
         
         $task_num = intval($task);
         
-        if ($task_num == 2) {
+        if ($task_num == 1) {
+            // ============================================================
+            // TASK 1: SCOUTING - SEARCH
+            // ============================================================
+            $results = $this->db->select('
+                    c.id,
+                    c.username,
+                    c.full_name,
+                    c.avatar_url,
+                    c.category,
+                    c.phone,
+                    c.alamat,
+                    c.penerima,
+                    c.created_at,
+                    c.status,
+                    c.imported_gmv,
+                    c.source,
+                    c.is_id as handler_id,
+                    u.username as is_username,
+                    u.full_name as is_full_name,
+                    b.name as brand_name,
+                    b.shop_name,
+                    "registered" as source_type,
+                    "pending" as deal_status,
+                    (SELECT COUNT(DISTINCT acl.id) 
+                     FROM affiliate_creator_links acl 
+                     WHERE acl.creator_id = c.id 
+                       AND acl.status = "ACTIVE") as total_links
+                ')
+                ->from('creators c')
+                ->join('brands b', 'c.brand_id = b.id', 'left')
+                ->join('users u', 'c.is_id = u.id', 'left')
+                ->group_start()
+                    ->like('c.username', $keyword, 'both')
+                    ->or_like('c.full_name', $keyword, 'both')
+                    ->or_like('c.category', $keyword, 'both')
+                    ->or_like('b.name', $keyword, 'both')
+                    ->or_like('b.shop_name', $keyword, 'both')
+                ->group_end()
+                ->where_in('c.status', ['PENDING', 'LINK_SWAPPING'])
+                ->order_by('c.imported_gmv', 'DESC')
+                ->limit($limit)
+                ->get()
+                ->result();
+                
+            // Format created_at date for JS
+            foreach ($results as $item) {
+                $item->created_at_formatted = !empty($item->created_at) ? date('d/m/Y H:i', strtotime($item->created_at)) : '-';
+                $item->follow_up_count = 0;
+            }
+        } elseif ($task_num == 2) {
             // ============================================================
             // TASK 2: WAITING HANDLER - SEARCH
             // ============================================================
