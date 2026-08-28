@@ -117,7 +117,7 @@ public function dashboard() {
                     WHERE (acl2.creator_id = c.id OR LOWER(TRIM(acl2.creator_username)) = LOWER(TRIM(c.username)))
                       AND acl2.status = 'ACTIVE'
                       AND (TRIM(ap2.shop_name) = TRIM(b.shop_name) OR TRIM(ap2.shop_name) = TRIM(b.name))
-                      AND (acl2.total_clicks > 0 OR acl2.total_orders > 0 OR acl2.showcase_status = 'added')
+                      AND acl2.showcase_status = 'added'
                 ) THEN 'ready'
                 WHEN c.is_id IS NULL OR c.is_id = {$user_id} THEN 'no_handler'
                 ELSE 'no_link'
@@ -345,6 +345,7 @@ public function get_task2_creators() {
                     WHERE (acl2.creator_id = c.id OR LOWER(TRIM(acl2.creator_username)) = LOWER(TRIM(c.username)))
                       AND acl2.status = "ACTIVE"
                       AND (TRIM(ap2.shop_name) = TRIM(b.shop_name) OR TRIM(ap2.shop_name) = TRIM(b.name))
+                      AND acl2.showcase_status = "added"
                       AND (acl2.created_by_user_id IS NULL OR acl2.created_by_user_id = 0)
                 ) THEN "ready"
                 WHEN EXISTS (
@@ -353,6 +354,7 @@ public function get_task2_creators() {
                     WHERE (acl2.creator_id = c.id OR LOWER(TRIM(acl2.creator_username)) = LOWER(TRIM(c.username)))
                       AND acl2.status = "ACTIVE"
                       AND (TRIM(ap2.shop_name) = TRIM(b.shop_name) OR TRIM(ap2.shop_name) = TRIM(b.name))
+                      AND acl2.showcase_status = "added"
                       AND acl2.created_by_user_id IS NOT NULL
                       AND acl2.created_by_user_id > 0
                 ) THEN "claimed"
@@ -7733,7 +7735,7 @@ public function search_creators_by_task() {
                             WHERE (acl2.creator_id = c.id OR LOWER(TRIM(acl2.creator_username)) = LOWER(TRIM(c.username)))
                               AND acl2.status = "ACTIVE"
                               AND (TRIM(ap2.shop_name) = TRIM(b.shop_name) OR TRIM(ap2.shop_name) = TRIM(b.name))
-                              AND (acl2.total_clicks > 0 OR acl2.total_orders > 0 OR acl2.showcase_status = "added")
+                              AND acl2.showcase_status = "added"
                         ) THEN "ready"
                         ELSE "no_handler"
                     END as deal_status
