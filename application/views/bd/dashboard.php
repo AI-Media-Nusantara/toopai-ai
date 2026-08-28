@@ -3468,7 +3468,7 @@ async function showTask3SetupModalWithRecommendations(brandId, brandName) {
             <button id="closeSetupModalBtn" style="background:#1e293b; color:#cbd5e6; flex:1; padding:12px; border-radius:40px; border:1px solid #2a3346; cursor:pointer;">
                 Tutup
             </button>
-            <button id="rejectBrandBtn" style="background:#ef4444; color:white; flex:1; padding:12px; border-radius:40px; border:none; cursor:pointer; font-weight:600;">
+            <button id="rejectBrandBtn" style="display: none; background:#ef4444; color:white; flex:1; padding:12px; border-radius:40px; border:none; cursor:pointer; font-weight:600;">
                 <i class="fas fa-times-circle"></i> Tolak Pendaftaran Brand
             </button>
         </div>
@@ -4434,60 +4434,7 @@ function renderSearchResults(containerId, brands, searchEndpoint) {
     });
     
     // 🔥 ATTACH EVENT LISTENER UNTUK BRAND ITEMS
-    document.querySelectorAll(`#${containerId} .brand-item-dashboard`).forEach(item => {
-        // Clone untuk menghindari double event listener
-        const newItem = item.cloneNode(true);
-        item.parentNode.replaceChild(newItem, item);
-        
-        newItem.addEventListener('click', async (e) => {
-            // Jangan trigger jika klik tombol di dalam item
-            if (e.target.closest('.check-registration-btn') || 
-                e.target.closest('.edit-brand-btn') ||
-                e.target.closest('.remove-existing-product-dashboard') || 
-                e.target.closest('.remove-new-product-dashboard')) {
-                return;
-            }
-            
-            const brandId = newItem.getAttribute('data-brand-id');
-            const brandName = newItem.getAttribute('data-brand-name');
-            const stage = parseInt(newItem.getAttribute('data-stage'));
-            
-            if (stage === 1) {
-                showTask1DetailDashboard(brandId, brandName);
-            } else if (stage === 2) {
-                const isClickable = newItem.getAttribute('data-is-clickable') === 'true';
-                
-                if (!isClickable) {
-                    showToastInModal('⏳ Brand sedang menunggu registrasi campaign. Klik tombol "Refresh" untuk cek status.', 'warning');
-                    return;
-                }
-                
-                // 🔥 CEK ULANG STATUS REGISTRASI SEBELUM BUKA MODAL
-                try {
-                    const checkResponse = await fetch(baseUrlDashboard + 'bd/check_brand_registration', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                        body: new URLSearchParams({ brand_id: brandId })
-                    });
-                    const checkResult = await checkResponse.json();
-                    
-                    if (checkResult.success && checkResult.has_products) {
-                        showToastInModal('✅ Brand sudah registrasi! Memuat ulang halaman...', 'success');
-                        setTimeout(() => location.reload(), 1000);
-                        return;
-                    }
-                } catch (err) {
-                    console.error('Error checking registration:', err);
-                }
-                
-                showTask2FollowUpModal(brandId, brandName);
-            } else if (stage === 3) {
-                showTask3SetupModalWithRecommendations(brandId, brandName);
-            } else if (stage === 4) {
-                showTask4MonitoringModalDashboard(brandId, brandName);
-            }
-        });
-    });
+    
 }
 function getStageFromEndpoint(endpoint) {
     if (endpoint === 'search_hunting_brands') return 1;
@@ -5673,35 +5620,6 @@ document.addEventListener('DOMContentLoaded', () => {
     initSearchTaskWithAPI('searchMonitoringDashboard', 'monitoringItemsContainerDashboard', 'monitoringCountDashboard', 'search_monitoring_brands');
     
     // Brand item click
-document.querySelectorAll('.brand-item-dashboard').forEach(item => {
-    item.addEventListener('click', async (e) => {
-        if (e.target.closest('.remove-existing-product-dashboard') || e.target.closest('.remove-new-product-dashboard')) return;
-        
-        const brandId = item.getAttribute('data-brand-id');
-        const brandName = item.getAttribute('data-brand-name');
-        const stage = parseInt(item.getAttribute('data-stage'));
-        
-        // 🔥 KHUSUS TASK 2: CEK APAKAH BISA DIKLIK
-        if (stage === 2) {
-            const isClickable = item.getAttribute('data-is-clickable') === 'true';
-            if (!isClickable) {
-                showToastInModal(' Brand sedang menunggu registrasi campaign. Tidak dapat difollow up sampai brand registrasi campaign terlebih dahulu.', 'warning');
-                return; // ✅ LANGSUNG RETURN, TIDAK BUKA MODAL
-            }
-            showTask2FollowUpModal(brandId, brandName);
-        } 
-        else if (stage === 1) {
-            showTask1DetailDashboard(brandId, brandName);
-        }
-        else if (stage === 3) {
-            showTask3SetupModalWithRecommendations(brandId, brandName);
-        }
-        else if (stage === 4) {
-            showTask4MonitoringModalDashboard(brandId, brandName);
-        }
-    });
-});
-
     // Task buttons
     const huntingBtn = document.querySelector('.task-btn-dashboard[data-action="hunting"]');
     if (huntingBtn) {
@@ -7056,64 +6974,61 @@ document.addEventListener('click', async function(e) {
 // Cari bagian ini di dalam document.addEventListener('DOMContentLoaded', function() {
 
 // Perbarui logika click untuk stage 2:
-document.querySelectorAll('.brand-item-dashboard').forEach(item => {
-    // Hapus event listener lama (jika ada)
-    const newItem = item.cloneNode(true);
-    item.parentNode.replaceChild(newItem, item);
+document.addEventListener('click', async function(e) {
+    const item = e.target.closest('.brand-item-dashboard');
+    if (!item) return;
     
-    newItem.addEventListener('click', async (e) => {
-        // Jangan trigger jika klik tombol di dalam item
-        if (e.target.closest('.check-registration-btn') || 
-            e.target.closest('.remove-existing-product-dashboard') || 
-            e.target.closest('.remove-new-product-dashboard')) {
+    // Jangan trigger jika klik tombol di dalam item
+    if (e.target.closest('.check-registration-btn') || 
+        e.target.closest('.edit-brand-btn') ||
+        e.target.closest('.remove-existing-product-dashboard') || 
+        e.target.closest('.remove-new-product-dashboard')) {
+        return;
+    }
+    
+    const brandId = item.getAttribute('data-brand-id');
+    const brandName = item.getAttribute('data-brand-name');
+    const stage = parseInt(item.getAttribute('data-stage'));
+    
+    if (stage === 1) {
+        showTask1DetailDashboard(brandId, brandName);
+    } else if (stage === 2) {
+        const isClickable = item.getAttribute('data-is-clickable') === 'true';
+        
+        if (!isClickable) {
+            showToastInModal('Brand sedang menunggu registrasi campaign. Klik tombol "Refresh" untuk cek status.', 'warning');
             return;
         }
         
-        const brandId = newItem.getAttribute('data-brand-id');
-        const brandName = newItem.getAttribute('data-brand-name');
-        const stage = parseInt(newItem.getAttribute('data-stage'));
-        
-        if (stage === 2) {
-            const isClickable = newItem.getAttribute('data-is-clickable') === 'true';
+        // CEK ULANG STATUS REGISTRASI SEBELUM BUKA MODAL
+        try {
+            const checkResponse = await fetch(baseUrlDashboard + 'bd/check_brand_registration', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ brand_id: brandId })
+            });
+            const checkResult = await checkResponse.json();
             
-            if (!isClickable) {
-                showToastInModal('⏳ Brand sedang menunggu registrasi campaign. Klik tombol "Refresh" untuk cek status.', 'warning');
+            if (checkResult.success && checkResult.has_products) {
+                // Brand sudah registrasi, refresh halaman dulu
+                showToastInModal('Brand sudah registrasi! Memuat ulang halaman...', 'success');
+                setTimeout(() => location.reload(), 1000);
                 return;
             }
-            
-            // 🔥 CEK ULANG STATUS REGISTRASI SEBELUM BUKA MODAL
-            try {
-                const checkResponse = await fetch(baseUrlDashboard + 'bd/check_brand_registration', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: new URLSearchParams({ brand_id: brandId })
-                });
-                const checkResult = await checkResponse.json();
-                
-                if (checkResult.success && checkResult.has_products) {
-                    // Brand sudah registrasi, refresh halaman dulu
-                    showToastInModal('✅ Brand sudah registrasi! Memuat ulang halaman...', 'success');
-                    setTimeout(() => location.reload(), 1000);
-                    return;
-                }
-            } catch (err) {
-                // Gagal cek, lanjutkan ke modal
-                console.error('Error checking registration:', err);
-            }
-            
-            // Buka modal follow up
-            showTask2FollowUpModal(brandId, brandName);
-        } 
-        else if (stage === 1) {
-            showTask1DetailDashboard(brandId, brandName);
+        } catch (err) {
+            // Gagal cek, lanjutkan ke modal
+            console.error('Error checking registration:', err);
         }
-        else if (stage === 3) {
-            showTask3SetupModalWithRecommendations(brandId, brandName);
-        }
-        else if (stage === 4) {
-            showTask4MonitoringModalDashboard(brandId, brandName);
-        }
-    });
+        
+        // Buka modal follow up
+        showTask2FollowUpModal(brandId, brandName);
+    } 
+    else if (stage === 3) {
+        showTask3SetupModalWithRecommendations(brandId, brandName);
+    }
+    else if (stage === 4) {
+        showTask4MonitoringModalDashboard(brandId, brandName);
+    }
 });
 
 // ========== TOMBOL CEK STATUS & PINDAH KE TASK 4 ==========

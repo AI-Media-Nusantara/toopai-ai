@@ -93,21 +93,17 @@ public function dashboard() {
              WHERE LOWER(TRIM(o.creator_username)) = LOWER(TRIM(c.username))
                AND o.order_date_local >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
                AND o.order_status NOT IN ('CANCELLED', 'REFUNDED')) as total_gmv_30d,
-            (SELECT product_name 
-             FROM affiliate_orders o2 
-             WHERE LOWER(TRIM(o2.creator_username)) = LOWER(TRIM(c.username))
-               AND o2.order_status NOT IN ('CANCELLED', 'REFUNDED')
-             GROUP BY o2.product_name 
-             ORDER BY SUM(o2.gmv) DESC 
-             LIMIT 1) as top_product,
-            (SELECT MAX(ap.image_url) 
-             FROM affiliate_products ap 
-             JOIN affiliate_orders o3 ON ap.product_id = o3.product_id AND ap.campaign_id = o3.campaign_id
-             WHERE LOWER(TRIM(o3.creator_username)) = LOWER(TRIM(c.username))
-               AND o3.order_status NOT IN ('CANCELLED', 'REFUNDED')
-             GROUP BY ap.product_id 
-             ORDER BY SUM(o3.gmv) DESC 
-             LIMIT 1) as top_product_image,
+            (SELECT GROUP_CONCAT(product_name SEPARATOR ', ')
+              FROM affiliate_creator_links acl3
+              WHERE (acl3.creator_id = c.id OR LOWER(TRIM(acl3.creator_username)) = LOWER(TRIM(c.username)))
+                AND acl3.showcase_status = 'added') as top_product,
+            (SELECT ap.image_url 
+              FROM affiliate_creator_links acl4
+              LEFT JOIN affiliate_products ap ON acl4.product_id = ap.product_id AND acl4.campaign_id = ap.campaign_id
+              WHERE (acl4.creator_id = c.id OR LOWER(TRIM(acl4.creator_username)) = LOWER(TRIM(c.username)))
+                AND acl4.showcase_status = 'added'
+              ORDER BY acl4.updated_at DESC
+              LIMIT 1) as top_product_image,
             CASE 
                 WHEN c.is_id IS NOT NULL AND c.is_id != {$user_id} THEN 'claimed'
                 WHEN (c.is_id IS NULL OR c.is_id = {$user_id}) AND EXISTS (
@@ -208,21 +204,17 @@ $task2_creators = $this->db->query($task2_sql)->result();
              WHERE o.creator_username = c.username 
                AND o.order_date_local >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
                AND o.order_status NOT IN ("CANCELLED", "REFUNDED")) as total_commission_30d,
-            (SELECT product_name 
-             FROM affiliate_orders o2 
-             WHERE o2.creator_username = c.username 
-               AND o2.order_status NOT IN ("CANCELLED", "REFUNDED")
-             GROUP BY o2.product_name 
-             ORDER BY SUM(o2.gmv) DESC 
-             LIMIT 1) as top_product,
-            (SELECT MAX(ap.image_url) 
-             FROM affiliate_products ap 
-             JOIN affiliate_orders o3 ON ap.product_id = o3.product_id AND ap.campaign_id = o3.campaign_id
-             WHERE o3.creator_username = c.username 
-               AND o3.order_status NOT IN ("CANCELLED", "REFUNDED")
-             GROUP BY ap.product_id 
-             ORDER BY SUM(o3.gmv) DESC 
-             LIMIT 1) as top_product_image
+            (SELECT GROUP_CONCAT(product_name SEPARATOR ", ")
+              FROM affiliate_creator_links acl3
+              WHERE (acl3.creator_id = c.id OR LOWER(TRIM(acl3.creator_username)) = LOWER(TRIM(c.username)))
+                AND acl3.showcase_status = "added") as top_product,
+            (SELECT ap.image_url 
+              FROM affiliate_creator_links acl4
+              LEFT JOIN affiliate_products ap ON acl4.product_id = ap.product_id AND acl4.campaign_id = ap.campaign_id
+              WHERE (acl4.creator_id = c.id OR LOWER(TRIM(acl4.creator_username)) = LOWER(TRIM(c.username)))
+                AND acl4.showcase_status = "added"
+              ORDER BY acl4.updated_at DESC
+              LIMIT 1) as top_product_image
         ')
         ->from('creators c')
         ->join('brands b', 'c.brand_id = b.id', 'left')
@@ -323,21 +315,17 @@ public function get_task2_creators() {
              WHERE o.creator_username = c.username 
                AND o.order_date_local >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
                AND o.order_status NOT IN ("CANCELLED", "REFUNDED")) as total_gmv_30d,
-            (SELECT product_name 
-             FROM affiliate_orders o2 
-             WHERE o2.creator_username = c.username 
-               AND o2.order_status NOT IN ("CANCELLED", "REFUNDED")
-             GROUP BY o2.product_name 
-             ORDER BY SUM(o2.gmv) DESC 
-             LIMIT 1) as top_product,
-            (SELECT MAX(ap.image_url) 
-             FROM affiliate_products ap 
-             JOIN affiliate_orders o3 ON ap.product_id = o3.product_id AND ap.campaign_id = o3.campaign_id
-             WHERE o3.creator_username = c.username 
-               AND o3.order_status NOT IN ("CANCELLED", "REFUNDED")
-             GROUP BY ap.product_id 
-             ORDER BY SUM(o3.gmv) DESC 
-             LIMIT 1) as top_product_image,
+            (SELECT GROUP_CONCAT(product_name SEPARATOR ", ")
+              FROM affiliate_creator_links acl3
+              WHERE (acl3.creator_id = c.id OR LOWER(TRIM(acl3.creator_username)) = LOWER(TRIM(c.username)))
+                AND acl3.showcase_status = "added") as top_product,
+            (SELECT ap.image_url 
+              FROM affiliate_creator_links acl4
+              LEFT JOIN affiliate_products ap ON acl4.product_id = ap.product_id AND acl4.campaign_id = ap.campaign_id
+              WHERE (acl4.creator_id = c.id OR LOWER(TRIM(acl4.creator_username)) = LOWER(TRIM(c.username)))
+                AND acl4.showcase_status = "added"
+              ORDER BY acl4.updated_at DESC
+              LIMIT 1) as top_product_image,
             CASE 
                 WHEN EXISTS (
                     SELECT 1 FROM affiliate_creator_links acl2
@@ -412,21 +400,17 @@ public function get_task3_creators() {
              WHERE o.creator_username = c.username 
                AND o.order_date_local >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
                AND o.order_status NOT IN ("CANCELLED", "REFUNDED")) as total_commission_30d,
-            (SELECT product_name 
-             FROM affiliate_orders o2 
-             WHERE o2.creator_username = c.username 
-               AND o2.order_status NOT IN ("CANCELLED", "REFUNDED")
-             GROUP BY o2.product_name 
-             ORDER BY SUM(o2.gmv) DESC 
-             LIMIT 1) as top_product,
-            (SELECT MAX(ap.image_url) 
-             FROM affiliate_products ap 
-             JOIN affiliate_orders o3 ON ap.product_id = o3.product_id AND ap.campaign_id = o3.campaign_id
-             WHERE o3.creator_username = c.username 
-               AND o3.order_status NOT IN ("CANCELLED", "REFUNDED")
-             GROUP BY ap.product_id 
-             ORDER BY SUM(o3.gmv) DESC 
-             LIMIT 1) as top_product_image
+            (SELECT GROUP_CONCAT(product_name SEPARATOR ", ")
+              FROM affiliate_creator_links acl3
+              WHERE (acl3.creator_id = c.id OR LOWER(TRIM(acl3.creator_username)) = LOWER(TRIM(c.username)))
+                AND acl3.showcase_status = "added") as top_product,
+            (SELECT ap.image_url 
+              FROM affiliate_creator_links acl4
+              LEFT JOIN affiliate_products ap ON acl4.product_id = ap.product_id AND acl4.campaign_id = ap.campaign_id
+              WHERE (acl4.creator_id = c.id OR LOWER(TRIM(acl4.creator_username)) = LOWER(TRIM(c.username)))
+                AND acl4.showcase_status = "added"
+              ORDER BY acl4.updated_at DESC
+              LIMIT 1) as top_product_image
         ')
         ->from('creators c')
         ->join('brands b', 'c.brand_id = b.id', 'left')
@@ -7796,8 +7780,29 @@ public function search_creators_by_task() {
                           AND order_status NOT IN ('CANCELLED', 'REFUNDED')
                      ";
                     $gmv = $this->db->query($gmv_query, [$item->username])->row();
-                     
                     $item->total_gmv_30d = floatval($gmv->total ?? 0);
+
+                    // Fetch products added to showcase
+                    $showcase_query = "
+                        SELECT GROUP_CONCAT(product_name SEPARATOR ', ') as top_product
+                        FROM affiliate_creator_links
+                        WHERE (creator_id = ? OR LOWER(TRIM(creator_username)) = LOWER(TRIM(?)))
+                          AND showcase_status = 'added'
+                    ";
+                    $showcase = $this->db->query($showcase_query, [$item->id, $item->username])->row();
+                    $item->top_product = $showcase->top_product ?? '';
+
+                    $image_query = "
+                        SELECT ap.image_url
+                        FROM affiliate_creator_links acl
+                        LEFT JOIN affiliate_products ap ON acl.product_id = ap.product_id AND acl.campaign_id = ap.campaign_id
+                        WHERE (acl.creator_id = ? OR LOWER(TRIM(acl.creator_username)) = LOWER(TRIM(?)))
+                          AND acl.showcase_status = 'added'
+                        ORDER BY acl.updated_at DESC
+                        LIMIT 1
+                    ";
+                    $image_res = $this->db->query($image_query, [$item->id, $item->username])->row();
+                    $item->top_product_image = $image_res->image_url ?? '';
                 } else {
                     // Unregistered: hitung dari orders
                     $gmv_query = "
@@ -7885,19 +7890,27 @@ public function search_creators_by_task() {
                 $links = $this->db->query($links_query, [$item->id])->row();
                 $item->total_links = intval($links->total_links ?? 0);
                 
-                // Top product
-                $top_product_query = "
-                    SELECT product_name
-                    FROM affiliate_orders
-                    WHERE LOWER(TRIM(creator_username)) = LOWER(TRIM(?))
-                      AND order_status NOT IN ('CANCELLED', 'REFUNDED')
-                    GROUP BY product_name
-                    ORDER BY SUM(gmv) DESC
+                // Fetch products added to showcase
+                $showcase_query = "
+                    SELECT GROUP_CONCAT(product_name SEPARATOR ', ') as top_product
+                    FROM affiliate_creator_links
+                    WHERE (creator_id = ? OR LOWER(TRIM(creator_username)) = LOWER(TRIM(?)))
+                      AND showcase_status = 'added'
+                ";
+                $showcase = $this->db->query($showcase_query, [$item->id, $item->username])->row();
+                $item->top_product = $showcase->top_product ?? '';
+
+                $image_query = "
+                    SELECT ap.image_url
+                    FROM affiliate_creator_links acl
+                    LEFT JOIN affiliate_products ap ON acl.product_id = ap.product_id AND acl.campaign_id = ap.campaign_id
+                    WHERE (acl.creator_id = ? OR LOWER(TRIM(acl.creator_username)) = LOWER(TRIM(?)))
+                      AND acl.showcase_status = 'added'
+                    ORDER BY acl.updated_at DESC
                     LIMIT 1
                 ";
-                $top_product = $this->db->query($top_product_query, [$item->username])->row();
-                $item->top_product = $top_product->product_name ?? '';
-                $item->top_product_image = '';
+                $image_res = $this->db->query($image_query, [$item->id, $item->username])->row();
+                $item->top_product_image = $image_res->image_url ?? '';
             }
         }
         
