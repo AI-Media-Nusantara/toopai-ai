@@ -4724,54 +4724,51 @@ document.addEventListener('DOMContentLoaded', function() {
     // ============================================================
     // 3. TASK 1 BUTTONS - DETAIL, SEND LINK, FOLLOW UP
     // ============================================================
-    document.querySelectorAll('.task1-detail-btn').forEach(btn => {
-        btn.addEventListener('click', function(e) {
+    document.addEventListener('click', function(e) {
+        // 1. DETAIL BUTTON
+        const detailBtn = e.target.closest('.task1-detail-btn');
+        if (detailBtn) {
             e.preventDefault();
             e.stopPropagation();
-            
-            const creatorId = this.getAttribute('data-creator-id');
-            console.log('Detail button clicked, creatorId:', creatorId);
-            
+            const creatorId = detailBtn.getAttribute('data-creator-id');
             if (creatorId) {
                 showTask1DetailModal(creatorId);
             } else {
-                const parent = this.closest('.scouting-item-dashboard');
+                const parent = detailBtn.closest('.scouting-item-dashboard');
                 if (parent) {
                     const id = parent.getAttribute('data-creator-id');
-                    console.log('Fallback creatorId from parent:', id);
                     if (id) showTask1DetailModal(id);
                 } else {
                     showToastGlobal('Creator ID tidak ditemukan', 'error');
                 }
             }
-        });
-    });
-    
-    document.querySelectorAll('.task1-send-link-btn').forEach(btn => {
-        btn.addEventListener('click', function(e) {
+            return;
+        }
+
+        // 2. SEND LINK BUTTON
+        const sendLinkBtn = e.target.closest('.task1-send-link-btn');
+        if (sendLinkBtn) {
             e.preventDefault();
             e.stopPropagation();
-            const creatorId = this.getAttribute('data-creator-id');
+            const creatorId = sendLinkBtn.getAttribute('data-creator-id');
             if (creatorId) {
                 showTask1SendLinkModal(creatorId);
             } else {
                 showToastGlobal('Creator ID tidak ditemukan', 'error');
             }
-        });
-    });
-    
-    document.querySelectorAll('.task1-followup-btn').forEach(btn => {
-        btn.addEventListener('click', function(e) {
+            return;
+        }
+
+        // 3. FOLLOW UP BUTTON
+        const followUpBtn = e.target.closest('.task1-followup-btn');
+        if (followUpBtn) {
             e.preventDefault();
             e.stopPropagation();
-            
-            const creatorId = this.getAttribute('data-creator-id');
-            console.log('Follow Up button clicked, creatorId:', creatorId);
-            
+            const creatorId = followUpBtn.getAttribute('data-creator-id');
             if (creatorId) {
                 showTask1FollowUpModal(creatorId);
             } else {
-                const parent = this.closest('.scouting-item-dashboard');
+                const parent = followUpBtn.closest('.scouting-item-dashboard');
                 if (parent) {
                     const id = parent.getAttribute('data-creator-id');
                     if (id) showTask1FollowUpModal(id);
@@ -4779,7 +4776,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     showToastGlobal('Creator ID tidak ditemukan', 'error');
                 }
             }
-        });
+            return;
+        }
     });
     
     // ============================================================
