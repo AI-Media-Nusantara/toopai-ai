@@ -96,12 +96,12 @@ public function dashboard() {
             (SELECT GROUP_CONCAT(product_name SEPARATOR ', ')
               FROM affiliate_creator_links acl3
               WHERE (acl3.creator_id = c.id OR LOWER(TRIM(acl3.creator_username)) = LOWER(TRIM(c.username)))
-                AND acl3.showcase_status = 'added') as top_product,
+                AND acl3.status = 'ACTIVE') as top_product,
             (SELECT ap.image_url 
               FROM affiliate_creator_links acl4
               LEFT JOIN affiliate_products ap ON acl4.product_id = ap.product_id AND acl4.campaign_id = ap.campaign_id
               WHERE (acl4.creator_id = c.id OR LOWER(TRIM(acl4.creator_username)) = LOWER(TRIM(c.username)))
-                AND acl4.showcase_status = 'added'
+                AND acl4.status = 'ACTIVE'
               ORDER BY acl4.updated_at DESC
               LIMIT 1) as top_product_image,
             CASE 
@@ -207,12 +207,12 @@ $task2_creators = $this->db->query($task2_sql)->result();
             (SELECT GROUP_CONCAT(product_name SEPARATOR ", ")
               FROM affiliate_creator_links acl3
               WHERE (acl3.creator_id = c.id OR LOWER(TRIM(acl3.creator_username)) = LOWER(TRIM(c.username)))
-                AND acl3.showcase_status = "added") as top_product,
+                AND acl3.status = "ACTIVE") as top_product,
             (SELECT ap.image_url 
               FROM affiliate_creator_links acl4
               LEFT JOIN affiliate_products ap ON acl4.product_id = ap.product_id AND acl4.campaign_id = ap.campaign_id
               WHERE (acl4.creator_id = c.id OR LOWER(TRIM(acl4.creator_username)) = LOWER(TRIM(c.username)))
-                AND acl4.showcase_status = "added"
+                AND acl4.status = "ACTIVE"
               ORDER BY acl4.updated_at DESC
               LIMIT 1) as top_product_image
         ')
@@ -7782,12 +7782,12 @@ public function search_creators_by_task() {
                     $gmv = $this->db->query($gmv_query, [$item->username])->row();
                     $item->total_gmv_30d = floatval($gmv->total ?? 0);
 
-                    // Fetch products added to showcase
+                    // Fetch products sent as active links
                     $showcase_query = "
                         SELECT GROUP_CONCAT(product_name SEPARATOR ', ') as top_product
                         FROM affiliate_creator_links
                         WHERE (creator_id = ? OR LOWER(TRIM(creator_username)) = LOWER(TRIM(?)))
-                          AND showcase_status = 'added'
+                          AND status = 'ACTIVE'
                     ";
                     $showcase = $this->db->query($showcase_query, [$item->id, $item->username])->row();
                     $item->top_product = $showcase->top_product ?? '';
@@ -7797,7 +7797,7 @@ public function search_creators_by_task() {
                         FROM affiliate_creator_links acl
                         LEFT JOIN affiliate_products ap ON acl.product_id = ap.product_id AND acl.campaign_id = ap.campaign_id
                         WHERE (acl.creator_id = ? OR LOWER(TRIM(acl.creator_username)) = LOWER(TRIM(?)))
-                          AND acl.showcase_status = 'added'
+                          AND acl.status = 'ACTIVE'
                         ORDER BY acl.updated_at DESC
                         LIMIT 1
                     ";
