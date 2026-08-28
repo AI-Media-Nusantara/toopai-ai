@@ -86,30 +86,37 @@ public function dashboard() {
             b.shop_name,
             (SELECT COUNT(DISTINCT acl.id) 
              FROM affiliate_creator_links acl 
+             LEFT JOIN affiliate_products ap ON acl.product_id = ap.product_id AND acl.campaign_id = ap.campaign_id
              WHERE (acl.creator_id = c.id OR LOWER(TRIM(acl.creator_username)) = LOWER(TRIM(c.username)))
-               AND acl.status = 'ACTIVE') as total_active_links,
+               AND acl.status = 'ACTIVE'
+               AND (TRIM(ap.shop_name) = TRIM(b.shop_name) OR TRIM(ap.shop_name) = TRIM(b.name))) as total_active_links,
             (SELECT COALESCE(SUM(o.gmv), 0) 
              FROM affiliate_orders o 
              WHERE LOWER(TRIM(o.creator_username)) = LOWER(TRIM(c.username))
                AND o.order_date_local >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
                AND o.order_status NOT IN ('CANCELLED', 'REFUNDED')) as total_gmv_30d,
-            (SELECT GROUP_CONCAT(product_name SEPARATOR ', ')
+            (SELECT GROUP_CONCAT(acl3.product_name SEPARATOR ', ')
               FROM affiliate_creator_links acl3
+              LEFT JOIN affiliate_products ap3 ON acl3.product_id = ap3.product_id AND acl3.campaign_id = ap3.campaign_id
               WHERE (acl3.creator_id = c.id OR LOWER(TRIM(acl3.creator_username)) = LOWER(TRIM(c.username)))
-                AND acl3.status = 'ACTIVE') as top_product,
-            (SELECT ap.image_url 
+                AND acl3.status = 'ACTIVE'
+                AND (TRIM(ap3.shop_name) = TRIM(b.shop_name) OR TRIM(ap3.shop_name) = TRIM(b.name))) as top_product,
+            (SELECT ap4.image_url 
               FROM affiliate_creator_links acl4
-              LEFT JOIN affiliate_products ap ON acl4.product_id = ap.product_id AND acl4.campaign_id = ap.campaign_id
+              LEFT JOIN affiliate_products ap4 ON acl4.product_id = ap4.product_id AND acl4.campaign_id = ap4.campaign_id
               WHERE (acl4.creator_id = c.id OR LOWER(TRIM(acl4.creator_username)) = LOWER(TRIM(c.username)))
                 AND acl4.status = 'ACTIVE'
+                AND (TRIM(ap4.shop_name) = TRIM(b.shop_name) OR TRIM(ap4.shop_name) = TRIM(b.name))
               ORDER BY acl4.updated_at DESC
               LIMIT 1) as top_product_image,
             CASE 
                 WHEN c.is_id IS NOT NULL AND c.is_id != {$user_id} THEN 'claimed'
                 WHEN (c.is_id IS NULL OR c.is_id = {$user_id}) AND EXISTS (
                     SELECT 1 FROM affiliate_creator_links acl2
+                    LEFT JOIN affiliate_products ap2 ON acl2.product_id = ap2.product_id AND acl2.campaign_id = ap2.campaign_id
                     WHERE (acl2.creator_id = c.id OR LOWER(TRIM(acl2.creator_username)) = LOWER(TRIM(c.username)))
                       AND acl2.status = 'ACTIVE'
+                      AND (TRIM(ap2.shop_name) = TRIM(b.shop_name) OR TRIM(ap2.shop_name) = TRIM(b.name))
                       AND (acl2.total_clicks > 0 OR acl2.total_orders > 0 OR acl2.showcase_status = 'added')
                 ) THEN 'ready'
                 WHEN c.is_id IS NULL OR c.is_id = {$user_id} THEN 'no_handler'
@@ -308,34 +315,44 @@ public function get_task2_creators() {
             b.shop_name,
             (SELECT COUNT(DISTINCT acl.id) 
              FROM affiliate_creator_links acl 
-             WHERE acl.creator_id = c.id 
-               AND acl.status = "ACTIVE") as total_active_links,
+             LEFT JOIN affiliate_products ap ON acl.product_id = ap.product_id AND acl.campaign_id = ap.campaign_id
+             WHERE (acl.creator_id = c.id OR LOWER(TRIM(acl.creator_username)) = LOWER(TRIM(c.username)))
+               AND acl.status = "ACTIVE"
+               AND (TRIM(ap.shop_name) = TRIM(b.shop_name) OR TRIM(ap.shop_name) = TRIM(b.name))) as total_active_links,
             (SELECT COALESCE(SUM(o.gmv), 0) 
              FROM affiliate_orders o 
              WHERE o.creator_username = c.username 
                AND o.order_date_local >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
                AND o.order_status NOT IN ("CANCELLED", "REFUNDED")) as total_gmv_30d,
-            (SELECT GROUP_CONCAT(product_name SEPARATOR ", ")
+            (SELECT GROUP_CONCAT(acl3.product_name SEPARATOR ", ")
               FROM affiliate_creator_links acl3
+              LEFT JOIN affiliate_products ap3 ON acl3.product_id = ap3.product_id AND acl3.campaign_id = ap3.campaign_id
               WHERE (acl3.creator_id = c.id OR LOWER(TRIM(acl3.creator_username)) = LOWER(TRIM(c.username)))
-                AND acl3.showcase_status = "added") as top_product,
-            (SELECT ap.image_url 
+                AND acl3.status = "ACTIVE"
+                AND (TRIM(ap3.shop_name) = TRIM(b.shop_name) OR TRIM(ap3.shop_name) = TRIM(b.name))) as top_product,
+            (SELECT ap4.image_url 
               FROM affiliate_creator_links acl4
-              LEFT JOIN affiliate_products ap ON acl4.product_id = ap.product_id AND acl4.campaign_id = ap.campaign_id
+              LEFT JOIN affiliate_products ap4 ON acl4.product_id = ap4.product_id AND acl4.campaign_id = ap4.campaign_id
               WHERE (acl4.creator_id = c.id OR LOWER(TRIM(acl4.creator_username)) = LOWER(TRIM(c.username)))
-                AND acl4.showcase_status = "added"
+                AND acl4.status = "ACTIVE"
+                AND (TRIM(ap4.shop_name) = TRIM(b.shop_name) OR TRIM(ap4.shop_name) = TRIM(b.name))
               ORDER BY acl4.updated_at DESC
               LIMIT 1) as top_product_image,
             CASE 
                 WHEN EXISTS (
                     SELECT 1 FROM affiliate_creator_links acl2
-                    WHERE acl2.creator_id = c.id
+                    LEFT JOIN affiliate_products ap2 ON acl2.product_id = ap2.product_id AND acl2.campaign_id = ap2.campaign_id
+                    WHERE (acl2.creator_id = c.id OR LOWER(TRIM(acl2.creator_username)) = LOWER(TRIM(c.username)))
                       AND acl2.status = "ACTIVE"
+                      AND (TRIM(ap2.shop_name) = TRIM(b.shop_name) OR TRIM(ap2.shop_name) = TRIM(b.name))
                       AND (acl2.created_by_user_id IS NULL OR acl2.created_by_user_id = 0)
                 ) THEN "ready"
                 WHEN EXISTS (
                     SELECT 1 FROM affiliate_creator_links acl2
-                    WHERE acl2.creator_id = c.id
+                    LEFT JOIN affiliate_products ap2 ON acl2.product_id = ap2.product_id AND acl2.campaign_id = ap2.campaign_id
+                    WHERE (acl2.creator_id = c.id OR LOWER(TRIM(acl2.creator_username)) = LOWER(TRIM(c.username)))
+                      AND acl2.status = "ACTIVE"
+                      AND (TRIM(ap2.shop_name) = TRIM(b.shop_name) OR TRIM(ap2.shop_name) = TRIM(b.name))
                       AND acl2.created_by_user_id IS NOT NULL
                       AND acl2.created_by_user_id > 0
                 ) THEN "claimed"
@@ -7703,15 +7720,19 @@ public function search_creators_by_task() {
                     b.shop_name,
                     "registered" as source_type,
                     (SELECT COUNT(DISTINCT acl.id) 
-                     FROM affiliate_creator_links acl 
-                     WHERE (acl.creator_id = c.id OR LOWER(TRIM(acl.creator_username)) = LOWER(TRIM(c.username)))
-                       AND acl.status = "ACTIVE") as total_active_links,
+                      FROM affiliate_creator_links acl 
+                      LEFT JOIN affiliate_products ap ON acl.product_id = ap.product_id AND acl.campaign_id = ap.campaign_id
+                      WHERE (acl.creator_id = c.id OR LOWER(TRIM(acl.creator_username)) = LOWER(TRIM(c.username)))
+                        AND acl.status = "ACTIVE"
+                        AND (TRIM(ap.shop_name) = TRIM(b.shop_name) OR TRIM(ap.shop_name) = TRIM(b.name))) as total_active_links,
                     CASE 
                         WHEN c.is_id IS NOT NULL AND c.is_id != ' . intval($user_id) . ' THEN "claimed"
                         WHEN (c.is_id IS NULL OR c.is_id = ' . intval($user_id) . ') AND EXISTS (
                             SELECT 1 FROM affiliate_creator_links acl2
+                            LEFT JOIN affiliate_products ap2 ON acl2.product_id = ap2.product_id AND acl2.campaign_id = ap2.campaign_id
                             WHERE (acl2.creator_id = c.id OR LOWER(TRIM(acl2.creator_username)) = LOWER(TRIM(c.username)))
                               AND acl2.status = "ACTIVE"
+                              AND (TRIM(ap2.shop_name) = TRIM(b.shop_name) OR TRIM(ap2.shop_name) = TRIM(b.name))
                               AND (acl2.total_clicks > 0 OR acl2.total_orders > 0 OR acl2.showcase_status = "added")
                         ) THEN "ready"
                         ELSE "no_handler"
@@ -7784,12 +7805,14 @@ public function search_creators_by_task() {
 
                     // Fetch products sent as active links
                     $showcase_query = "
-                        SELECT GROUP_CONCAT(product_name SEPARATOR ', ') as top_product
-                        FROM affiliate_creator_links
-                        WHERE (creator_id = ? OR LOWER(TRIM(creator_username)) = LOWER(TRIM(?)))
-                          AND status = 'ACTIVE'
+                        SELECT GROUP_CONCAT(acl.product_name SEPARATOR ', ') as top_product
+                        FROM affiliate_creator_links acl
+                        LEFT JOIN affiliate_products ap ON acl.product_id = ap.product_id AND acl.campaign_id = ap.campaign_id
+                        WHERE (acl.creator_id = ? OR LOWER(TRIM(acl.creator_username)) = LOWER(TRIM(?)))
+                          AND acl.status = 'ACTIVE'
+                          AND (TRIM(ap.shop_name) = TRIM(?) OR TRIM(ap.shop_name) = TRIM(?))
                     ";
-                    $showcase = $this->db->query($showcase_query, [$item->id, $item->username])->row();
+                    $showcase = $this->db->query($showcase_query, [$item->id, $item->username, $item->shop_name, $item->brand_name])->row();
                     $item->top_product = $showcase->top_product ?? '';
 
                     $image_query = "
@@ -7798,10 +7821,11 @@ public function search_creators_by_task() {
                         LEFT JOIN affiliate_products ap ON acl.product_id = ap.product_id AND acl.campaign_id = ap.campaign_id
                         WHERE (acl.creator_id = ? OR LOWER(TRIM(acl.creator_username)) = LOWER(TRIM(?)))
                           AND acl.status = 'ACTIVE'
+                          AND (TRIM(ap.shop_name) = TRIM(?) OR TRIM(ap.shop_name) = TRIM(?))
                         ORDER BY acl.updated_at DESC
                         LIMIT 1
                     ";
-                    $image_res = $this->db->query($image_query, [$item->id, $item->username])->row();
+                    $image_res = $this->db->query($image_query, [$item->id, $item->username, $item->shop_name, $item->brand_name])->row();
                     $item->top_product_image = $image_res->image_url ?? '';
                 } else {
                     // Unregistered: hitung dari orders
