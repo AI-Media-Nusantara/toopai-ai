@@ -1016,6 +1016,7 @@ public function get_creator_task1_detail() {
         // ============================================================
         $products = [];
         $total_gmv = floatval($creator->imported_gmv ?? 0);
+        $creator->total_gmv = $total_gmv;
         
         try {
             // Cek apakah ada link afiliasi — fallback ke creator_username jika creator_id NULL
@@ -1056,11 +1057,6 @@ public function get_creator_task1_detail() {
                 
                 $products = $products_query->result();
                 log_message('debug', 'Products found: ' . count($products));
-                
-                // Hitung total GMV dari products
-                if (!empty($products)) {
-                    $total_gmv = array_sum(array_column($products, 'product_gmv'));
-                }
             }
         } catch (Exception $e) {
             log_message('error', 'Error getting products: ' . $e->getMessage());
@@ -1269,16 +1265,8 @@ public function get_creator_task1_detail() {
             return $b->total_gmv <=> $a->total_gmv;
         });
 
-        // Kalkulasikan keseluruhan GMV dari seluruh brand yang terhubung
-        $total_gmv_sum = 0;
-        foreach ($brands as $b) {
-            $total_gmv_sum += floatval($b->total_gmv);
-        }
-        if ($total_gmv_sum > 0) {
-            $total_gmv = $total_gmv_sum;
-            $creator->total_gmv = $total_gmv_sum;
-        }
-
+        // Keep total_gmv as imported_gmv, do not overwrite with sum of brand GMVs
+        
         // ============================================================
         // 5.5 ENRICH DARI FASTMOSS — baseInfo (GMV total) + shopList (GMV per brand)
         // ============================================================
@@ -1381,15 +1369,7 @@ public function get_creator_task1_detail() {
 
                 log_message('debug', '[task1_detail] Final brands after merge: ' . count($brands));
 
-                // Hitung ulang total GMV
-                $total_gmv_sum = 0;
-                foreach ($brands as $b) {
-                    $total_gmv_sum += floatval($b->total_gmv);
-                }
-                if ($total_gmv_sum > 0) {
-                    $total_gmv = $total_gmv_sum;
-                    $creator->total_gmv = $total_gmv_sum;
-                }
+                // Keep total_gmv as imported_gmv, do not overwrite with sum of brand GMVs
             }
         } catch (Exception $e) {
             // Jangan gagalkan seluruh response jika FastMoss error

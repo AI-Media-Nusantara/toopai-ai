@@ -104,3 +104,18 @@ FROM affiliate_creator_links;
 -- SELECT COUNT(*) as creators_without_tiktok_open_id
 -- FROM creators
 -- WHERE tiktok_open_id IS NULL OR tiktok_open_id = '';
+
+-- -------------------------------------------------------------------------
+-- STEP 5: Tambah kolom FastMoss GMV ke tabel creators
+-- -------------------------------------------------------------------------
+-- Jalankan ALTER TABLE berikut jika menggunakan MySQL >= 8.0.19:
+-- ALTER TABLE creators 
+--     ADD COLUMN IF NOT EXISTS fastmoss_gmv DECIMAL(20,2) DEFAULT NULL AFTER auto_activated_at,
+--     ADD COLUMN IF NOT EXISTS fastmoss_gmv_28d DECIMAL(20,2) DEFAULT NULL AFTER fastmoss_gmv,
+--     ADD COLUMN IF NOT EXISTS fastmoss_synced_at DATETIME DEFAULT NULL AFTER fastmoss_gmv_28d;
+
+-- Jika MySQL < 8.0 (tidak support IF NOT EXISTS pada ALTER TABLE), jalankan ini secara manual:
+ALTER TABLE creators ADD COLUMN fastmoss_gmv DECIMAL(20,2) DEFAULT NULL AFTER auto_activated_at;
+ALTER TABLE creators ADD COLUMN fastmoss_gmv_28d DECIMAL(20,2) DEFAULT NULL AFTER fastmoss_gmv;
+ALTER TABLE creators ADD COLUMN fastmoss_synced_at DATETIME DEFAULT NULL AFTER fastmoss_gmv_28d;
+

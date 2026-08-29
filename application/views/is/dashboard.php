@@ -1439,10 +1439,22 @@
     </div>
     
     <!-- Search input -->
-    <div style="flex-shrink: 0; padding: 8px 12px;">
+    <div style="flex-shrink: 0; padding: 8px 12px 4px 12px;">
         <input type="text" id="searchScoutingDashboard" placeholder=" Cari creator atau brand..." 
                onkeyup="filterTaskAjax('task1', this.value)"
                style="width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; font-size: 12px; background: rgba(255,255,255,0.05); color: var(--text-primary); outline: none; transition: var(--transition);">
+    </div>
+    
+    <!-- View Switcher (Creator vs Brand) -->
+    <div style="display: flex; gap: 6px; padding: 0 12px 8px 12px; flex-shrink: 0;">
+        <button onclick="changeScoutingDisplayMode('creator')" id="btnScoutingModeCreator" 
+                style="flex: 1; padding: 6px 10px; font-size: 11px; font-weight: 600; border-radius: 8px; cursor: pointer; transition: 0.2s; outline: none; border: 1px solid var(--purple); background: rgba(139,92,246,0.15); color: #a78bfa;">
+            <i class="fas fa-user" style="margin-right: 4px;"></i> Berdasarkan Creator
+        </button>
+        <button onclick="changeScoutingDisplayMode('brand')" id="btnScoutingModeBrand" 
+                style="flex: 1; padding: 6px 10px; font-size: 11px; font-weight: 600; border-radius: 8px; cursor: pointer; transition: 0.2s; outline: none; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.02); color: var(--text-secondary);">
+            <i class="fas fa-store" style="margin-right: 4px;"></i> Berdasarkan Brand
+        </button>
     </div>
     
     <!-- Scrollable container -->
@@ -1453,14 +1465,18 @@
             #scoutingContainerDashboard::-webkit-scrollbar-track { background: transparent; }
         </style>
         
-        <?php if (!empty($task1_creators)): ?>
-            <?php foreach ($task1_creators as $item): ?>
+        <?php
+        // Closure to render a single creator card in Task 1 Scouting (avoiding HTML duplication)
+        $render_scouting_card = function($item) {
+            $phone = $item->phone ?? '';
+            $shopOrBrandName = !empty($item->shop_name) ? $item->shop_name : (!empty($item->brand_name) ? $item->brand_name : '');
+            ?>
             <div class="stage-item-dashboard scouting-item-dashboard" 
                  data-creator-id="<?= $item->id ?>" 
                  data-creator-name="<?= htmlspecialchars($item->username) ?>"
-                 data-creator-phone="<?= htmlspecialchars($item->phone ?? '') ?>"
-                 data-no-phone="<?= empty($item->phone) ? '1' : '0' ?>"
-                 data-searchable="<?= strtolower(htmlspecialchars($item->username . ' ' . ($item->shop_name ?? '') . ' ' . ($item->brand_name ?? ''))) ?>"
+                 data-creator-phone="<?= htmlspecialchars($phone) ?>"
+                 data-no-phone="<?= (empty($phone) || $phone === 'no_phone') ? '1' : '0' ?>"
+                 data-searchable="<?= strtolower(htmlspecialchars($item->username . ' ' . $shopOrBrandName . ' ' . ($item->category ?? ''))) ?>"
                  style="padding: 12px; margin-bottom: 8px; border-radius: 13px; border: 1px solid rgba(112,136,185,0.14); background: rgba(9,17,34,0.56); cursor: pointer; transition: var(--transition);">
                 
                 <div style="display:flex; justify-content:space-between; align-items:center; gap: 8px;">
@@ -1482,9 +1498,9 @@
                 
                 <!-- SHOP/BRAND NAME -->
                 <div class="item-details-dashboard" style="margin-top: 4px; display: flex; flex-wrap: wrap; gap: 5px 9px; font-size: 9.5px; color: var(--is-muted-2);">
-                    <?php if (!empty($item->shop_name) || !empty($item->brand_name)): ?>
+                    <?php if (!empty($shopOrBrandName)): ?>
                     <span class="brand-badge" style="background: rgba(74,222,128,0.15); padding: 2px 8px; border-radius: 20px; display: inline-flex; align-items: center; gap: 4px; font-size: 9.5px; color: #4ade80;">
-                        <i class="fas fa-store" style="font-size: 8px;"></i> <?= htmlspecialchars($item->shop_name ?: $item->brand_name) ?>
+                        <i class="fas fa-store" style="font-size: 8px;"></i> <?= htmlspecialchars($shopOrBrandName) ?>
                     </span>
                     <?php else: ?>
                     <span style="color: #9aaebe; font-size: 10px; display: inline-flex; align-items: center; gap: 4px;">
@@ -1503,8 +1519,8 @@
                 <div class="item-details-dashboard" style="display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 9.5px; color: var(--is-muted-2); margin-top: 2px;">
                     <span id="phoneDisplay_<?= $item->id ?>" style="display: inline-flex; align-items: center; gap: 4px;">
                         <i class="fab fa-whatsapp" style="color: #25D366;"></i> 
-                        <?php if (!empty($item->phone)): ?>
-                            <?= htmlspecialchars($item->phone) ?>
+                        <?php if (!empty($phone) && $phone !== 'no_phone'): ?>
+                            <?= htmlspecialchars($phone) ?>
                             <span onclick="event.stopPropagation(); window.openUpdatePhoneModal('<?= $item->id ?>', '<?= htmlspecialchars($item->username) ?>')"
                                   title="Edit nomor WA"
                                   style="cursor:pointer; color:#6b7280; font-size:8px; margin-left:2px;">
@@ -1514,11 +1530,8 @@
                             <span style="color: #ef4444;">Tidak ada</span>
                         <?php endif; ?>
                     </span>
-
+                    
                     <?php
-                    // Prioritas tampil GMV di kartu Step 1:
-                    // 1. fastmoss_gmv_28d → GMV produk 28 hari dari FastMoss summary (paling akurat & konsisten)
-                    // 2. imported_gmv     → fallback dari cron (bisa tidak akurat)
                     $gmv_display     = floatval($item->fastmoss_gmv_28d ?? 0);
                     $gmv_is_fastmoss = $gmv_display > 0;
                     if (!$gmv_is_fastmoss && !empty($item->imported_gmv) && $item->imported_gmv > 0) {
@@ -1545,10 +1558,10 @@
                 </div>
                 
                 <!-- Multiple Link -->
-                <?php if (!empty($item->multi_links)): ?>
+                <?php if (isset($item->total_links) && $item->total_links > 0): ?>
                 <div class="item-details-dashboard" style="margin-top:4px; display: flex; gap: 4px;">
                     <span style="color:#8b5cf6; font-size:9px; display: inline-flex; align-items: center; gap: 4px;">
-                        <i class="fas fa-layer-group"></i> <?= count($item->multi_links) ?> Multiple Link tersedia
+                        <i class="fas fa-layer-group"></i> <?= $item->total_links ?> Multiple Link tersedia
                     </span>
                 </div>
                 <?php endif; ?>
@@ -1573,7 +1586,7 @@
                     </div>
                     
                     <!-- TOMBOL FETCH WA DARI TAP / INPUT MANUAL -->
-                    <?php if (empty($item->phone) || $item->phone === 'no_phone'): ?>
+                    <?php if (empty($phone) || $phone === 'no_phone'): ?>
                     <div class="action-buttons-wa-wrapper" style="display:inline-flex; gap:4px; align-items:center;">
                         <button class="resync-wa-btn"
                                 data-creator-id="<?= $item->id ?>"
@@ -1607,18 +1620,64 @@
                     </button>
                 </div>
             </div>
-            <?php endforeach; ?>
-        <?php else: ?>
-            <div class="stage-item-dashboard" style="padding: 30px 20px; text-align: center; border: 1px dashed rgba(139,92,246,0.3); border-radius: 13px; background: rgba(9,17,34,0.3);">
-                <i class="fas fa-users" style="font-size: 32px; color: var(--purple); opacity: 0.5; display: block; margin-bottom: 12px;"></i>
-                <strong style="color: var(--text-primary); font-size: 13px; display: block; margin-bottom: 6px;">
-                    <i class="fas fa-info-circle"></i> Belum ada creator
-                </strong>
-                <div style="color: var(--text-secondary); font-size: 11px; line-height: 1.6;">
-                    Klik <strong>"Tambah Creator"</strong> atau <strong>"Import Excel"</strong> untuk mulai
+            <?php
+        };
+        ?>
+
+        <!-- Creator View (Default) -->
+        <div id="scoutingCreatorView" style="display: block;">
+            <?php if (!empty($task1_creators)): ?>
+                <?php foreach ($task1_creators as $item) { $render_scouting_card($item); } ?>
+            <?php else: ?>
+                <div class="stage-item-dashboard" style="padding: 30px 20px; text-align: center; border: 1px dashed rgba(139,92,246,0.3); border-radius: 13px; background: rgba(9,17,34,0.3);">
+                    <i class="fas fa-users" style="font-size: 32px; color: var(--purple); opacity: 0.5; display: block; margin-bottom: 12px;"></i>
+                    <strong style="color: var(--text-primary); font-size: 13px; display: block; margin-bottom: 6px;">
+                        <i class="fas fa-info-circle"></i> Belum ada creator
+                    </strong>
+                    <div style="color: var(--text-secondary); font-size: 11px; line-height: 1.6;">
+                        Klik <strong>"Tambah Creator"</strong> atau <strong>"Import Excel"</strong> untuk mulai
+                    </div>
                 </div>
-            </div>
-        <?php endif; ?>
+            <?php endif; ?>
+        </div>
+
+        <!-- Brand View -->
+        <div id="scoutingBrandView" style="display: none;">
+            <?php 
+            if (!empty($task1_creators)): 
+                $grouped_by_brand = [];
+                foreach ($task1_creators as $item) {
+                    $bname = !empty($item->shop_name) ? $item->shop_name : (!empty($item->brand_name) ? $item->brand_name : 'Belum ada brand');
+                    $grouped_by_brand[$bname][] = $item;
+                }
+                ksort($grouped_by_brand);
+                
+                foreach ($grouped_by_brand as $brand_name => $items):
+            ?>
+                <div class="brand-group-header" style="margin: 12px 0 6px 0; padding: 6px 12px; font-weight: bold; font-size: 11px; color: #a78bfa; background: rgba(139,92,246,0.08); border-radius: 8px; display: flex; align-items: center; justify-content: space-between;">
+                    <span><i class="fas fa-store" style="margin-right: 6px;"></i> <?= htmlspecialchars($brand_name) ?></span>
+                    <span style="background: rgba(139,92,246,0.15); color: #a78bfa; font-size: 9px; padding: 1px 6px; border-radius: 10px;"><?= count($items) ?></span>
+                </div>
+                
+                <?php foreach ($items as $item) { $render_scouting_card($item); } ?>
+            <?php 
+                endforeach;
+            else: 
+            ?>
+                <div class="stage-item-dashboard" style="padding: 30px 20px; text-align: center; border: 1px dashed rgba(139,92,246,0.3); border-radius: 13px; background: rgba(9,17,34,0.3);">
+                    <i class="fas fa-users" style="font-size: 32px; color: var(--purple); opacity: 0.5; display: block; margin-bottom: 12px;"></i>
+                    <strong style="color: var(--text-primary); font-size: 13px; display: block; margin-bottom: 6px;">
+                        <i class="fas fa-info-circle"></i> Belum ada creator
+                    </strong>
+                    <div style="color: var(--text-secondary); font-size: 11px; line-height: 1.6;">
+                        Klik <strong>"Tambah Creator"</strong> atau <strong>"Import Excel"</strong> untuk mulai
+                    </div>
+                </div>
+            <?php endif; ?>
+        </div>
+
+        <!-- Dynamic Search Results View -->
+        <div id="scoutingSearchResultsView" style="display: none;"></div>
     </div>
     
     <!-- Button group -->
@@ -2572,13 +2631,27 @@ window.savePhoneNumber = async function(creatorId) {
         const result = await response.json();
         
         if (result.success) {
-            showToastGlobal('�7�3 Nomor WhatsApp berhasil diupdate!', 'success');
+            showToastGlobal('✅ Nomor WhatsApp berhasil diupdate!', 'success');
             window.closeUpdatePhoneModal();
             
             const phoneDisplay = document.getElementById('phoneDisplaySendLink');
             if (phoneDisplay) {
                 phoneDisplay.innerHTML = `<i class="fab fa-whatsapp" style="color: #25D366;"></i> ${escapeHtml(result.phone || phone)}`;
             }
+            
+            // Sync all phone displays on the dashboard cards (Creator View & Brand View)
+            const cards = document.querySelectorAll(`.stage-item-dashboard[data-creator-id="${creatorId}"]`);
+            cards.forEach(card => {
+                card.setAttribute('data-creator-phone', result.phone || phone);
+                card.setAttribute('data-no-phone', '0');
+                const wrapper = card.querySelector('.action-buttons-wa-wrapper');
+                if (wrapper) wrapper.style.display = 'none';
+            });
+            
+            const phoneDisplays = document.querySelectorAll(`[id^="phoneDisplay_${creatorId}"], [id^="phoneDisplay_brandview_${creatorId}"]`);
+            phoneDisplays.forEach(pd => {
+                pd.innerHTML = `<i class="fab fa-whatsapp" style="color: #25D366;"></i> ${escapeHtml(result.phone || phone)} <span onclick="event.stopPropagation(); window.openUpdatePhoneModal('${creatorId}', '')" title="Edit nomor WA" style="cursor:pointer; color:#6b7280; font-size:8px; margin-left:2px;"><i class="fas fa-pencil-alt"></i></span>`;
+            });
             
             const sendBtn = document.getElementById('sendLinkConfirmBtn');
             if (sendBtn) {
@@ -4259,6 +4332,64 @@ window.checkShowcaseSingle = async function(linkId, btn) {
 // FILTER TASK FUNCTIONS - AJAX
 // ============================================================
 
+// State and functions for Task 1 Scouting Display Mode (Creator vs Brand)
+let currentScoutingDisplayMode = 'creator'; // 'creator' atau 'brand'
+
+function changeScoutingDisplayMode(mode) {
+    if (currentScoutingDisplayMode === mode) return;
+    currentScoutingDisplayMode = mode;
+    
+    // Update button styles
+    const btnCreator = document.getElementById('btnScoutingModeCreator');
+    const btnBrand = document.getElementById('btnScoutingModeBrand');
+    
+    if (btnCreator && btnBrand) {
+        if (mode === 'creator') {
+            btnCreator.style.border = '1px solid var(--purple)';
+            btnCreator.style.background = 'rgba(139,92,246,0.15)';
+            btnCreator.style.color = '#a78bfa';
+            
+            btnBrand.style.border = '1px solid rgba(255,255,255,0.1)';
+            btnBrand.style.background = 'rgba(255,255,255,0.02)';
+            btnBrand.style.color = 'var(--text-secondary)';
+        } else {
+            btnBrand.style.border = '1px solid var(--purple)';
+            btnBrand.style.background = 'rgba(139,92,246,0.15)';
+            btnBrand.style.color = '#a78bfa';
+            
+            btnCreator.style.border = '1px solid rgba(255,255,255,0.1)';
+            btnCreator.style.background = 'rgba(255,255,255,0.02)';
+            btnCreator.style.color = 'var(--text-secondary)';
+        }
+    }
+    
+    applyScoutingViewMode();
+}
+
+function applyScoutingViewMode() {
+    const creatorView = document.getElementById('scoutingCreatorView');
+    const brandView = document.getElementById('scoutingBrandView');
+    const searchView = document.getElementById('scoutingSearchResultsView');
+    
+    const searchInput = document.getElementById('searchScoutingDashboard');
+    const isSearching = searchInput && searchInput.value.trim() !== '';
+    
+    if (isSearching) {
+        if (creatorView) creatorView.style.display = 'none';
+        if (brandView) brandView.style.display = 'none';
+        if (searchView) searchView.style.display = 'block';
+    } else {
+        if (searchView) searchView.style.display = 'none';
+        if (currentScoutingDisplayMode === 'creator') {
+            if (creatorView) creatorView.style.display = 'block';
+            if (brandView) brandView.style.display = 'none';
+        } else {
+            if (creatorView) creatorView.style.display = 'none';
+            if (brandView) brandView.style.display = 'block';
+        }
+    }
+}
+
 let searchTimer = null;
 
 // Cache konten awal task containers agar bisa di-restore tanpa reload halaman
@@ -4306,16 +4437,32 @@ function filterTaskAjax(task, keyword) {
         if (countBadge && _taskOriginalCount[task] !== undefined) {
             countBadge.textContent = _taskOriginalCount[task];
         }
+        if (task === 'task1') {
+            applyScoutingViewMode();
+        }
         return;
     }
     
-    if (container) {
-        container.innerHTML = `
-            <div style="text-align:center; padding:40px;">
-                <i class="fas fa-spinner fa-pulse fa-2x" style="color: var(--purple);"></i>
-                <p style="margin-top: 12px; color: var(--text-secondary); font-size: 12px;">Mencari...</p>
-            </div>
-        `;
+    if (task === 'task1') {
+        const searchView = document.getElementById('scoutingSearchResultsView');
+        if (searchView) {
+            searchView.innerHTML = `
+                <div style="text-align:center; padding:40px;">
+                    <i class="fas fa-spinner fa-pulse fa-2x" style="color: var(--purple);"></i>
+                    <p style="margin-top: 12px; color: var(--text-secondary); font-size: 12px;">Mencari...</p>
+                </div>
+            `;
+        }
+        applyScoutingViewMode();
+    } else {
+        if (container) {
+            container.innerHTML = `
+                <div style="text-align:center; padding:40px;">
+                    <i class="fas fa-spinner fa-pulse fa-2x" style="color: var(--purple);"></i>
+                    <p style="margin-top: 12px; color: var(--text-secondary); font-size: 12px;">Mencari...</p>
+                </div>
+            `;
+        }
     }
     
     searchTimer = setTimeout(function() {
@@ -4357,21 +4504,39 @@ async function performSearch(task, keyword) {
             countBadge.textContent = result.total || 0;
         }
         
-        if (result.success && result.data && result.data.length > 0) {
-            renderSearchResults(task, result.data, container);
+        if (task === 'task1') {
+            const searchView = document.getElementById('scoutingSearchResultsView');
+            if (searchView) {
+                if (result.success && result.data && result.data.length > 0) {
+                    renderSearchResults('task1', result.data, searchView);
+                } else {
+                    searchView.innerHTML = `
+                        <div class="is-empty">
+                            <i class="fas fa-search"></i>
+                            <p>Tidak ada creator yang cocok dengan "<strong>${escapeHtml(keyword)}</strong>"</p>
+                            <span style="font-size: 11px; color: var(--is-muted);">Coba kata kunci lain</span>
+                        </div>
+                    `;
+                }
+            }
+            applyScoutingViewMode();
         } else {
-            container.innerHTML = `
-                <div class="is-empty">
-                    <i class="fas fa-search"></i>
-                    <p>Tidak ada creator yang cocok dengan "<strong>${escapeHtml(keyword)}</strong>"</p>
-                    <span style="font-size: 11px; color: var(--is-muted);">Coba kata kunci lain</span>
-                </div>
-            `;
+            if (result.success && result.data && result.data.length > 0) {
+                renderSearchResults(task, result.data, container);
+            } else {
+                container.innerHTML = `
+                    <div class="is-empty">
+                        <i class="fas fa-search"></i>
+                        <p>Tidak ada creator yang cocok dengan "<strong>${escapeHtml(keyword)}</strong>"</p>
+                        <span style="font-size: 11px; color: var(--is-muted);">Coba kata kunci lain</span>
+                    </div>
+                `;
+            }
         }
         
     } catch (error) {
         console.error('Search error:', error);
-        container.innerHTML = `
+        const errorHtml = `
             <div class="is-empty">
                 <i class="fas fa-exclamation-triangle" style="color: #ef4444;"></i>
                 <p style="color: #ef4444;">Gagal mencari data</p>
@@ -4379,7 +4544,170 @@ async function performSearch(task, keyword) {
                 <button onclick="location.reload()" style="margin-top:12px; padding:6px 16px; background:var(--bg-elevated); border:1px solid var(--border); border-radius:8px; color:var(--text-primary); cursor:pointer;">Refresh</button>
             </div>
         `;
+        if (task === 'task1') {
+            const searchView = document.getElementById('scoutingSearchResultsView');
+            if (searchView) searchView.innerHTML = errorHtml;
+            applyScoutingViewMode();
+        } else {
+            container.innerHTML = errorHtml;
+        }
     }
+}
+
+function renderSingleCreatorHtml(creator) {
+    const phone = creator.phone || '';
+    const shopOrBrandName = creator.shop_name || creator.brand_name || '';
+    
+    // Determine GMV display
+    const fastmossGmv28d = parseFloat(creator.fastmoss_gmv_28d || 0);
+    const importedGmv = parseFloat(creator.imported_gmv || 0);
+    let gmvDisplay = fastmossGmv28d;
+    let gmvIsFastmoss = gmvDisplay > 0;
+    if (!gmvIsFastmoss && importedGmv > 0) {
+        gmvDisplay = importedGmv;
+    }
+    
+    return `
+        <div class="stage-item-dashboard scouting-item-dashboard" 
+             data-creator-id="${escapeHtml(creator.id || '')}" 
+             data-creator-name="${escapeHtml(creator.username || '')}"
+             data-creator-phone="${escapeHtml(phone)}"
+             data-no-phone="${!phone || phone === 'no_phone' ? '1' : '0'}"
+             data-searchable="${escapeHtml((creator.username || '').toLowerCase() + ' ' + shopOrBrandName.toLowerCase() + ' ' + (creator.category || '').toLowerCase())}"
+             style="padding: 12px; margin-bottom: 8px; border-radius: 13px; border: 1px solid rgba(112,136,185,0.14); background: rgba(9,17,34,0.56); cursor: pointer; transition: var(--transition);">
+            
+            <div style="display:flex; justify-content:space-between; align-items:center; gap: 8px;">
+                <strong style="font-size: 12px; line-height: 1.25; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                    <i class="fab fa-tiktok" style="color: #8b5cf6;"></i> 
+                    ${escapeHtml(creator.username)}
+                </strong>
+                <div style="display:flex; gap:4px; align-items:center; flex-shrink: 0;">
+                    ${creator.follow_up_count > 0 ? `
+                    <span style="background:rgba(245,158,11,0.15); color:#f59e0b; font-size:8px; padding:2px 6px; border-radius:10px; display:inline-flex; align-items:center; gap:3px;">
+                        <i class="fas fa-clock"></i> ${creator.follow_up_count}x
+                    </span>
+                    ` : ''}
+                    <span class="badge-dashboard badge-pending" style="font-size:8px; padding:3px 8px; display:inline-flex; align-items:center; gap:3px;">
+                        <i class="fas fa-clock"></i> ${escapeHtml(creator.status || 'PENDING')}
+                    </span>
+                </div>
+            </div>
+            
+            <!-- SHOP/BRAND NAME -->
+            <div class="item-details-dashboard" style="margin-top: 4px; display: flex; flex-wrap: wrap; gap: 5px 9px; font-size: 9.5px; color: var(--is-muted-2);">
+                ${shopOrBrandName ? `
+                <span class="brand-badge" style="background: rgba(74,222,128,0.15); padding: 2px 8px; border-radius: 20px; display: inline-flex; align-items: center; gap: 4px; font-size: 9.5px; color: #4ade80;">
+                    <i class="fas fa-store" style="font-size: 8px;"></i> ${escapeHtml(shopOrBrandName)}
+                </span>
+                ` : `
+                <span style="color: #9aaebe; font-size: 10px; display: inline-flex; align-items: center; gap: 4px;">
+                    <i class="fas fa-store" style="font-size: 8px;"></i> Belum ada brand
+                </span>
+                `}
+                
+                ${creator.category ? `
+                <span style="display: inline-flex; align-items: center; gap: 4px;">
+                    <i class="fas fa-tag" style="font-size: 8px;"></i> ${escapeHtml(creator.category)}
+                </span>
+                ` : ''}
+            </div>
+            
+            <!-- WhatsApp & GMV -->
+            <div class="item-details-dashboard" style="display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 9.5px; color: var(--is-muted-2); margin-top: 2px;">
+                <span id="phoneDisplay_${creator.id}" style="display: inline-flex; align-items: center; gap: 4px;">
+                    <i class="fab fa-whatsapp" style="color: #25D366;"></i> 
+                    ${phone && phone !== 'no_phone' ? `
+                        ${escapeHtml(phone)}
+                        <span onclick="event.stopPropagation(); window.openUpdatePhoneModal('${creator.id}', '${escapeHtml(creator.username)}')"
+                              title="Edit nomor WA"
+                              style="cursor:pointer; color:#6b7280; font-size:8px; margin-left:2px;">
+                            <i class="fas fa-pencil-alt"></i>
+                        </span>
+                    ` : `
+                        <span style="color: #ef4444;">Tidak ada</span>
+                    `}
+                </span>
+                
+                ${gmvDisplay > 0 ? `
+                <span style="display: inline-flex; align-items: center; gap: 4px; ${gmvIsFastmoss ? 'color:#34d399;' : 'color:#fbbf24;'}">
+                    <i class="fas fa-chart-line" style="font-size: 8px;"></i>
+                    ${gmvIsFastmoss ? `
+                        <span title="GMV Produk 28 hari dari FastMoss">
+                            GMV: Rp ${formatNumber(gmvDisplay)} <span style="opacity:.65; font-size:8px;">(28h)</span>
+                        </span>
+                    ` : `
+                        <span title="GMV estimasi dari data produk">
+                            GMV: Rp ${formatNumber(gmvDisplay)}
+                        </span>
+                    `}
+                </span>
+                ` : ''}
+            </div>
+            
+            <!-- Multiple Link -->
+            ${creator.total_links > 0 ? `
+            <div class="item-details-dashboard" style="margin-top:4px; display: flex; gap: 4px;">
+                <span style="color:#8b5cf6; font-size:9px; display: inline-flex; align-items: center; gap: 4px;">
+                    <i class="fas fa-layer-group"></i> ${creator.total_links} Multiple Link tersedia
+                </span>
+            </div>
+            ` : ''}
+            
+            <!-- SUMBER DATA & TANGGAL INPUT -->
+            <div class="item-details-dashboard" style="font-size: 9px; margin-top: 6px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px; color: var(--is-muted);">
+                <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                    ${creator.source === 'imported' ? `
+                    <span style="color: #fbbf24; display: inline-flex; align-items: center; gap: 3px;">
+                        <i class="fas fa-file-import" style="font-size: 8px;"></i> Imported
+                    </span>
+                    ` : `
+                    <span style="color: #4ade80; display: inline-flex; align-items: center; gap: 3px;">
+                        <i class="fas fa-user-plus" style="font-size: 8px;"></i> Manual
+                    </span>
+                    `}
+                    
+                    <span style="display: inline-flex; align-items: center; gap: 3px;">
+                        <i class="fas fa-calendar-alt" style="font-size: 8px;"></i> 
+                        ${creator.created_at_formatted || '-'}
+                    </span>
+                </div>
+                
+                <!-- TOMBOL FETCH WA DARI TAP / INPUT MANUAL -->
+                ${!phone || phone === 'no_phone' ? `
+                <div class="action-buttons-wa-wrapper" style="display:inline-flex; gap:4px; align-items:center;">
+                    <button class="resync-wa-btn"
+                            data-creator-id="${creator.id}"
+                            data-creator-name="${escapeHtml(creator.username)}"
+                            title="Ambil nomor WA dari TAP API"
+                            style="background: linear-gradient(135deg,#0ea5e9,#2563eb); color:#fff; border:none; padding:2px 8px; border-radius:10px; cursor:pointer; font-size:9px; font-weight:600; transition:var(--transition); display:inline-flex; align-items:center; gap:3px;">
+                        <i class="fab fa-tiktok" style="font-size:8px;"></i> Fetch TAP
+                    </button>
+                    <button onclick="event.stopPropagation(); window.openUpdatePhoneModal('${creator.id}', '${escapeHtml(creator.username)}')"
+                            title="Input nomor WA manual"
+                            style="background:rgba(245,158,11,0.15); color:#f59e0b; border:1px solid rgba(245,158,11,0.3); padding:2px 8px; border-radius:10px; cursor:pointer; font-size:9px; font-weight:600; transition:var(--transition); display:inline-flex; align-items:center; gap:3px;">
+                        <i class="fas fa-keyboard" style="font-size:8px;"></i> Manual
+                    </button>
+                </div>
+                ` : ''}
+            </div>
+            
+            <!-- ACTION BUTTONS -->
+            <div style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
+                <button class="task1-detail-btn" data-creator-id="${creator.id}"
+                        style="background: linear-gradient(135deg, var(--purple-glow), rgba(59,130,246,0.1)); color: var(--purple); border: 1px solid rgba(139,92,246,0.3); padding: 4px 12px; border-radius: 20px; cursor: pointer; font-size: 9px; font-weight: 600; transition: var(--transition); display: inline-flex; align-items: center; gap: 4px;">
+                    <i class="fas fa-info-circle"></i> Detail
+                </button>
+                <button class="task1-send-link-btn" data-creator-id="${creator.id}"
+                    style="background: linear-gradient(135deg, #10b981, #059669); color: white; border: none; padding: 4px 12px; border-radius: 20px; cursor: pointer; font-size: 9px; font-weight: 600; transition: var(--transition); display: inline-flex; align-items: center; gap: 4px;">
+                    <i class="fas fa-paper-plane"></i> Send Link
+                </button>
+                <button class="task1-followup-btn" data-creator-id="${creator.id}"
+                        style="background: linear-gradient(135deg, #f59e0b, #d97706); color: white; border: none; padding: 4px 12px; border-radius: 20px; cursor: pointer; font-size: 9px; font-weight: 600; transition: var(--transition); display: inline-flex; align-items: center; gap: 4px;">
+                    <i class="fas fa-comment"></i> Follow Up
+                </button>
+            </div>
+        </div>
+    `;
 }
 
 function renderSearchResults(task, creators, container) {
@@ -4389,140 +4717,39 @@ function renderSearchResults(task, creators, container) {
     const isTask2 = (taskNum === 2);
     const isTask3 = (taskNum === 3);
     
-    creators.forEach(function(creator) {
-        if (isTask1) {
-            const phone = creator.phone || '';
-            const shopOrBrandName = creator.shop_name || creator.brand_name || '';
+    if (isTask1) {
+        if (currentScoutingDisplayMode === 'brand') {
+            const grouped = {};
+            creators.forEach(function(creator) {
+                const bname = creator.shop_name || creator.brand_name || 'Belum ada brand';
+                if (!grouped[bname]) {
+                    grouped[bname] = [];
+                }
+                grouped[bname].push(creator);
+            });
             
-            html += `
-                <div class="stage-item-dashboard scouting-item-dashboard" 
-                     data-creator-id="${escapeHtml(creator.id || '')}" 
-                     data-creator-name="${escapeHtml(creator.username || '')}"
-                     data-creator-phone="${escapeHtml(phone)}"
-                     data-no-phone="${!phone ? '1' : '0'}"
-                     data-searchable="${escapeHtml(creator.username.toLowerCase())}"
-                     style="padding: 12px; margin-bottom: 8px; border-radius: 13px; border: 1px solid rgba(112,136,185,0.14); background: rgba(9,17,34,0.56); cursor: pointer; transition: var(--transition);">
-                    
-                    <div style="display:flex; justify-content:space-between; align-items:center; gap: 8px;">
-                        <strong style="font-size: 12px; line-height: 1.25; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
-                            <i class="fab fa-tiktok" style="color: #8b5cf6;"></i> 
-                            ${escapeHtml(creator.username)}
-                        </strong>
-                        <div style="display:flex; gap:4px; align-items:center; flex-shrink: 0;">
-                            ${creator.follow_up_count > 0 ? `
-                            <span style="background:rgba(245,158,11,0.15); color:#f59e0b; font-size:8px; padding:2px 6px; border-radius:10px; display:inline-flex; align-items:center; gap:3px;">
-                                <i class="fas fa-clock"></i> ${creator.follow_up_count}x
-                            </span>
-                            ` : ''}
-                            <span class="badge-dashboard badge-pending" style="font-size:8px; padding:3px 8px; display:inline-flex; align-items:center; gap:3px;">
-                                <i class="fas fa-clock"></i> ${escapeHtml(creator.status || 'PENDING')}
-                            </span>
-                        </div>
+            Object.keys(grouped).sort().forEach(function(brandName) {
+                const groupCreators = grouped[brandName];
+                html += `
+                    <div class="brand-group-header" style="margin: 12px 0 6px 0; padding: 6px 12px; font-weight: bold; font-size: 11px; color: #a78bfa; background: rgba(139,92,246,0.08); border-radius: 8px; display: flex; align-items: center; justify-content: space-between;">
+                        <span><i class="fas fa-store" style="margin-right: 6px;"></i> ${escapeHtml(brandName)}</span>
+                        <span style="background: rgba(139,92,246,0.15); color: #a78bfa; font-size: 9px; padding: 1px 6px; border-radius: 10px;">${groupCreators.length}</span>
                     </div>
-                    
-                    <!-- SHOP/BRAND NAME -->
-                    <div class="item-details-dashboard" style="margin-top: 4px; display: flex; flex-wrap: wrap; gap: 5px 9px; font-size: 9.5px; color: var(--is-muted-2);">
-                        ${shopOrBrandName ? `
-                        <span class="brand-badge" style="background: rgba(74,222,128,0.15); padding: 2px 8px; border-radius: 20px; display: inline-flex; align-items: center; gap: 4px; font-size: 9.5px; color: #4ade80;">
-                            <i class="fas fa-store" style="font-size: 8px;"></i> ${escapeHtml(shopOrBrandName)}
-                        </span>
-                        ` : `
-                        <span style="color: #9aaebe; font-size: 10px; display: inline-flex; align-items: center; gap: 4px;">
-                            <i class="fas fa-store" style="font-size: 8px;"></i> Belum ada brand
-                        </span>
-                        `}
-                    </div>
-                    
-                    <!-- WhatsApp & GMV -->
-                    <div class="item-details-dashboard" style="display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 9.5px; color: var(--is-muted-2); margin-top: 2px;">
-                        <span id="phoneDisplay_${creator.id}" style="display: inline-flex; align-items: center; gap: 4px;">
-                            <i class="fab fa-whatsapp" style="color: #25D366;"></i> 
-                            ${phone ? `
-                                ${escapeHtml(phone)}
-                                <span onclick="event.stopPropagation(); window.openUpdatePhoneModal('${creator.id}', '${escapeHtml(creator.username)}')"
-                                      title="Edit nomor WA"
-                                      style="cursor:pointer; color:#6b7280; font-size:8px; margin-left:2px;">
-                                    <i class="fas fa-pencil-alt"></i>
-                                </span>
-                            ` : `
-                                <span style="color: #ef4444;">Tidak ada</span>
-                            `}
-                        </span>
-                        
-                        ${creator.imported_gmv > 0 ? `
-                        <span style="color: #fbbf24; display: inline-flex; align-items: center; gap: 4px;">
-                            <i class="fas fa-chart-line" style="font-size: 8px;"></i> GMV: Rp ${formatNumber(creator.imported_gmv)}
-                        </span>
-                        ` : ''}
-                    </div>
-                    
-                    <!-- Multiple Link -->
-                    ${creator.total_links > 0 ? `
-                    <div class="item-details-dashboard" style="margin-top:4px; display: flex; gap: 4px;">
-                        <span style="color:#8b5cf6; font-size:9px; display: inline-flex; align-items: center; gap: 4px;">
-                            <i class="fas fa-layer-group"></i> ${creator.total_links} Multiple Link tersedia
-                        </span>
-                    </div>
-                    ` : ''}
-                    
-                    <!-- SUMBER DATA & TANGGAL INPUT -->
-                    <div class="item-details-dashboard" style="font-size: 9px; margin-top: 6px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px; color: var(--is-muted);">
-                        <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
-                            ${creator.source === 'imported' ? `
-                            <span style="color: #fbbf24; display: inline-flex; align-items: center; gap: 3px;">
-                                <i class="fas fa-file-import" style="font-size: 8px;"></i> Imported
-                            </span>
-                            ` : `
-                            <span style="color: #4ade80; display: inline-flex; align-items: center; gap: 3px;">
-                                <i class="fas fa-user-plus" style="font-size: 8px;"></i> Manual
-                            </span>
-                            `}
-                            
-                            <span style="display: inline-flex; align-items: center; gap: 3px;">
-                                <i class="fas fa-calendar-alt" style="font-size: 8px;"></i> 
-                                ${creator.created_at_formatted || '-'}
-                            </span>
-                        </div>
-                        
-                        <!-- TOMBOL FETCH WA DARI TAP / INPUT MANUAL -->
-                        ${!phone || phone === 'no_phone' ? `
-                        <div class="action-buttons-wa-wrapper" style="display:inline-flex; gap:4px; align-items:center;">
-                            <button class="resync-wa-btn"
-                                    data-creator-id="${creator.id}"
-                                    data-creator-name="${escapeHtml(creator.username)}"
-                                    title="Ambil nomor WA dari TAP API"
-                                    style="background: linear-gradient(135deg,#0ea5e9,#2563eb); color:#fff; border:none; padding:2px 8px; border-radius:10px; cursor:pointer; font-size:9px; font-weight:600; transition:var(--transition); display:inline-flex; align-items:center; gap:3px;">
-                                <i class="fab fa-tiktok" style="font-size:8px;"></i> Fetch TAP
-                            </button>
-                            <button onclick="event.stopPropagation(); window.openUpdatePhoneModal('${creator.id}', '${escapeHtml(creator.username)}')"
-                                    title="Input nomor WA manual"
-                                    style="background:rgba(245,158,11,0.15); color:#f59e0b; border:1px solid rgba(245,158,11,0.3); padding:2px 8px; border-radius:10px; cursor:pointer; font-size:9px; font-weight:600; transition:var(--transition); display:inline-flex; align-items:center; gap:3px;">
-                                <i class="fas fa-keyboard" style="font-size:8px;"></i> Manual
-                            </button>
-                        </div>
-                        ` : ''}
-                    </div>
-                    
-                    <!-- ACTION BUTTONS -->
-                    <div style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
-                        <button class="task1-detail-btn" data-creator-id="${creator.id}"
-                                style="background: linear-gradient(135deg, var(--purple-glow), rgba(59,130,246,0.1)); color: var(--purple); border: 1px solid rgba(139,92,246,0.3); padding: 4px 12px; border-radius: 20px; cursor: pointer; font-size: 9px; font-weight: 600; transition: var(--transition); display: inline-flex; align-items: center; gap: 4px;">
-                            <i class="fas fa-info-circle"></i> Detail
-                        </button>
-                        <button class="task1-send-link-btn" data-creator-id="${creator.id}"
-                            style="background: linear-gradient(135deg, #10b981, #059669); color: white; border: none; padding: 4px 12px; border-radius: 20px; cursor: pointer; font-size: 9px; font-weight: 600; transition: var(--transition); display: inline-flex; align-items: center; gap: 4px;">
-                            <i class="fas fa-paper-plane"></i> Send Link
-                        </button>
-                        <button class="task1-followup-btn" data-creator-id="${creator.id}"
-                                style="background: linear-gradient(135deg, #f59e0b, #d97706); color: white; border: none; padding: 4px 12px; border-radius: 20px; cursor: pointer; font-size: 9px; font-weight: 600; transition: var(--transition); display: inline-flex; align-items: center; gap: 4px;">
-                            <i class="fas fa-comment"></i> Follow Up
-                        </button>
-                    </div>
-                </div>
-            `;
-            return;
+                `;
+                groupCreators.forEach(function(creator) {
+                    html += renderSingleCreatorHtml(creator);
+                });
+            });
+        } else {
+            creators.forEach(function(creator) {
+                html += renderSingleCreatorHtml(creator);
+            });
         }
-        
+        container.innerHTML = html;
+        return;
+    }
+    
+    creators.forEach(function(creator) {
         const dealStatus = creator.deal_status || 'no_handler';
         const sourceType = creator.source_type || 'registered';
         
