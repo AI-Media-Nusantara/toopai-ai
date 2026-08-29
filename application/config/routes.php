@@ -147,6 +147,7 @@ $route['is/get_sample_recommendations']      = 'is/get_sample_recommendations';
 $route['is/save_sample_delivery']            = 'is/save_sample_delivery';
 $route['is/get_monitoring_creator_detail']   = 'is/get_monitoring_creator_detail';
 $route['is/get_creator_gmv_breakdown']       = 'is/get_creator_gmv_breakdown';
+$route['is/debug_fastmoss_base_info/(:any)'] = 'is/debug_fastmoss_base_info/$1';
 $route['is/add_creator_video']               = 'is/add_creator_video';
 $route['is/update_sample_video_link']        = 'is/update_sample_video_link';
 $route['is/get_sample_keranjang_trigger']    = 'is/get_sample_keranjang_trigger';

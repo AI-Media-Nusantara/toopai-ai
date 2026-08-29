@@ -152,4 +152,74 @@ class Fastmoss_scraper extends CI_Controller
             'rows' => $products
         ], JSON_PRETTY_PRINT);
     }
+
+    public function debug_base_info($uid = '7091513277024715803')
+    {
+        header('Content-Type: application/json');
+
+        $time   = time();
+        $cnonce = rand(10000000, 99999999);
+        $url    = 'https://www.fastmoss.com/api/author/v3/detail/baseInfo'
+            . '?uid='    . urlencode($uid)
+            . '&_time='  . $time
+            . '&cnonce=' . $cnonce;
+
+        $this->load->model('Fastmoss_model');
+
+        // Raw response dengan cookie
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL            => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER     => [
+                'accept: application/json, text/plain, */*',
+                'accept-language: id-ID,id;q=0.9',
+                'lang: ID_ID',
+                'region: ID',
+                'source: pc',
+                'referer: https://www.fastmoss.com/id/influencer/detail/' . $uid,
+                'user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36',
+            ],
+            CURLOPT_ENCODING       => '',
+            CURLOPT_TIMEOUT        => 30,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => false,
+            CURLOPT_COOKIE         => $this->Fastmoss_model->get_cookie_string_public(),
+        ]);
+        $raw_with_cookie = curl_exec($ch);
+        curl_close($ch);
+
+        // Raw response tanpa cookie
+        $ch2 = curl_init();
+        curl_setopt_array($ch2, [
+            CURLOPT_URL            => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER     => [
+                'accept: application/json, text/plain, */*',
+                'accept-language: id-ID,id;q=0.9',
+                'lang: ID_ID',
+                'region: ID',
+                'source: pc',
+                'referer: https://www.fastmoss.com/id/influencer/detail/' . $uid,
+                'user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36',
+            ],
+            CURLOPT_ENCODING       => '',
+            CURLOPT_TIMEOUT        => 30,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => false,
+        ]);
+        $raw_no_cookie = curl_exec($ch2);
+        curl_close($ch2);
+
+        // Hasil parse
+        $parsed_result = $this->Fastmoss_model->get_creator_base_info($uid);
+
+        echo json_encode([
+            'uid'              => $uid,
+            'url'              => $url,
+            'parsed_result'    => $parsed_result,
+            'raw_with_cookie'  => json_decode($raw_with_cookie, true),
+            'raw_no_cookie'    => json_decode($raw_no_cookie, true),
+        ], JSON_PRETTY_PRINT);
+    }
 }

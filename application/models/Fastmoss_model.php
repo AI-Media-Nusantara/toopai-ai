@@ -401,6 +401,80 @@ class Fastmoss_model extends CI_Model
 
     /**
      * ============================================================
+     * GET CREATOR BASE INFO (Total GMV, Followers, dll)
+     * Mengambil informasi ringkasan creator dari FastMoss.
+     *
+     * Endpoint: /api/author/v3/detail/summary
+     * Tidak memerlukan cookie — data tersedia publik.
+     *
+     * Field kunci yang dikembalikan:
+     *   goods_max_sale_amount → GMV produk terlaris creator (28 hari)
+     *   goods_max_sold_count  → jumlah unit terjual terbanyak (28 hari)
+     *   goods_sale_country_rank → peringkat penjualan di negara
+     *
+     * @param  string $uid  FastMoss creator UID (tiktok_open_id)
+     * @return array  atau [] jika gagal
+     * ============================================================
+     */
+    public function get_creator_base_info($uid)
+    {
+        if (empty($uid)) {
+            return [];
+        }
+
+        $time   = time();
+        $cnonce = rand(10000000, 99999999);
+
+        // Gunakan endpoint summary — bisa diakses tanpa cookie
+        $url = $this->baseUrl . '/api/author/v3/detail/summary'
+            . '?uid='    . urlencode($uid)
+            . '&_time='  . $time
+            . '&cnonce=' . $cnonce;
+
+        $referer = 'https://www.fastmoss.com/id/influencer/detail/' . $uid;
+
+        // Coba tanpa cookie dulu (tersedia publik)
+        $json = $this->request_json_no_cookie($url, $this->headers($referer));
+
+        // Fallback dengan cookie jika gagal
+        if (empty($json['data']) || $json['code'] !== 200) {
+            $json = $this->request_json($url, $this->headers($referer));
+        }
+
+        log_message('debug', '[FastMoss][summary] uid=' . $uid
+            . ' code='     . ($json['code'] ?? 'N/A')
+            . ' has_data=' . (!empty($json['data']) ? 'yes' : 'no')
+            . ' msg='      . ($json['msg'] ?? $json['message'] ?? '')
+        );
+
+        if ($json['code'] !== 200 || empty($json['data'])) {
+            return [];
+        }
+
+        // total_sales dalam 28 hari
+        $sales_28d = intval($d['goods_max_sold_count'] ?? 0);
+
+        // Peringkat penjualan di negara
+        $country_rank = intval($d['goods_sale_country_rank'] ?? 0);
+
+        return [
+            'uid'          => (string)($d['uid'] ?? $uid),
+            'username'     => $d['unique_id']  ?? '',
+            'nickname'     => $d['nickname']   ?? '',
+            'avatar'       => '',
+            'follower_count' => 0,
+            'total_gmv'    => 0,      // tidak tersedia tanpa login
+            'gmv_28d'      => $gmv_28d,
+            'total_sales'  => 0,
+            'sales_28d'    => $sales_28d,
+            'country_rank' => $country_rank,
+            'region'       => $d['region'] ?? 'ID',
+            'raw'          => $d,
+        ];
+    }
+
+    /**
+     * ============================================================
      * GET CREATOR BRAND COLLABORATIONS
      * Mengambil daftar brand/shop yang pernah dikolaborasikan creator
      * beserta GMV dan jumlah produk dari setiap brand.
@@ -577,5 +651,12 @@ class Fastmoss_model extends CI_Model
     ]);
 }
 
+    /**
+     * Public alias untuk cookie_string() — dipakai oleh debug controller.
+     */
+    public function get_cookie_string_public()
+    {
+        return $this->cookie_string();
+    }
 
 }

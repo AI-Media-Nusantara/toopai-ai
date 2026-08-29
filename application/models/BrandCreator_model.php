@@ -269,6 +269,26 @@ public function save_creators_from_fastmoss($brand_id, $creators_data, $is_id = 
         $category = $data['category'] ?? [];
         $price = floatval($data['price'] ?? 0);
         $inventory = intval($data['inventory'] ?? 0);
+
+        // 🔥 AMBIL TOTAL GMV DARI FASTMOSS baseInfo
+        // Dilakukan sekali per creator menggunakan UID yang diperoleh dari response
+        $fastmoss_gmv     = null;
+        $fastmoss_gmv_28d = null;
+        if (!empty($uid)) {
+            try {
+                $base_info = $this->Fastmoss_model->get_creator_base_info($uid);
+                if (!empty($base_info)) {
+                    $fastmoss_gmv     = $base_info['total_gmv'] > 0 ? $base_info['total_gmv'] : null;
+                    $fastmoss_gmv_28d = $base_info['gmv_28d']   > 0 ? $base_info['gmv_28d']   : null;
+                    // Perbarui follower dari baseInfo jika lebih akurat
+                    if (!empty($base_info['follower_count'])) {
+                        $follower_count = max($follower_count, intval($base_info['follower_count']));
+                    }
+                }
+            } catch (Exception $e) {
+                log_message('error', '[save_creators_from_fastmoss] baseInfo error for uid=' . $uid . ': ' . $e->getMessage());
+            }
+        }
         
         // CEK APAKAH SUDAH ADA DI creators
         $existing_creator = $this->db->where('username', $username)
@@ -280,20 +300,33 @@ public function save_creators_from_fastmoss($brand_id, $creators_data, $is_id = 
         
         if ($existing_creator) {
             // UPDATE creator yang sudah ada
-            $new_gmv = floatval($existing_creator->imported_gmv ?? 0) + $gmv_from_this_product;
+            // imported_gmv: akumulasi GMV per produk (tetap dipertahankan untuk kompatibilitas)
+            $new_gmv   = floatval($existing_creator->imported_gmv ?? 0) + $gmv_from_this_product;
             $new_sales = intval($existing_creator->imported_sales_count ?? 0) + $sales_from_this_product;
             $new_followers = max(
                 intval($existing_creator->imported_followers ?? 0),
                 $follower_count
             );
+
+            $update_data = [
+                'imported_gmv'          => $new_gmv,
+                'imported_sales_count'  => $new_sales,
+                'imported_followers'    => $new_followers,
+                'updated_at'            => date('Y-m-d H:i:s'),
+            ];
+
+            // Simpan fastmoss_gmv jika berhasil diambil dari baseInfo
+            if ($fastmoss_gmv !== null) {
+                $update_data['fastmoss_gmv']       = $fastmoss_gmv;
+                $update_data['fastmoss_gmv_28d']   = $fastmoss_gmv_28d;
+                $update_data['fastmoss_synced_at'] = date('Y-m-d H:i:s');
+            }
+            // Simpan UID jika belum ada
+            if (!empty($uid) && empty($existing_creator->tiktok_open_id)) {
+                $update_data['tiktok_open_id'] = $uid;
+            }
             
-            $this->db->where('id', $existing_creator->id)
-                ->update('creators', [
-                    'imported_gmv' => $new_gmv,
-                    'imported_sales_count' => $new_sales,
-                    'imported_followers' => $new_followers,
-                    'updated_at' => date('Y-m-d H:i:s')
-                ]);
+            $this->db->where('id', $existing_creator->id)->update('creators', $update_data);
             
             $creator_id = $existing_creator->id;
             $result['updated_creators']++;
@@ -302,23 +335,26 @@ public function save_creators_from_fastmoss($brand_id, $creators_data, $is_id = 
         } else {
             // INSERT creator baru
             $insert_creator = [
-                'username' => $username,
-                'full_name' => $nickname,
-                'phone' => null,
-                'email' => null,
-                'category' => $this->_detect_category_from_creator($data),
-                'is_id' => $is_id,
-                'brand_id' => $brand_id,
-                'shop_name' => $this->_get_brand_shop_name($brand_id),
-                'source' => 'imported',
-                'status' => 'PENDING',
-                'avatar_url' => $avatar_url,
-                'imported_followers' => $follower_count,
-                'imported_gmv' => $gmv_from_this_product,
+                'username'             => $username,
+                'full_name'            => $nickname,
+                'phone'                => null,
+                'email'                => null,
+                'category'             => $this->_detect_category_from_creator($data),
+                'is_id'                => $is_id,
+                'brand_id'             => $brand_id,
+                'shop_name'            => $this->_get_brand_shop_name($brand_id),
+                'source'               => 'imported',
+                'status'               => 'PENDING',
+                'avatar_url'           => $avatar_url,
+                'imported_followers'   => $follower_count,
+                'imported_gmv'         => $gmv_from_this_product,
                 'imported_sales_count' => $sales_from_this_product,
-                'tiktok_open_id' => $uid,
-                'created_at' => date('Y-m-d H:i:s'),
-                'updated_at' => date('Y-m-d H:i:s')
+                'tiktok_open_id'       => $uid,
+                'fastmoss_gmv'         => $fastmoss_gmv,
+                'fastmoss_gmv_28d'     => $fastmoss_gmv_28d,
+                'fastmoss_synced_at'   => $fastmoss_gmv !== null ? date('Y-m-d H:i:s') : null,
+                'created_at'           => date('Y-m-d H:i:s'),
+                'updated_at'           => date('Y-m-d H:i:s'),
             ];
             
             $insert_creator = array_filter($insert_creator, function($value) {

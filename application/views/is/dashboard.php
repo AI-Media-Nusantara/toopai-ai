@@ -1514,10 +1514,32 @@
                             <span style="color: #ef4444;">Tidak ada</span>
                         <?php endif; ?>
                     </span>
-                    
-                    <?php if (!empty($item->imported_gmv) && $item->imported_gmv > 0): ?>
-                    <span style="color: #fbbf24; display: inline-flex; align-items: center; gap: 4px;">
-                        <i class="fas fa-chart-line" style="font-size: 8px;"></i> GMV: Rp <?= number_format($item->imported_gmv, 0, ',', '.') ?>
+
+                    <?php
+                    // Prioritas tampil GMV di kartu Step 1:
+                    // 1. fastmoss_gmv_28d → GMV produk 28 hari dari FastMoss summary (paling akurat & konsisten)
+                    // 2. imported_gmv     → fallback dari cron (bisa tidak akurat)
+                    $gmv_display     = floatval($item->fastmoss_gmv_28d ?? 0);
+                    $gmv_is_fastmoss = $gmv_display > 0;
+                    if (!$gmv_is_fastmoss && !empty($item->imported_gmv) && $item->imported_gmv > 0) {
+                        $gmv_display = floatval($item->imported_gmv);
+                    }
+                    ?>
+
+                    <?php if ($gmv_display > 0): ?>
+                    <span style="display: inline-flex; align-items: center; gap: 4px;
+                                 <?= $gmv_is_fastmoss ? 'color:#34d399;' : 'color:#fbbf24;' ?>">
+                        <i class="fas fa-chart-line" style="font-size: 8px;"></i>
+                        <?php if ($gmv_is_fastmoss): ?>
+                            <span title="GMV Produk 28 hari dari FastMoss">
+                                GMV: Rp <?= number_format($gmv_display, 0, ',', '.') ?>
+                                <span style="opacity:.65; font-size:8px;">(28h)</span>
+                            </span>
+                        <?php else: ?>
+                            <span title="GMV estimasi dari data produk">
+                                GMV: Rp <?= number_format($gmv_display, 0, ',', '.') ?>
+                            </span>
+                        <?php endif; ?>
                     </span>
                     <?php endif; ?>
                 </div>
@@ -3409,8 +3431,12 @@ async function showTask1DetailModal(creatorId) {
                             <div style="color:var(--purple); font-size:13px;">@${escapeHtml(c.username)}</div>
                         </div>
                         <div style="text-align:right; background: rgba(16,185,129,0.1); padding: 8px 16px; border-radius: 12px; border: 1px solid rgba(16,185,129,0.2);">
-                            <div style="color:#10b981; font-size:16px; font-weight:700;">Rp ${formatNumber(result.total_gmv || 0)}</div>
-                            <div style="font-size:10px; color:var(--text-muted);">Total GMV</div>
+                            ${(result.fastmoss_gmv_28d > 0)
+                                ? `<div style="color:#10b981; font-size:16px; font-weight:700;">Rp ${formatNumber(result.fastmoss_gmv_28d)}</div>
+                                   <div style="font-size:10px; color:var(--text-muted);">GMV Produk <span style="opacity:.6;">(28h · FastMoss)</span></div>`
+                                : `<div style="color:#10b981; font-size:16px; font-weight:700;">Rp ${formatNumber(result.total_gmv || 0)}</div>
+                                   <div style="font-size:10px; color:var(--text-muted);">Total GMV Kolaborasi</div>`
+                            }
                         </div>
                     </div>
                     <div style="display:flex; gap:12px; margin-top:8px; flex-wrap:wrap; font-size:11px; color:var(--text-secondary);">

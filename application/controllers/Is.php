@@ -15,7 +15,7 @@ class Is extends CI_Controller {
         }
         $this->load->helper('excel');
         $this->load->library('Jsm_api');
-        $this->load->model(['Campaign_model', 'Brand_model', 'Product_model', 'User_model', 'Jsm_token_model', 'Creator_model', 'Task_progress_model']);
+        $this->load->model(['Campaign_model', 'Brand_model', 'Product_model', 'User_model', 'Jsm_token_model', 'Creator_model', 'Task_progress_model', 'Fastmoss_model']);
         $this->load->helper('number');
         $this->load->database();
     }
@@ -58,8 +58,8 @@ public function dashboard() {
         ->join('brands b', 'c.brand_id = b.id', 'left')
         ->join('users u', 'c.is_id = u.id', 'left')
         ->where_in('c.status', ['PENDING', 'LINK_SWAPPING'])
-        ->order_by('(CASE WHEN c.phone IS NOT NULL AND c.phone != "" AND c.phone != "no_phone" THEN 1 ELSE 0 END)', 'DESC')
-        ->order_by('c.imported_gmv', 'DESC')
+        ->order_by('(CASE WHEN c.phone IS NOT NULL AND c.phone != "" AND c.phone != "no_phone" THEN 1 ELSE 0 END)', 'DESC', false)
+        ->order_by('COALESCE(c.fastmoss_gmv_28d, c.imported_gmv, 0)', 'DESC', false)
         ->limit(100)
         ->get()
         ->result();
@@ -927,7 +927,10 @@ public function get_creator_task1_detail() {
             c.total_gmv,
             c.total_orders,
             c.shop_name,
-            c.tiktok_open_id
+            c.tiktok_open_id,
+            c.fastmoss_gmv,
+            c.fastmoss_gmv_28d,
+            c.fastmoss_synced_at
         ')
         ->from('creators c')
         ->where('c.id', $creator_id)
@@ -1277,10 +1280,7 @@ public function get_creator_task1_detail() {
         }
 
         // ============================================================
-        // 5.5 ENRICH DARI FASTMOSS — ambil semua brand collab creator
-        // Dipanggil selalu; data FastMoss di-merge ke brands_map lokal.
-        // Brand yang sudah ada di lokal diperbarui GMV-nya jika FastMoss
-        // memberikan nilai lebih besar. Brand baru dari FastMoss ditambahkan.
+        // 5.5 ENRICH DARI FASTMOSS — baseInfo (GMV total) + shopList (GMV per brand)
         // ============================================================
         try {
             $this->load->model('Fastmoss_model');
@@ -1289,8 +1289,6 @@ public function get_creator_task1_detail() {
             $fm_uid = $creator->tiktok_open_id ?? null;
 
             if (empty($fm_uid) && !empty($creator->username)) {
-                // Gunakan resolve_uid_by_username yang lebih robust
-                // (coba username langsung sebagai uid, kemudian search dengan/tanpa cookie)
                 $fm_uid = $this->Fastmoss_model->resolve_uid_by_username($creator->username);
                 if ($fm_uid) {
                     $this->db->where('id', $creator_id)
@@ -1303,6 +1301,39 @@ public function get_creator_task1_detail() {
             }
 
             if (!empty($fm_uid)) {
+                // ── 5.5a: baseInfo → total GMV creator ────────────────
+                // Ambil jika belum pernah di-sync atau sudah lebih dari 6 jam
+                $need_sync = empty($creator->fastmoss_synced_at)
+                    || empty($creator->fastmoss_gmv_28d)
+                    || (time() - strtotime($creator->fastmoss_synced_at)) > 6 * 3600;
+
+                if ($need_sync) {
+                    $base_info = $this->Fastmoss_model->get_creator_base_info($fm_uid);
+                    if (!empty($base_info)) {
+                        // summary endpoint: gmv_28d = goods_max_sale_amount (GMV produk terlaris 28h)
+                        $new_fastmoss_gmv_28d = $base_info['gmv_28d'] > 0 ? floatval($base_info['gmv_28d']) : null;
+
+                        // Simpan ke DB — selalu update synced_at, kolom GMV hanya jika ada nilai
+                        $sync_data = [
+                            'fastmoss_synced_at' => date('Y-m-d H:i:s'),
+                            'updated_at'         => date('Y-m-d H:i:s'),
+                        ];
+                        if ($new_fastmoss_gmv_28d !== null) {
+                            $sync_data['fastmoss_gmv']     = $new_fastmoss_gmv_28d; // simpan juga ke fastmoss_gmv sebagai referensi
+                            $sync_data['fastmoss_gmv_28d'] = $new_fastmoss_gmv_28d;
+                        }
+                        $this->db->where('id', $creator_id)->update('creators', $sync_data);
+
+                        // Update object creator untuk response
+                        $creator->fastmoss_gmv       = $new_fastmoss_gmv_28d;
+                        $creator->fastmoss_gmv_28d   = $new_fastmoss_gmv_28d;
+                        $creator->fastmoss_synced_at = $sync_data['fastmoss_synced_at'];
+
+                        log_message('debug', '[task1_detail] summary gmv_28d=' . $new_fastmoss_gmv_28d . ' uid=' . $fm_uid);
+                    }
+                }
+
+                // ── 5.5b: shopList → GMV per brand kolaborasi ─────────
                 $fm_brands = $this->Fastmoss_model->get_all_creator_brand_collabs($fm_uid, 5);
 
                 log_message('debug', '[task1_detail] FastMoss returned ' . count($fm_brands) . ' brands for uid=' . $fm_uid);
@@ -1627,16 +1658,18 @@ public function get_creator_task1_detail() {
         // 9. KIRIM RESPONSE
         // ============================================================
         $response = [
-            'success' => true,
-            'creator' => $creator,
-            'brands' => $brands,
-            'products' => $products,
-            'whatsapp_logs' => $whatsapp_logs,
-            'multi_links' => $multi_links,
-            'total_gmv' => $total_gmv,
+            'success'        => true,
+            'creator'        => $creator,
+            'brands'         => $brands,
+            'products'       => $products,
+            'whatsapp_logs'  => $whatsapp_logs,
+            'multi_links'    => $multi_links,
+            'total_gmv'      => $total_gmv,
+            'fastmoss_gmv'   => floatval($creator->fastmoss_gmv ?? 0),    // total GMV creator all-time dari baseInfo
+            'fastmoss_gmv_28d' => floatval($creator->fastmoss_gmv_28d ?? 0), // GMV 28 hari dari baseInfo
             'total_products' => count($products),
-            'total_brands' => count($brands),
-            'phone_source' => $phone_source
+            'total_brands'   => count($brands),
+            'phone_source'   => $phone_source
         ];
         
         log_message('debug', '=== get_creator_task1_detail SUCCESS ===');
@@ -10613,6 +10646,115 @@ public function get_sample_keranjang_trigger() {
 
 
     /**
+     * DEBUG: Lihat raw response FastMoss baseInfo untuk satu creator.
+     * Akses: /is/debug_fastmoss_base_info/{uid}
+     * Hanya untuk IS/admin — dilindungi constructor.
+     */
+    public function debug_fastmoss_base_info($uid = null)
+    {
+        $this->output->set_content_type('application/json');
+
+        if (empty($uid)) {
+            $username = $this->input->get('username');
+            if (!empty($username)) {
+                $row = $this->db->select('tiktok_open_id')
+                    ->where('LOWER(username)', strtolower(trim($username)))
+                    ->get('creators')->row();
+                $uid = $row->tiktok_open_id ?? null;
+            }
+        }
+
+        if (empty($uid)) {
+            return $this->output->set_output(json_encode([
+                'error' => 'UID diperlukan. Gunakan /is/debug_fastmoss_base_info/{uid} atau ?username=xxx'
+            ]));
+        }
+
+        $cookie = $this->Fastmoss_model->get_cookie_string_public();
+
+        // Fungsi helper cURL
+        $do_request = function($url) use ($cookie) {
+            $headers = [
+                'accept: application/json, text/plain, */*',
+                'accept-language: id-ID,id;q=0.9',
+                'lang: ID_ID',
+                'region: ID',
+                'source: pc',
+                'referer: https://www.fastmoss.com/id/influencer/detail/' . explode('uid=', explode('&', $url)[0])[1],
+                'user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36',
+            ];
+            $ch = curl_init();
+            curl_setopt_array($ch, [
+                CURLOPT_URL            => $url,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_HTTPHEADER     => $headers,
+                CURLOPT_ENCODING       => '',
+                CURLOPT_TIMEOUT        => 10,
+                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_SSL_VERIFYHOST => false,
+                CURLOPT_COOKIE         => $cookie,
+            ]);
+            $raw = curl_exec($ch);
+            curl_close($ch);
+            return json_decode($raw, true);
+        };
+
+        $base  = 'https://www.fastmoss.com/api/author/v3/detail/';
+        $t     = time();
+        $cn    = rand(10000000, 99999999);
+        $q     = "?uid={$uid}&_time={$t}&cnonce={$cn}";
+
+        // Probe semua endpoint kandidat yang kemungkinan berisi GMV
+        $endpoints = [
+            'baseInfo'  => $base . 'baseInfo'  . $q,
+            'saleInfo'  => $base . 'saleInfo'  . $q,
+            'goodsInfo' => $base . 'goodsInfo' . $q,
+            'saleData'  => $base . 'saleData'  . $q,
+            'gmvInfo'   => $base . 'gmvInfo'   . $q,
+            'overview'  => $base . 'overview'  . $q,
+            'summary'   => $base . 'summary'   . $q,
+            'salesStat' => $base . 'salesStat' . $q,
+            'shopList'  => $base . 'shopList'  . "?uid={$uid}&page=1&pagesize=5&order=gmv,2&date_type=0&_time={$t}&cnonce={$cn}",
+        ];
+
+        $results = [];
+        foreach ($endpoints as $name => $url) {
+            $resp = $do_request($url);
+            $code = $resp['code'] ?? null;
+            $data = $resp['data'] ?? [];
+            // Cari key yang mengandung kata gmv/sale/amount di data
+            $gmv_keys = [];
+            if (is_array($data)) {
+                foreach ($data as $k => $v) {
+                    if (is_numeric($v) && (
+                        stripos($k, 'gmv') !== false ||
+                        stripos($k, 'sale') !== false ||
+                        stripos($k, 'amount') !== false ||
+                        stripos($k, 'revenue') !== false
+                    )) {
+                        $gmv_keys[$k] = $v;
+                    }
+                }
+            }
+            $results[$name] = [
+                'url'          => $url,
+                'code'         => $code,
+                'msg'          => $resp['msg'] ?? null,
+                'is_login'     => $resp['ext']['is_login'] ?? null,
+                'all_keys'     => is_array($data) ? array_keys($data) : [],
+                'gmv_keys'     => $gmv_keys,
+                'data_preview' => $data,   // full data untuk endpoint yang berhasil
+            ];
+        }
+
+        return $this->output->set_output(json_encode([
+            'uid'     => $uid,
+            'results' => $results,
+        ], JSON_PRETTY_PRINT));
+    }
+
+
+    /**
      * Batch populate tiktok_open_id untuk semua creator yang belum punya UID.
      * Panggil sekali dari browser: /is/populate_tiktok_open_ids
      * Bisa diakses oleh role IS atau ADMIN.
@@ -10673,6 +10815,19 @@ public function get_sample_keranjang_trigger() {
             ->group_end()
             ->count_all_results('creators');
 
+        return $this->output->set_output(json_encode([
+            'success'   => true,
+            'processed' => $total,
+            'resolved'  => $resolved,
+            'failed'    => count($failed),
+            'remaining' => $remaining,
+            'details'   => $failed,
+            'message'   => "Berhasil resolve $resolved dari $total creator. Sisa yang belum: $remaining. "
+                         . ($remaining > 0 ? 'Panggil endpoint ini lagi untuk batch berikutnya.' : 'Semua selesai!')
+        ]));
+    }
+
+} // end class Is
         return $this->output->set_output(json_encode([
             'success'   => true,
             'processed' => $total,
