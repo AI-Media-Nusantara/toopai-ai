@@ -10828,16 +10828,3 @@ public function get_sample_keranjang_trigger() {
     }
 
 } // end class Is
-        return $this->output->set_output(json_encode([
-            'success'   => true,
-            'processed' => $total,
-            'resolved'  => $resolved,
-            'failed'    => count($failed),
-            'remaining' => $remaining,
-            'details'   => $failed,
-            'message'   => "Berhasil resolve $resolved dari $total creator. Sisa yang belum: $remaining. "
-                         . ($remaining > 0 ? 'Panggil endpoint ini lagi untuk batch berikutnya.' : 'Semua selesai!')
-        ]));
-    }
-
-} // end class Is
