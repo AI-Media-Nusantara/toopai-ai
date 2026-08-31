@@ -6,12 +6,14 @@ class Is extends CI_Controller {
     public function __construct() {
         parent::__construct();
         
-        if (!$this->session->userdata('logged_in')) {
-            redirect('auth/login');
-        }
-        
-        if ($this->session->userdata('role') != 'IS') {
-            show_error('Access denied. IS only area.', 403);
+        if (!is_cli()) {
+            if (!$this->session->userdata('logged_in')) {
+                redirect('auth/login');
+            }
+            
+            if ($this->session->userdata('role') != 'IS') {
+                show_error('Access denied. IS only area.', 403);
+            }
         }
         $this->load->helper('excel');
         $this->load->library('Jsm_api');
@@ -38,6 +40,11 @@ public function dashboard() {
             c.*,
             b.name as brand_name,
             b.shop_name,
+            (SELECT COALESCE(SUM(bc.total_gmv), 0) 
+             FROM brand_creators bc 
+             JOIN creators c2 ON bc.creator_username = c2.username
+             WHERE bc.brand_id = b.id 
+               AND c2.status IN ("PENDING", "LINK_SWAPPING")) as brand_total_gmv,
             u.username as is_username,
             u.full_name as is_full_name,
             (SELECT COUNT(DISTINCT acl.id) 
@@ -272,6 +279,18 @@ foreach ($task2_creators as $c) {
     
     $gmv_growth = $yesterday_gmv > 0 ? (($today_gmv - $yesterday_gmv) / $yesterday_gmv * 100) : ($today_gmv > 0 ? 100 : 0);
     
+    // Get total creator count per brand
+    $brand_counts_raw = $this->db->select('brand_id, COUNT(*) as cnt')
+                                  ->from('creators')
+                                  ->where('brand_id >', 0)
+                                  ->group_by('brand_id')
+                                  ->get()
+                                  ->result();
+    $brand_creator_counts = [];
+    foreach ($brand_counts_raw as $row) {
+        $brand_creator_counts[$row->brand_id] = intval($row->cnt);
+    }
+    
     $data = [
         'title' => 'IS Dashboard - Toopai',
         'task1_creators' => $task1_creators,
@@ -284,6 +303,7 @@ foreach ($task2_creators as $c) {
         'today_orders' => $today_orders,
         'gmv_growth' => round($gmv_growth, 1),
         'total_creators' => $this->db->count_all_results('creators'),
+        'brand_creator_counts' => $brand_creator_counts,
         'is_supervisor' => $is_supervisor,
     ];
     
@@ -1067,20 +1087,40 @@ public function get_creator_task1_detail() {
         // ============================================================
         $brands_map = [];
 
-        // A. Ambil brand dari affiliate_orders (berdasarkan sales/orders history)
+        // A. Ambal brand dari affiliate_orders (berdasarkan sales/orders history)
         if (!empty($creator->username)) {
             try {
-                $this->db->select('
-                    o.shop_name,
-                    COUNT(DISTINCT o.product_id) as total_products,
-                    SUM(o.gmv) as total_gmv
-                ')
-                ->from('affiliate_orders o')
-                ->where('o.creator_username', $creator->username)
-                ->where_not_in('o.order_status', ['CANCELLED', 'REFUNDED'])
-                ->where('o.shop_name IS NOT NULL', NULL, FALSE)
-                ->where('o.shop_name !=', '')
-                ->group_by('o.shop_name');
+                $order_cols = $this->db->list_fields('affiliate_orders');
+                $has_order_shop_name = in_array('shop_name', $order_cols);
+
+                if ($has_order_shop_name) {
+                    $this->db->select('
+                        o.shop_name,
+                        COUNT(DISTINCT o.product_id) as total_products,
+                        SUM(o.gmv) as total_gmv
+                    ')
+                    ->from('affiliate_orders o')
+                    ->where('o.creator_username', $creator->username)
+                    ->where_not_in('o.order_status', ['CANCELLED', 'REFUNDED'])
+                    ->where('o.order_date_local >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)')
+                    ->where('o.shop_name IS NOT NULL', NULL, FALSE)
+                    ->where('o.shop_name !=', '')
+                    ->group_by('o.shop_name');
+                } else {
+                    $this->db->select('
+                        ap.shop_name,
+                        COUNT(DISTINCT o.product_id) as total_products,
+                        SUM(o.gmv) as total_gmv
+                    ')
+                    ->from('affiliate_orders o')
+                    ->join('affiliate_products ap', 'o.product_id = ap.product_id', 'left')
+                    ->where('o.creator_username', $creator->username)
+                    ->where_not_in('o.order_status', ['CANCELLED', 'REFUNDED'])
+                    ->where('o.order_date_local >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)')
+                    ->where('ap.shop_name IS NOT NULL', NULL, FALSE)
+                    ->where('ap.shop_name !=', '')
+                    ->group_by('ap.shop_name');
+                }
 
                 $q = $this->db->get();
                 if ($q) {
@@ -1113,7 +1153,7 @@ public function get_creator_task1_detail() {
             $this->db->select('
                 ap.shop_name,
                 COUNT(DISTINCT acl.product_id) as total_products,
-                SUM(acl.total_gmv) as total_gmv
+                0 as total_gmv
             ')
             ->from('affiliate_creator_links acl')
             ->join('affiliate_products ap', 'acl.product_id = ap.product_id AND acl.campaign_id = ap.campaign_id', 'inner')
@@ -1160,7 +1200,7 @@ public function get_creator_task1_detail() {
                 $this->db->select('
                     cp.shop_name,
                     COUNT(DISTINCT cp.product_id) as total_products,
-                    SUM(cp.gmv) as total_gmv
+                    0 as total_gmv
                 ')
                 ->from('creator_products cp')
                 ->where('cp.creator_id', $creator_id)
@@ -1224,7 +1264,7 @@ public function get_creator_task1_detail() {
                     'shop_name' => !empty($brand_shop_name) ? $brand_shop_name : $brand_name,
                     'category' => $creator->category ?? '',
                     'total_products' => 0,
-                    'total_gmv' => floatval($creator->imported_gmv ?? 0)
+                    'total_gmv' => 0
                 ];
             }
         }
@@ -1273,25 +1313,27 @@ public function get_creator_task1_detail() {
         try {
             $this->load->model('Fastmoss_model');
 
-            // Pastikan punya FastMoss UID (= tiktok_open_id di kolom creators)
             $fm_uid = $creator->tiktok_open_id ?? null;
-
-            if (empty($fm_uid) && !empty($creator->username)) {
-                $fm_uid = $this->Fastmoss_model->resolve_uid_by_username($creator->username);
-                if ($fm_uid) {
+            $just_resolved = false;
+            if ((empty($fm_uid) || $fm_uid === $creator->username || !is_numeric($fm_uid)) && !empty($creator->username)) {
+                $resolved_uid = $this->Fastmoss_model->resolve_uid_by_username($creator->username);
+                if ($resolved_uid && is_numeric($resolved_uid)) {
+                    $fm_uid = $resolved_uid;
                     $this->db->where('id', $creator_id)
                              ->update('creators', [
                                  'tiktok_open_id' => $fm_uid,
                                  'updated_at'     => date('Y-m-d H:i:s')
                              ]);
                     $creator->tiktok_open_id = $fm_uid;
+                    $just_resolved = true;
                 }
             }
 
-            if (!empty($fm_uid)) {
+            if (!empty($fm_uid) && is_numeric($fm_uid)) {
                 // ── 5.5a: baseInfo → total GMV creator ────────────────
-                // Ambil jika belum pernah di-sync atau sudah lebih dari 6 jam
-                $need_sync = empty($creator->fastmoss_synced_at)
+                // Ambil jika belum pernah di-sync, baru saja di-resolve, atau sudah lebih dari 6 jam
+                $need_sync = $just_resolved
+                    || empty($creator->fastmoss_synced_at)
                     || empty($creator->fastmoss_gmv_28d)
                     || (time() - strtotime($creator->fastmoss_synced_at)) > 6 * 3600;
 
@@ -1330,14 +1372,55 @@ public function get_creator_task1_detail() {
                     $s_name = trim($fb['shop_name'] ?? '');
                     if (empty($s_name)) continue;
 
+                    // --- SAVE TO brand_creators TABLE ---
+                    // 1. Cari brand_id yang cocok dari database brands
+                    $db_brand = $this->db->select('id')
+                        ->group_start()
+                            ->where('name', $s_name)
+                            ->or_where('shop_name', $s_name)
+                        ->group_end()
+                        ->get('brands')
+                        ->row();
+
+                    if ($db_brand) {
+                        $existing_bc = $this->db->where('brand_id', $db_brand->id)
+                            ->where('creator_username', $creator->username)
+                            ->get('brand_creators')
+                            ->row();
+
+                        $bc_data = [
+                            'brand_id'         => $db_brand->id,
+                            'creator_username' => $creator->username,
+                            'creator_nickname' => $creator->full_name ?: $creator->username,
+                            'follower_count'   => intval($creator->follower_count ?? 0),
+                            'total_gmv'        => floatval($fb['gmv']),
+                            'total_orders'     => intval($fb['sales_count']),
+                            'creator_open_id'  => $fm_uid,
+                            'last_sync'        => date('Y-m-d H:i:s'),
+                            'updated_at'       => date('Y-m-d H:i:s')
+                        ];
+
+                        if ($existing_bc) {
+                            $this->db->where('id', $existing_bc->id)->update('brand_creators', $bc_data);
+                        } else {
+                            $bc_data['created_at'] = date('Y-m-d H:i:s');
+                            $this->db->insert('brand_creators', $bc_data);
+                        }
+                    }
+                    // ------------------------------------
+
                     $key = strtolower($s_name);
 
                     if (isset($brands_map[$key])) {
-                        // Brand sudah ada di lokal — ambil nilai GMV tertinggi
-                        $brands_map[$key]['total_gmv']     = max(
-                            floatval($brands_map[$key]['total_gmv']),
-                            floatval($fb['gmv'])
-                        );
+                        // Prioritaskan GMV FastMoss (28 hari terakhir) jika nilainya valid (> 0)
+                        if (floatval($fb['gmv']) > 0) {
+                            $brands_map[$key]['total_gmv'] = floatval($fb['gmv']);
+                        } else {
+                            $brands_map[$key]['total_gmv'] = max(
+                                floatval($brands_map[$key]['total_gmv']),
+                                floatval($fb['gmv'])
+                            );
+                        }
                         $brands_map[$key]['total_products'] = max(
                             intval($brands_map[$key]['total_products']),
                             intval($fb['product_count'])
@@ -1346,7 +1429,7 @@ public function get_creator_task1_detail() {
                     } else {
                         // Brand baru — hanya dari FastMoss
                         $brands_map[$key] = [
-                            'brand_id'      => null,
+                            'brand_id'      => $db_brand ? $db_brand->id : null,
                             'brand_name'    => $s_name,
                             'shop_name'     => $s_name,
                             'shop_logo'     => $fb['shop_logo'] ?? '',
@@ -1366,8 +1449,25 @@ public function get_creator_task1_detail() {
                 usort($brands, function($a, $b) {
                     return $b->total_gmv <=> $a->total_gmv;
                 });
-
                 log_message('debug', '[task1_detail] Final brands after merge: ' . count($brands));
+
+                // Hitung total GMV akumulasi dari brand kolaborasi dalam 28 hari terakhir
+                $fastmoss_brand_gmv_sum = 0;
+                foreach ($brands as $b) {
+                    if (isset($b->_source) && ($b->_source === 'fastmoss' || $b->_source === 'merged')) {
+                        $fastmoss_brand_gmv_sum += floatval($b->total_gmv);
+                    }
+                }
+                
+                // Gunakan jumlah akumulasi GMV per-brand
+                $final_gmv_28d = $fastmoss_brand_gmv_sum;
+                
+                // Simpan akumulasi GMV 28 hari ke object creator dan database
+                $creator->fastmoss_gmv_28d = $final_gmv_28d;
+                $this->db->where('id', $creator_id)->update('creators', [
+                    'fastmoss_gmv_28d' => $final_gmv_28d,
+                    'updated_at'       => date('Y-m-d H:i:s')
+                ]);
 
                 // Keep total_gmv as imported_gmv, do not overwrite with sum of brand GMVs
             }
@@ -9626,6 +9726,114 @@ public function send_link_task1() {
 // =====================================================================
 
 /**
+ * AJAX — Ambil creator list untuk detail brand
+ */
+public function get_brand_creators() {
+    $this->output->set_content_type('application/json');
+
+    if (!$this->session->userdata('logged_in')) {
+        return $this->output->set_output(json_encode(['success' => false, 'message' => 'Session expired']));
+    }
+
+    $brand_id = $this->input->post('brand_id');
+    $brand_name = $this->input->post('brand_name');
+
+    if (empty($brand_id) && empty($brand_name)) {
+        return $this->output->set_output(json_encode(['success' => false, 'message' => 'Brand ID or Brand Name is required']));
+    }
+
+    if ($brand_name === 'Belum ada brand' || $brand_id == 0) {
+        $this->db->select('
+            c.*,
+            "Belum ada brand" as brand_name,
+            "" as shop_name,
+            u.username as is_username,
+            u.full_name as is_full_name,
+            0 as brand_specific_gmv,
+            (SELECT COUNT(DISTINCT acl.id) 
+             FROM affiliate_creator_links acl 
+             WHERE acl.creator_id = c.id 
+               AND acl.status = "ACTIVE") as total_links,
+            (SELECT MAX(acl.created_at) 
+             FROM affiliate_creator_links acl 
+             WHERE acl.creator_id = c.id 
+               AND acl.status = "ACTIVE") as last_link_created,
+            (SELECT COALESCE(SUM(o.gmv), 0) 
+             FROM affiliate_orders o 
+             WHERE o.creator_username = c.username 
+               AND o.order_date_local >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+               AND o.order_status NOT IN ("CANCELLED", "REFUNDED")) as total_gmv_30d
+        ')
+        ->from('creators c')
+        ->join('users u', 'c.is_id = u.id', 'left')
+        ->group_start()
+            ->where('c.brand_id IS NULL')
+            ->or_where('c.brand_id', 0)
+        ->group_end()
+        ->where_in('c.status', ['PENDING', 'LINK_SWAPPING']);
+    } else {
+        $this->db->select('
+            c.*,
+            b.name as brand_name,
+            b.shop_name,
+            u.username as is_username,
+            u.full_name as is_full_name,
+            COALESCE(GREATEST(
+                COALESCE(bc.total_gmv, 0),
+                (SELECT COALESCE(SUM(o.gmv), 0) 
+                 FROM affiliate_orders o 
+                 JOIN affiliate_products ap ON o.product_id = ap.product_id
+                 WHERE o.creator_username = c.username 
+                   AND (TRIM(ap.shop_name) = TRIM(b.shop_name) OR TRIM(ap.shop_name) = TRIM(b.name))
+                   AND o.order_date_local >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+                   AND o.order_status NOT IN ("CANCELLED", "REFUNDED"))
+            ), 0) as brand_specific_gmv,
+            (SELECT COUNT(DISTINCT acl.id) 
+             FROM affiliate_creator_links acl 
+             WHERE acl.creator_id = c.id 
+               AND acl.status = "ACTIVE") as total_links,
+            (SELECT MAX(acl.created_at) 
+             FROM affiliate_creator_links acl 
+             WHERE acl.creator_id = c.id 
+               AND acl.status = "ACTIVE") as last_link_created,
+            (SELECT COALESCE(SUM(o.gmv), 0) 
+             FROM affiliate_orders o 
+             WHERE o.creator_username = c.username 
+               AND o.order_date_local >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+               AND o.order_status NOT IN ("CANCELLED", "REFUNDED")) as total_gmv_30d
+        ')
+        ->from('creators c')
+        ->join('brands b', '1=1', 'inner')
+        ->join('brand_creators bc', 'bc.brand_id = b.id AND bc.creator_username = c.username', 'left')
+        ->join('users u', 'c.is_id = u.id', 'left')
+        ->group_start()
+            ->where('c.brand_id = b.id')
+            ->or_where('bc.id IS NOT NULL')
+        ->group_end()
+        ->where_in('c.status', ['PENDING', 'LINK_SWAPPING']);
+
+        if (!empty($brand_id)) {
+            $this->db->where('b.id', $brand_id);
+        } else {
+            $this->db->group_start()
+                     ->where('b.name', $brand_name)
+                     ->or_where('b.shop_name', $brand_name)
+                     ->group_end();
+        }
+    }
+
+    $creators = $this->db->order_by('COALESCE(bc.total_gmv, 0)', 'DESC', false)
+                         ->order_by('COALESCE(c.fastmoss_gmv_28d, c.imported_gmv, 0)', 'DESC', false)
+                         ->get()
+                         ->result();
+
+    return $this->output->set_output(json_encode([
+        'success' => true,
+        'creators' => $creators
+    ]));
+}
+
+/**
  * AJAX — Ambil scouting list
  */
 public function get_scouting_list() {
@@ -10805,6 +11013,169 @@ public function get_sample_keranjang_trigger() {
             'message'   => "Berhasil resolve $resolved dari $total creator. Sisa yang belum: $remaining. "
                          . ($remaining > 0 ? 'Panggil endpoint ini lagi untuk batch berikutnya.' : 'Semua selesai!')
         ]));
+    }
+
+    /**
+     * Batch Sync Step 1 (PENDING) Creators
+     * CLI: php index.php is sync_step1_creators
+     */
+    public function sync_step1_creators()
+    {
+        $is_cli = is_cli();
+        if (!$is_cli) {
+            $this->output->set_content_type('application/json');
+        }
+
+        $this->load->model('Fastmoss_model');
+
+        // 1. Resolve UID untuk yang non-numeric / placeholder
+        $unresolved = $this->db->select('id, username, tiktok_open_id')
+            ->where('status', 'PENDING')
+            ->group_start()
+                ->where('tiktok_open_id IS NULL')
+                ->or_where('tiktok_open_id', '')
+                ->or_where('tiktok_open_id = username')
+                ->or_where('tiktok_open_id NOT REGEXP "^[0-9]+$"')
+            ->group_end()
+            ->get('creators')
+            ->result();
+
+        if (!empty($unresolved)) {
+            $msg = "Resolving UIDs for " . count($unresolved) . " creators...\n";
+            if ($is_cli) {
+                echo $msg;
+            } else {
+                log_message('info', '[sync_step1_creators] ' . $msg);
+            }
+
+            foreach ($unresolved as $c) {
+                $uid = $this->Fastmoss_model->resolve_uid_by_username($c->username);
+                if ($uid && is_numeric($uid)) {
+                    $this->db->where('id', $c->id)->update('creators', [
+                        'tiktok_open_id' => $uid,
+                        'updated_at' => date('Y-m-d H:i:s')
+                    ]);
+                    $msg2 = "Resolved @{$c->username} to {$uid}\n";
+                } else {
+                    $msg2 = "Failed to resolve @{$c->username}\n";
+                }
+
+                if ($is_cli) {
+                    echo $msg2;
+                } else {
+                    log_message('info', '[sync_step1_creators] ' . $msg2);
+                }
+                sleep(2);
+            }
+        }
+
+        // 2. Ambil semua creator di Step 1 (PENDING) yang tiktok_open_id-nya valid (numeric)
+        // tapi fastmoss_gmv_28d-nya masih NULL atau 0
+        $creators = $this->db->select('id, username, tiktok_open_id')
+            ->where('status', 'PENDING')
+            ->where('tiktok_open_id REGEXP "^[0-9]+$"')
+            ->where('(fastmoss_gmv_28d IS NULL OR fastmoss_gmv_28d = 0)')
+            ->order_by('id', 'DESC')
+            ->get('creators')
+            ->result();
+
+        $msg_count = "Found " . count($creators) . " creators to sync.\n";
+        if ($is_cli) {
+            echo $msg_count;
+        } else {
+            log_message('info', '[sync_step1_creators] ' . $msg_count);
+        }
+
+        $count = 0;
+        foreach ($creators as $c) {
+            $count++;
+            $msg_item = "[{$count}/" . count($creators) . "] Syncing @{$c->username} (UID: {$c->tiktok_open_id})... ";
+            if ($is_cli) {
+                echo $msg_item;
+            }
+
+            try {
+                // Ambil brand collabs dari FastMoss (28 hari terakhir)
+                $fm_brands = $this->Fastmoss_model->get_all_creator_brand_collabs($c->tiktok_open_id, 10);
+                
+                $sum = 0;
+                foreach ($fm_brands as $fb) {
+                    $s_name = trim($fb['shop_name'] ?? '');
+                    if (empty($s_name)) continue;
+
+                    // --- SAVE TO brand_creators TABLE ---
+                    // 1. Cari brand_id yang cocok dari database brands
+                    $db_brand = $this->db->select('id')
+                        ->group_start()
+                            ->where('name', $s_name)
+                            ->or_where('shop_name', $s_name)
+                        ->group_end()
+                        ->get('brands')
+                        ->row();
+
+                    if ($db_brand) {
+                        $existing_bc = $this->db->where('brand_id', $db_brand->id)
+                            ->where('creator_username', $c->username)
+                            ->get('brand_creators')
+                            ->row();
+
+                        $bc_data = [
+                            'brand_id'         => $db_brand->id,
+                            'creator_username' => $c->username,
+                            'creator_nickname' => $c->username,
+                            'follower_count'   => 0,
+                            'total_gmv'        => floatval($fb['gmv']),
+                            'total_orders'     => intval($fb['sales_count']),
+                            'creator_open_id'  => $c->tiktok_open_id,
+                            'last_sync'        => date('Y-m-d H:i:s'),
+                            'updated_at'       => date('Y-m-d H:i:s')
+                        ];
+
+                        if ($existing_bc) {
+                            $this->db->where('id', $existing_bc->id)->update('brand_creators', $bc_data);
+                        } else {
+                            $bc_data['created_at'] = date('Y-m-d H:i:s');
+                            $this->db->insert('brand_creators', $bc_data);
+                        }
+                    }
+                    // ------------------------------------
+
+                    $sum += floatval($fb['gmv']);
+                }
+                
+                $final_gmv = $sum;
+                
+                // Update DB
+                $this->db->where('id', $c->id)->update('creators', [
+                    'fastmoss_gmv_28d' => $final_gmv,
+                    'fastmoss_synced_at' => date('Y-m-d H:i:s'),
+                    'updated_at' => date('Y-m-d H:i:s')
+                ]);
+                
+                $msg_res = "Success (GMV: Rp " . number_format($final_gmv, 2) . ")\n";
+            } catch (Exception $e) {
+                $msg_res = "Failed: " . $e->getMessage() . "\n";
+            }
+            
+            if ($is_cli) {
+                echo $msg_res;
+            } else {
+                log_message('info', '[sync_step1_creators] ' . $msg_item . $msg_res);
+            }
+            
+            // Jeda 2 detik untuk menghindari rate limit / block dari FastMoss
+            sleep(2);
+        }
+
+        $msg_done = "Completed!\n";
+        if ($is_cli) {
+            echo $msg_done;
+        } else {
+            return $this->output->set_output(json_encode([
+                'success' => true,
+                'message' => 'Sync completed'
+            ]));
+        }
     }
 
 } // end class Is

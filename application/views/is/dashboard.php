@@ -1463,6 +1463,23 @@
             #scoutingContainerDashboard::-webkit-scrollbar { width: 5px; }
             #scoutingContainerDashboard::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.22); border-radius: 999px; }
             #scoutingContainerDashboard::-webkit-scrollbar-track { background: transparent; }
+            .brand-item-card {
+                padding: 14px;
+                margin-bottom: 10px;
+                border-radius: 13px;
+                border: 1px solid rgba(112,136,185,0.14);
+                background: rgba(9,17,34,0.56);
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                transition: all 0.2s ease-in-out;
+            }
+            .brand-item-card:hover {
+                transform: translateY(-2px);
+                border-color: rgba(139,92,246,0.3);
+                background: rgba(9,17,34,0.7);
+                box-shadow: 0 4px 15px rgba(139,92,246,0.1);
+            }
         </style>
         
         <?php
@@ -1648,29 +1665,71 @@
                 $grouped_by_brand = [];
                 foreach ($task1_creators as $item) {
                     $bname = !empty($item->shop_name) ? $item->shop_name : (!empty($item->brand_name) ? $item->brand_name : 'Belum ada brand');
-                    $grouped_by_brand[$bname][] = $item;
+                    $brand_id = !empty($item->brand_id) ? $item->brand_id : 0;
+                    $brand_total_gmv = !empty($item->brand_total_gmv) ? floatval($item->brand_total_gmv) : 0.0;
+                    
+                    if (!isset($grouped_by_brand[$bname])) {
+                        $grouped_by_brand[$bname] = [
+                            'brand_id' => $brand_id,
+                            'brand_name' => $bname,
+                            'creators_count' => 0,
+                            'total_gmv' => $brand_total_gmv,
+                            'items' => []
+                        ];
+                    }
+                    $grouped_by_brand[$bname]['items'][] = $item;
+                    $grouped_by_brand[$bname]['creators_count']++;
                 }
-                ksort($grouped_by_brand);
                 
-                foreach ($grouped_by_brand as $brand_name => $items):
+                // Sort by total_gmv DESC, then brand_name ASC
+                uasort($grouped_by_brand, function($a, $b) {
+                    if ($a['total_gmv'] == $b['total_gmv']) {
+                        return strcmp($a['brand_name'], $b['brand_name']);
+                    }
+                    return ($a['total_gmv'] < $b['total_gmv']) ? 1 : -1;
+                });
+                
+                foreach ($grouped_by_brand as $brand_name => $brand_data):
             ?>
-                <div class="brand-group-header" style="margin: 12px 0 6px 0; padding: 6px 12px; font-weight: bold; font-size: 11px; color: #a78bfa; background: rgba(139,92,246,0.08); border-radius: 8px; display: flex; align-items: center; justify-content: space-between;">
-                    <span><i class="fas fa-store" style="margin-right: 6px;"></i> <?= htmlspecialchars($brand_name) ?></span>
-                    <span style="background: rgba(139,92,246,0.15); color: #a78bfa; font-size: 9px; padding: 1px 6px; border-radius: 10px;"><?= count($items) ?></span>
+                <div class="brand-item-card">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(139,92,246,0.15); display: flex; align-items: center; justify-content: center; border: 1px solid rgba(139,92,246,0.25);">
+                            <i class="fas fa-store" style="color: #a78bfa; font-size: 16px;"></i>
+                        </div>
+                        <div>
+                            <strong style="font-size: 13px; color: var(--text-primary); display: block; line-height: 1.2;"><?= htmlspecialchars($brand_name) ?></strong>
+                            <?php 
+                            $total_promoting = ($brand_data['brand_id'] > 0 && isset($brand_creator_counts[$brand_data['brand_id']])) 
+                                ? $brand_creator_counts[$brand_data['brand_id']] 
+                                : $brand_data['creators_count'];
+                            ?>
+                            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 3px;">
+                                <span style="font-size: 10px; color: var(--is-muted-2);">
+                                    <?= $total_promoting ?> Creator mempromosikan
+                                </span>
+                                <span style="font-size: 10px; color: #34d399; font-weight: 500; display: inline-flex; align-items: center; gap: 3px;">
+                                    <i class="fas fa-chart-line" style="font-size: 8px;"></i> Rp <?= number_format($brand_data['total_gmv'], 0, ',', '.') ?>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="brand-detail-btn" 
+                            onclick="showBrandCreatorsModal(<?= $brand_data['brand_id'] ?>, '<?= htmlspecialchars(addslashes($brand_name)) ?>')" 
+                            style="background: linear-gradient(135deg, var(--purple-glow), rgba(59,130,246,0.1)); color: var(--purple); border: 1px solid rgba(139,92,246,0.3); padding: 6px 14px; border-radius: 20px; cursor: pointer; font-size: 11px; font-weight: 600; transition: var(--transition); display: inline-flex; align-items: center; gap: 6px; outline: none;">
+                        <i class="fas fa-info-circle"></i> Detail
+                    </button>
                 </div>
-                
-                <?php foreach ($items as $item) { $render_scouting_card($item); } ?>
             <?php 
                 endforeach;
             else: 
             ?>
                 <div class="stage-item-dashboard" style="padding: 30px 20px; text-align: center; border: 1px dashed rgba(139,92,246,0.3); border-radius: 13px; background: rgba(9,17,34,0.3);">
-                    <i class="fas fa-users" style="font-size: 32px; color: var(--purple); opacity: 0.5; display: block; margin-bottom: 12px;"></i>
+                    <i class="fas fa-store" style="font-size: 32px; color: var(--purple); opacity: 0.5; display: block; margin-bottom: 12px;"></i>
                     <strong style="color: var(--text-primary); font-size: 13px; display: block; margin-bottom: 6px;">
-                        <i class="fas fa-info-circle"></i> Belum ada creator
+                        <i class="fas fa-info-circle"></i> Belum ada brand
                     </strong>
                     <div style="color: var(--text-secondary); font-size: 11px; line-height: 1.6;">
-                        Klik <strong>"Tambah Creator"</strong> atau <strong>"Import Excel"</strong> untuk mulai
+                        Belum ada brand yang sedang di-scout
                     </div>
                 </div>
             <?php endif; ?>
@@ -1948,6 +2007,24 @@
                 <button onclick="closeDealConfirmModal()" style="flex: 1; background: rgba(255,255,255,0.05); color: var(--text-secondary); padding: 12px; border-radius: 40px; border: 1px solid var(--border); font-weight: 600; cursor: pointer; font-size: 13px;">
                     Batal
                 </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- MODAL DETAIL BRAND CREATORS -->
+<!-- ============================================================ -->
+<div id="brandCreatorsModal" class="modal-overlay-dashboard" style="display:none; z-index: 9998;">
+    <div class="modal-glass-dashboard" style="max-width: 900px; width: 95%;">
+        <div class="modal-header-dashboard">
+            <h3 id="brandCreatorsModalTitle"><i class="fas fa-store"></i> List Creator Brand</h3>
+            <span class="modal-close-dashboard" onclick="closeBrandCreatorsModal()">&times;</span>
+        </div>
+        <div class="modal-body" id="brandCreatorsModalBody" style="max-height: 70vh; overflow-y: auto; padding: 20px;">
+            <div style="text-align:center; padding:40px;">
+                <i class="fas fa-spinner fa-pulse fa-2x" style="color: var(--purple);"></i>
+                <p style="margin-top: 12px; color: var(--text-secondary);">Loading creator list...</p>
             </div>
         </div>
     </div>
@@ -3506,7 +3583,7 @@ async function showTask1DetailModal(creatorId) {
                         <div style="text-align:right; background: rgba(16,185,129,0.1); padding: 8px 16px; border-radius: 12px; border: 1px solid rgba(16,185,129,0.2);">
                             ${(result.fastmoss_gmv_28d > 0)
                                 ? `<div style="color:#10b981; font-size:16px; font-weight:700;">Rp ${formatNumber(result.fastmoss_gmv_28d)}</div>
-                                   <div style="font-size:10px; color:var(--text-muted);">GMV Produk <span style="opacity:.6;">(28h · FastMoss)</span></div>`
+                                   <div style="font-size:10px; color:var(--text-muted);">Total GMV Kolaborasi <span style="opacity:.6;">(28h · FastMoss)</span></div>`
                                 : `<div style="color:#10b981; font-size:16px; font-weight:700;">Rp ${formatNumber(result.total_gmv || 0)}</div>
                                    <div style="font-size:10px; color:var(--text-muted);">Total GMV Kolaborasi</div>`
                             }
@@ -3554,8 +3631,11 @@ async function showTask1DetailModal(creatorId) {
                         </div>
                         <div style="color:var(--text-muted);font-size:9px;">${b.total_products || 0} produk</div>
                     </div>
-                    <div style="color:${accentColor};font-size:11px;font-weight:700;flex-shrink:0;text-align:right;">
-                        Rp ${formatNumber(b.total_gmv || 0)}
+                    <div style="flex-shrink:0;text-align:right;display:flex;flex-direction:column;align-items:flex-end;justify-content:center;">
+                        <span style="color:${accentColor};font-size:11px;font-weight:700;line-height:1.2;">
+                            Rp ${formatNumber(b.total_gmv || 0)}
+                        </span>
+                        <span style="font-size:8px;color:var(--text-muted);margin-top:1px;">GMV (28 hari)</span>
                     </div>
                 </div>`;
             }
@@ -4387,6 +4467,143 @@ function applyScoutingViewMode() {
             if (creatorView) creatorView.style.display = 'none';
             if (brandView) brandView.style.display = 'block';
         }
+    }
+}
+
+function closeBrandCreatorsModal() {
+    const modal = document.getElementById('brandCreatorsModal');
+    if (modal) {
+        modal.style.display = 'none';
+        modal.classList.remove('active');
+    }
+}
+
+async function showBrandCreatorsModal(brandId, brandName) {
+    console.log('showBrandCreatorsModal called with:', brandId, brandName);
+    
+    const modal = document.getElementById('brandCreatorsModal');
+    const body = document.getElementById('brandCreatorsModalBody');
+    const title = document.getElementById('brandCreatorsModalTitle');
+    
+    if (!modal || !body || !title) {
+        showToastGlobal('Modal tidak ditemukan', 'error');
+        return;
+    }
+    
+    modal.style.display = 'flex';
+    modal.classList.add('active');
+    title.innerHTML = `<i class="fas fa-store" style="color: var(--purple);"></i> Brand: ${escapeHtml(brandName)}`;
+    body.innerHTML = `
+        <div style="text-align:center; padding:40px;">
+            <i class="fas fa-spinner fa-pulse fa-2x" style="color: var(--purple);"></i>
+            <p style="margin-top: 12px; color: var(--text-secondary);">Loading creator list...</p>
+        </div>
+    `;
+    
+    try {
+        const formData = new FormData();
+        formData.append('brand_id', brandId);
+        formData.append('brand_name', brandName);
+        
+        const response = await fetch(BASE_URL + 'is/get_brand_creators', {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const result = await response.json();
+        console.log('Brand Creators result:', result);
+        
+        if (!result.success || !result.creators || result.creators.length === 0) {
+            body.innerHTML = `
+                <div style="text-align:center; padding:40px;">
+                    <i class="fas fa-user-slash fa-2x" style="color: var(--is-muted);"></i>
+                    <p style="margin-top: 12px; color: var(--text-secondary);">Tidak ada creator yang ditemukan untuk brand ini</p>
+                    <button onclick="closeBrandCreatorsModal()" style="margin-top:16px; padding: 8px 24px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); cursor: pointer;">Close</button>
+                </div>
+            `;
+            return;
+        }
+        
+        let html = `<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; width: 100%;">`;
+        result.creators.forEach(c => {
+            const phone = c.phone || '';
+            const isPhoneValid = (phone && phone !== 'no_phone');
+            const gmv_display = parseFloat(c.brand_specific_gmv || 0);
+            const statusLabel = c.status || 'PENDING';
+            
+            html += `
+                <div class="scouting-item-dashboard" 
+                     style="padding: 14px; border-radius: 13px; border: 1px solid rgba(112,136,185,0.14); background: rgba(9,17,34,0.7); display: flex; flex-direction: column; gap: 8px; position: relative;">
+                    
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <strong style="font-size: 13px; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                            <i class="fab fa-tiktok" style="color: #8b5cf6;"></i> 
+                            @${escapeHtml(c.username)}
+                        </strong>
+                        <div style="display:flex; gap:4px; align-items:center;">
+                            <span class="badge-dashboard" style="font-size:8px; padding:3px 8px; background: rgba(139,92,246,0.15); color: #a78bfa; border-radius: 8px;">
+                                <i class="fas fa-info-circle"></i> ${escapeHtml(statusLabel)}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <!-- WA & GMV -->
+                    <div style="display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 10px; color: var(--text-secondary);">
+                        <span style="display: inline-flex; align-items: center; gap: 4px;">
+                            <i class="fab fa-whatsapp" style="color: #25D366;"></i> 
+                            ${isPhoneValid ? escapeHtml(phone) : '<span style="color: #ef4444;">Tidak ada</span>'}
+                        </span>
+                        ${gmv_display > 0 ? `
+                        <span style="display: inline-flex; align-items: center; gap: 4px; color:#34d399;">
+                            <i class="fas fa-chart-line"></i> GMV: Rp ${formatNumber(gmv_display)}
+                        </span>
+                        ` : ''}
+                    </div>
+                    
+                    ${c.is_full_name ? `
+                    <div style="font-size: 9.5px; color: var(--is-muted-2);">
+                        <i class="fas fa-user-tie"></i> Handler: <strong>${escapeHtml(c.is_full_name)}</strong>
+                    </div>
+                    ` : ''}
+
+                    <!-- Tombol Aksi -->
+                    <div style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
+                        <button onclick="closeBrandCreatorsModal(); showTask1DetailModal('${c.id}')"
+                                style="background: rgba(139,92,246,0.1); color: #a78bfa; border: 1px solid rgba(139,92,246,0.25); padding: 4px 10px; border-radius: 20px; cursor: pointer; font-size: 9px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; outline: none; transition: 0.2s;">
+                            <i class="fas fa-info-circle"></i> Detail
+                        </button>
+                        ${c.status === 'PENDING' || c.status === 'LINK_SWAPPING' ? `
+                        <button onclick="closeBrandCreatorsModal(); showTask1SendLinkModal('${c.id}')"
+                                style="background: linear-gradient(135deg, #10b981, #059669); color: white; border: none; padding: 4px 10px; border-radius: 20px; cursor: pointer; font-size: 9px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; outline: none; transition: 0.2s;">
+                            <i class="fas fa-paper-plane"></i> Send Link
+                        </button>
+                        <button onclick="closeBrandCreatorsModal(); showTask1FollowUpModal('${c.id}')"
+                                style="background: linear-gradient(135deg, #f59e0b, #d97706); color: white; border: none; padding: 4px 10px; border-radius: 20px; cursor: pointer; font-size: 9px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; outline: none; transition: 0.2s;">
+                            <i class="fas fa-comment"></i> Follow Up
+                        </button>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        });
+        html += `</div>`;
+        body.innerHTML = html;
+        
+    } catch (err) {
+        console.error(err);
+        body.innerHTML = `
+            <div style="text-align:center; padding:40px; color: #ef4444;">
+                <i class="fas fa-exclamation-triangle fa-2x"></i>
+                <p style="margin-top: 12px;">Gagal mengambil data creator</p>
+                <span style="font-size: 11px; color: var(--text-muted);">${escapeHtml(err.message)}</span>
+                <br>
+                <button onclick="closeBrandCreatorsModal()" style="margin-top:16px; padding: 8px 24px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); cursor: pointer;">Close</button>
+            </div>
+        `;
     }
 }
 

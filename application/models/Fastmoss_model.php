@@ -212,7 +212,7 @@ class Fastmoss_model extends CI_Model
         $cnonce = rand(10000000, 99999999);
 
         $url = $this->baseUrl . "/api/author/search"
-            . "?keyword=" . urlencode($username)
+            . "?name=" . urlencode($username)
             . "&region={$region}"
             . "&page=1"
             . "&pagesize=10"
@@ -224,7 +224,10 @@ class Fastmoss_model extends CI_Model
             $this->headers('https://www.fastmoss.com/id/influencer')
         );
 
-        return $json['data']['list']
+        log_message('debug', '[FastMoss][search_creator] raw_json=' . json_encode($json));
+
+        return $json['data']['author_list']
+            ?? $json['data']['list']
             ?? $json['data']['rows']
             ?? $json['data']['data']
             ?? [];
@@ -254,7 +257,7 @@ class Fastmoss_model extends CI_Model
         $time   = time();
         $cnonce = rand(10000000, 99999999);
         $url    = $this->baseUrl . "/api/author/search"
-            . "?keyword=" . urlencode($username)
+            . "?name=" . urlencode($username)
             . "&region=ID"
             . "&page=1"
             . "&pagesize=10"
@@ -262,7 +265,7 @@ class Fastmoss_model extends CI_Model
             . "&cnonce={$cnonce}";
 
         $json = $this->request_json($url, $this->headers('https://www.fastmoss.com/id/influencer'));
-        $list = $json['data']['list'] ?? $json['data']['rows'] ?? $json['data']['data'] ?? [];
+        $list = $json['data']['author_list'] ?? $json['data']['list'] ?? $json['data']['rows'] ?? $json['data']['data'] ?? [];
 
         if (!empty($list)) {
             foreach ($list as $row) {
@@ -281,7 +284,7 @@ class Fastmoss_model extends CI_Model
 
         // ── Strategi 3: search tanpa cookie ───────────────────────
         $json2 = $this->request_json_no_cookie($url, $this->headers('https://www.fastmoss.com/id/influencer'));
-        $list2 = $json2['data']['list'] ?? $json2['data']['rows'] ?? $json2['data']['data'] ?? [];
+        $list2 = $json2['data']['author_list'] ?? $json2['data']['list'] ?? $json2['data']['rows'] ?? $json2['data']['data'] ?? [];
 
         if (!empty($list2)) {
             foreach ($list2 as $row) {
@@ -327,8 +330,6 @@ class Fastmoss_model extends CI_Model
                          ?? $data['user']['uid'] ?? $data['user']['author_id']
                          ?? null;
             if ($returned_uid) return (string)$returned_uid;
-            // Kalau tidak ada field uid tapi data valid, pakai candidate itu sendiri
-            return (string)$candidate;
         }
 
         // Coba dengan cookie
@@ -344,7 +345,6 @@ class Fastmoss_model extends CI_Model
                           ?? $data2['user']['uid'] ?? $data2['user']['author_id']
                           ?? null;
             if ($returned_uid2) return (string)$returned_uid2;
-            return (string)$candidate;
         }
 
         return null;
@@ -446,10 +446,14 @@ class Fastmoss_model extends CI_Model
             . ' has_data=' . (!empty($json['data']) ? 'yes' : 'no')
             . ' msg='      . ($json['msg'] ?? $json['message'] ?? '')
         );
+        log_message('debug', '[FastMoss][summary] raw_json=' . json_encode($json));
 
         if ($json['code'] !== 200 || empty($json['data'])) {
             return [];
         }
+
+        $d = $json['data'];
+        $gmv_28d = floatval($d['goods_max_sale_amount'] ?? 0);
 
         // total_sales dalam 28 hari
         $sales_28d = intval($d['goods_max_sold_count'] ?? 0);
@@ -502,7 +506,7 @@ class Fastmoss_model extends CI_Model
             . '&page='     . intval($page)
             . '&pagesize=' . intval($pageSize)
             . '&order=gmv,2'       // urutkan by GMV descending
-            . '&date_type=0'       // all-time
+            . '&date_type=28'      // 28 hari terakhir
             . '&_time='    . $time
             . '&cnonce='   . $cnonce;
 
@@ -528,6 +532,7 @@ class Fastmoss_model extends CI_Model
             . ' list_count=' . count($json['data']['list'] ?? $json['data']['rows'] ?? [])
             . ' msg=' . ($json['msg'] ?? $json['message'] ?? '')
         );
+        log_message('debug', '[FastMoss][shopList] raw_json=' . json_encode($json));
 
         if (!empty($json['error'])) {
             return ['brands' => [], 'total' => 0, 'error' => $json['message'] ?? 'Request error'];
@@ -658,5 +663,4 @@ class Fastmoss_model extends CI_Model
     {
         return $this->cookie_string();
     }
-
 }
