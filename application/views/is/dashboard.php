@@ -3716,6 +3716,7 @@ async function showTask1DetailModal(creatorId) {
             `;
         }
         
+        /*
         // PRODUCTS
         if (products.length > 0) {
             html += `
@@ -3750,6 +3751,7 @@ async function showTask1DetailModal(creatorId) {
                 </div>
             `;
         }
+        */
         
         // MULTI LINKS
         if (multiLinks.length > 0) {
