@@ -6284,6 +6284,42 @@ document.getElementById('phoneDuplicateModal').addEventListener('click', functio
     </div>
 </div>
 
+<!-- Modal Warning Requirement Tidak Terpenuhi -->
+<div class="db-sample-overlay" id="dbReqWarningOverlay">
+    <div class="db-sample-modal" style="max-width:480px;text-align:center;">
+        <div style="font-size:42px;margin-bottom:10px;color:#f59e0b">⚠️</div>
+        <h4 style="color:#f87171;font-size:16px;margin-bottom:8px;">Requirement Brand Tidak Terpenuhi</h4>
+        <p style="font-size:12px;color:#cbd5e1;line-height:1.6;margin-bottom:14px;">
+            Creator ini <strong>tidak memenuhi requirement minimum GMV</strong> yang ditentukan oleh brand. Apakah Anda ingin tetap melanjutkan pengiriman sample?
+        </p>
+
+        <!-- Summary Card Requirement -->
+        <div style="background:#0f172a;border:1px solid rgba(245,158,11,0.25);border-radius:14px;padding:12px 16px;margin-bottom:18px;text-align:left;font-size:11px;color:#94a3b8;display:flex;flex-direction:column;gap:6px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+                <span>Brand Dipromosikan:</span>
+                <strong id="dbReqWarnBrand" style="color:#e2e8f0;">-</strong>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+                <span>GMV Creator di Brand ini:</span>
+                <strong id="dbReqWarnCreatorGmv" style="color:#f87171;">-</strong>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+                <span>Requirement Min. GMV Brand:</span>
+                <strong id="dbReqWarnMinGmv" style="color:#38bdf8;">-</strong>
+            </div>
+        </div>
+
+        <div class="db-sample-btns" style="flex-direction:column;gap:8px;">
+            <button class="db-sample-btn" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#0a0e17;font-weight:700;" onclick="dbForceProceedWilling()">
+                ⚡ Tetap Lanjutkan Pengiriman Sample
+            </button>
+            <button class="db-sample-btn" style="background:rgba(255,255,255,0.08);color:#94a3b8;border:1px solid rgba(255,255,255,0.15);" onclick="dbCloseReqWarningModal()">
+                ✕ Batal Pengiriman
+            </button>
+        </div>
+    </div>
+</div>
+
 <!-- Modal Rekomendasi Produk -->
 <div class="db-rec-overlay" id="dbRecOverlay">
     <div class="db-rec-modal">
@@ -6351,15 +6387,57 @@ document.getElementById('phoneDuplicateModal').addEventListener('click', functio
     let _dbSelProducts = [];
     let _dbAllRecommendations = [];
 
-    // Buka modal konfirmasi kesediaan
+    // Buka modal konfirmasi kesediaan (dengan validasi requirement brand terlebih dahulu)
     window.openDashboardWillingModal = function(creatorId, username) {
         _dbCreatorId   = creatorId;
         _dbCreatorName = username;
         _dbSelProducts = [];
         _dbAllRecommendations = [];
+
+        showToastGlobal('Memeriksa requirement brand creator...', 'info');
+
+        fetch(BASE_URL + 'is/check_sample_requirement', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: `creator_id=${creatorId}`
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) {
+                dbDirectOpenWillingModal(username);
+                return;
+            }
+
+            if (data.meets_requirement) {
+                // Condition 1: Creator memenuhi requirement -> langsung buka modal kesediaan
+                dbDirectOpenWillingModal(username);
+            } else {
+                // Condition 2: Creator TIDAK memenuhi requirement -> tampilkan modal warning terlebih dahulu
+                document.getElementById('dbReqWarnBrand').textContent = data.brand_name || '-';
+                document.getElementById('dbReqWarnCreatorGmv').textContent = data.formatted_creator_gmv || 'Rp 0';
+                document.getElementById('dbReqWarnMinGmv').textContent = data.formatted_min_gmv || 'Rp 0';
+                document.getElementById('dbReqWarningOverlay').classList.add('active');
+            }
+        })
+        .catch(err => {
+            console.error('Requirement check error:', err);
+            dbDirectOpenWillingModal(username);
+        });
+    };
+
+    function dbDirectOpenWillingModal(username) {
         document.getElementById('dbWillingName').textContent = '@' + username;
         document.getElementById('dbWillingNotes').value = '';
         document.getElementById('dbWillingOverlay').classList.add('active');
+    }
+
+    window.dbCloseReqWarningModal = function() {
+        document.getElementById('dbReqWarningOverlay').classList.remove('active');
+    };
+
+    window.dbForceProceedWilling = function() {
+        dbCloseReqWarningModal();
+        dbDirectOpenWillingModal(_dbCreatorName);
     };
 
     window.dbCloseWillingModal = function() {

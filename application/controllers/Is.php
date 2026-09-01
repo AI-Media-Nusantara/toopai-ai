@@ -10297,6 +10297,85 @@ public function confirm_sample_willingness() {
 // --------------------------------------------------------------------------
 
 /**
+ * Cek validasi requirement brand (Minimum GMV) sebelum pengiriman sample.
+ * POST param: creator_id
+ */
+public function check_sample_requirement() {
+    $this->output->set_content_type('application/json');
+
+    try {
+        $creator_id = $this->input->post('creator_id');
+
+        if (!$creator_id) {
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Creator ID required'
+            ]));
+        }
+
+        // Ambil data creator dan brand yang sedang dipromosikan
+        $creator = $this->db->select('c.id, c.username, c.brand_id, c.imported_gmv, c.fastmoss_gmv_28d, b.name as brand_name, b.shop_name, COALESCE(b.creator_gmv, b.requirement_creator_gmv, 0) as min_gmv_req')
+            ->from('creators c')
+            ->join('brands b', 'c.brand_id = b.id', 'left')
+            ->where('c.id', $creator_id)
+            ->get()
+            ->row();
+
+        if (!$creator) {
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Creator tidak ditemukan'
+            ]));
+        }
+
+        // Minimum GMV yang ditentukan oleh brand pada requirement
+        $min_gmv_req = floatval($creator->min_gmv_req ?? 0);
+
+        // Hitung GMV creator khusus pada brand yang sedang dipromosikan
+        $brand_gmv = 0;
+        if (!empty($creator->username) && (!empty($creator->brand_id) || !empty($creator->shop_name))) {
+            $this->db->select('COALESCE(SUM(o.gmv), 0) as total_gmv')
+                ->from('affiliate_orders o')
+                ->where('o.creator_username', $creator->username)
+                ->where('o.order_status NOT IN ("CANCELLED", "REFUNDED")');
+
+            if (!empty($creator->shop_name)) {
+                $this->db->join('affiliate_products ap', 'o.product_id = ap.product_id', 'left');
+                $this->db->where('LOWER(TRIM(ap.shop_name))', strtolower(trim($creator->shop_name)));
+            }
+
+            $res = $this->db->get()->row();
+            $brand_gmv = floatval($res->total_gmv ?? 0);
+        }
+
+        // Fallback: Jika orders belum ter-sync ke affiliate_orders tapi creator terikat di brand ini
+        if ($brand_gmv <= 0) {
+            $brand_gmv = floatval($creator->fastmoss_gmv_28d ?? $creator->imported_gmv ?? 0);
+        }
+
+        // Pengecekan requirement: jika min_gmv_req <= 0, maka dianggap memenuhi requirement
+        $meets_requirement = ($min_gmv_req <= 0) || ($brand_gmv >= $min_gmv_req);
+
+        return $this->output->set_output(json_encode([
+            'success'               => true,
+            'meets_requirement'     => $meets_requirement,
+            'brand_name'            => $creator->brand_name ?: ($creator->shop_name ?: 'Brand'),
+            'creator_brand_gmv'     => $brand_gmv,
+            'min_gmv_req'           => $min_gmv_req,
+            'formatted_creator_gmv' => 'Rp ' . number_format($brand_gmv, 0, ',', '.'),
+            'formatted_min_gmv'     => 'Rp ' . number_format($min_gmv_req, 0, ',', '.'),
+        ]));
+
+    } catch (Exception $e) {
+        log_message('error', 'check_sample_requirement error: ' . $e->getMessage());
+        return $this->output->set_output(json_encode([
+            'success' => false,
+            'message' => 'Server error: ' . $e->getMessage()
+        ]));
+    }
+}
+
+/**
  * Ambil rekomendasi produk sample untuk creator.
  * Berbasis kategori sama, brand berbeda dari produk yang sudah dimiliki.
  *
