@@ -6314,17 +6314,10 @@ document.getElementById('phoneDuplicateModal').addEventListener('click', functio
                 <span class="db-rec-foot-count">Dipilih: <strong id="dbRecCount">0</strong> produk</span>
             </div>
             <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
-                <!-- Pilihan metode pengiriman -->
-                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-                    <span style="font-size:10px;color:#94a3b8;font-weight:600;">Metode:</span>
-                    <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:#e2e8f0;cursor:pointer">
-                        <input type="radio" name="dbDeliveryMethod" value="manual" checked onchange="dbOnMethodChange(this.value)" style="accent-color:#4ade80">
-                        Manual
-                    </label>
-                    <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:#e2e8f0;cursor:pointer">
-                        <input type="radio" name="dbDeliveryMethod" value="system" onchange="dbOnMethodChange(this.value)" style="accent-color:#3b82f6">
-                        By System (TAP)
-                    </label>
+                <!-- Informasi metode pengiriman (Ditentukan oleh Brand) -->
+                <div id="dbDeliveryMethodInfo" style="display:flex;align-items:center;gap:6px;font-size:11px;color:#e2e8f0;flex-wrap:wrap">
+                    <span style="color:#94a3b8;font-weight:600;">Metode Pengiriman Brand:</span>
+                    <span id="dbDeliveryMethodText" style="font-weight:600;color:#64748b;">(Pilih produk terlebih dahulu)</span>
                 </div>
                 <!-- Input TAP Request ID — muncul hanya jika By System -->
                 <div id="dbTapIdWrap" style="display:none;width:100%">
@@ -6415,13 +6408,25 @@ document.getElementById('phoneDuplicateModal').addEventListener('click', functio
                         <i class="fas ${p.badge_icon || 'fa-tag'}"></i> ${escHtmlDb(p.badge_label)}
                     </span>
                 </div>` : '';
+            
+            const methodBadge = (p.delivery_method === 'system') ? `
+                <span style="font-size:8px;padding:1px 5px;border-radius:6px;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);font-weight:600;margin-left:4px;">
+                    ⚡ By System
+                </span>` : `
+                <span style="font-size:8px;padding:1px 5px;border-radius:6px;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);font-weight:600;margin-left:4px;">
+                    🚚 Manual
+                </span>`;
+
             return `
                 <div class="db-rec-item ${isSel ? 'sel' : ''}" data-db-rec-key="${pId}">
                     <div class="chk">✓</div>
                     ${p.image_url ? `<img src="${escHtmlDb(p.image_url)}" class="db-rec-img" onerror="this.style.display='none'">` : '<div class="db-rec-img" style="display:flex;align-items:center;justify-content:center;color:#64748b"><i class="fas fa-image fa-2x"></i></div>'}
                     ${badgeHtml}
                     <div class="db-rec-name">${escHtmlDb(p.product_name || p.name || '-')}</div>
-                    <div class="db-rec-brand">🏪 ${escHtmlDb(p.shop_name || p.brand_display_name || '-')}</div>
+                    <div class="db-rec-brand" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px;">
+                        <span>🏪 ${escHtmlDb(p.shop_name || p.brand_display_name || '-')}</span>
+                        ${methodBadge}
+                    </div>
                 </div>`;
         }).join('');
 
@@ -6440,8 +6445,32 @@ document.getElementById('phoneDuplicateModal').addEventListener('click', functio
                     this.classList.add('sel');
                 }
                 document.getElementById('dbRecCount').textContent = _dbSelProducts.length;
+                dbUpdateDeliveryMethodInfo();
             });
         });
+    }
+
+    function dbUpdateDeliveryMethodInfo() {
+        const infoText = document.getElementById('dbDeliveryMethodText');
+        const tapWrap = document.getElementById('dbTapIdWrap');
+        if (!infoText) return;
+
+        if (_dbSelProducts.length === 0) {
+            infoText.innerHTML = '<span style="color:#64748b;">(Pilih produk terlebih dahulu)</span>';
+            if (tapWrap) tapWrap.style.display = 'none';
+            return;
+        }
+
+        const hasSystem = _dbSelProducts.some(p => p.delivery_method === 'system' || p.sample_type === 'auto' || p.sample_method === 'auto');
+        const brandsList = Array.from(new Set(_dbSelProducts.map(p => p.shop_name || p.brand_display_name || 'Brand'))).join(', ');
+
+        if (hasSystem) {
+            infoText.innerHTML = `<span style="color:#60a5fa;font-weight:700;"><i class="fas fa-bolt"></i> By System (TAP)</span> <span style="color:#94a3b8;font-size:10px;">(Brand ${escHtmlDb(brandsList)})</span>`;
+            if (tapWrap) tapWrap.style.display = 'block';
+        } else {
+            infoText.innerHTML = `<span style="color:#34d399;font-weight:700;"><i class="fas fa-truck"></i> Manual</span> <span style="color:#94a3b8;font-size:10px;">(Brand ${escHtmlDb(brandsList)})</span>`;
+            if (tapWrap) tapWrap.style.display = 'none';
+        }
     }
 
     window.dbFilterRecProducts = function() {
@@ -6465,9 +6494,7 @@ document.getElementById('phoneDuplicateModal').addEventListener('click', functio
         if (document.getElementById('dbRecSearchInput')) {
             document.getElementById('dbRecSearchInput').value = '';
         }
-        // Reset metode ke Manual setiap kali modal dibuka
-        document.querySelectorAll('input[name="dbDeliveryMethod"]').forEach(r => { r.checked = r.value === 'manual'; });
-        document.getElementById('dbTapIdWrap').style.display = 'none';
+        dbUpdateDeliveryMethodInfo();
         document.getElementById('dbTapRequestId').value = '';
         document.getElementById('dbRecGrid').innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:30px;color:#94a3b8"><i class="fas fa-spinner fa-pulse fa-2x"></i></div>';
         document.getElementById('dbRecOverlay').classList.add('active');
@@ -6498,21 +6525,18 @@ document.getElementById('phoneDuplicateModal').addEventListener('click', functio
         document.getElementById('dbRecOverlay').classList.remove('active');
     };
 
-    // Toggle TAP Request ID input berdasarkan metode yang dipilih
-    window.dbOnMethodChange = function(value) {
-        document.getElementById('dbTapIdWrap').style.display = value === 'system' ? 'block' : 'none';
-    };
-
     window.dbConfirmSampleDelivery = function() {
         if (_dbSelProducts.length === 0) {
             showToastGlobal('Pilih minimal 1 produk sample', 'error');
             return;
         }
-        const deliveryMethod = document.querySelector('input[name="dbDeliveryMethod"]:checked')?.value || 'manual';
+
+        const hasSystem = _dbSelProducts.some(p => p.delivery_method === 'system' || p.sample_type === 'auto' || p.sample_method === 'auto');
+        const deliveryMethod = hasSystem ? 'system' : 'manual';
         const tapRequestId   = document.getElementById('dbTapRequestId').value.trim();
 
         if (deliveryMethod === 'system' && !tapRequestId) {
-            showToastGlobal('TAP Request ID wajib diisi untuk pengiriman By System', 'error');
+            showToastGlobal('TAP Request ID wajib diisi untuk pengiriman By System (TAP)', 'error');
             return;
         }
 

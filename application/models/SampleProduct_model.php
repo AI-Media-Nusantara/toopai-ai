@@ -113,7 +113,7 @@ class SampleProduct_model extends CI_Model {
 
         log_message('debug', "[SampleRec] creator_id={$creator_id} username={$username} | product_ids=" . count($creator_product_ids) . " brands=" . count($creator_brands) . " categories=" . count($creator_categories) . " | brands=[" . implode(',', $creator_brands) . "] | categories=[" . implode(',', $creator_categories) . "]");
 
-        $select_fields = 'ap.*, b.id as brand_db_id, b.name as brand_display_name, b.sample_type, COALESCE(b.is_bestseller, 0) as is_bestseller, COALESCE(b.is_trending, 0) as is_trending, COALESCE(b.day7_gmv, 0) as brand_day7_gmv, COALESCE(b.total_gmv, 0) as brand_total_gmv';
+        $select_fields = 'ap.*, b.id as brand_db_id, b.name as brand_display_name, b.sample_type, b.sample_method, COALESCE(b.is_bestseller, 0) as is_bestseller, COALESCE(b.is_trending, 0) as is_trending, COALESCE(b.day7_gmv, 0) as brand_day7_gmv, COALESCE(b.total_gmv, 0) as brand_total_gmv';
 
         // ----------------------------------------------------------------
         // 2. Query utama: kategori SAMA, brand BERBEDA, produk BERBEDA
@@ -224,6 +224,17 @@ class SampleProduct_model extends CI_Model {
 
         foreach ($recs as &$p) {
             $sc = intval($p->sales_count ?? 0);
+
+            // Tentukan metode pengiriman produk berdasarkan konfigurasi Brand
+            $st = strtolower(trim($p->sample_type ?? ''));
+            $sm = strtolower(trim($p->sample_method ?? ''));
+            if ($st === 'auto' || $st === 'system' || $sm === 'auto' || $sm === 'system') {
+                $p->delivery_method = 'system';
+                $p->delivery_method_label = 'By System (TAP)';
+            } else {
+                $p->delivery_method = 'manual';
+                $p->delivery_method_label = 'Manual';
+            }
 
             // Best Seller: Brand Bestseller di TAP ATAU produk top sales (minimal 30% dari sales tertinggi & min 1000 sales)
             $is_bestseller = (!empty($p->is_bestseller) && intval($p->is_bestseller) === 1)
