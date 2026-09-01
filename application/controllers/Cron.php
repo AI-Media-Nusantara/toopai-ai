@@ -758,28 +758,41 @@ public function force_sync($date = null) {
      */
     public function sync_brands_data() {
         echo "  Syncing brands performance status (Bestseller & Trending)...\n";
+        
+        // Auto-migrate database columns if missing on server database
+        if (!$this->db->field_exists('day7_gmv', 'brand_creators')) {
+            $this->db->query("ALTER TABLE brand_creators ADD COLUMN day7_gmv DECIMAL(15,2) DEFAULT 0.00 AFTER total_gmv");
+        }
+        if (!$this->db->field_exists('is_bestseller', 'brands')) {
+            $this->db->query("ALTER TABLE brands ADD COLUMN is_bestseller TINYINT(1) DEFAULT 0, ADD COLUMN is_trending TINYINT(1) DEFAULT 0, ADD COLUMN day7_gmv DECIMAL(15,2) DEFAULT 0.00");
+        }
+
         $brands = $this->db->get('brands')->result();
         if (empty($brands)) return;
 
+        $has_day7_col = $this->db->field_exists('day7_gmv', 'brand_creators');
+
         $brand_stats = [];
         foreach ($brands as $b) {
-            $gmv_28d_row = $this->db->query("
+            $gmv_28d_q = $this->db->query("
                 SELECT COALESCE(SUM(bc.total_gmv), 0) as gmv
                 FROM brand_creators bc
                 JOIN creators c ON bc.creator_username = c.username
                 WHERE bc.brand_id = ? AND c.status IN ('PENDING', 'LINK_SWAPPING')
-            ", [$b->id])->row();
+            ", [$b->id]);
             
-            $gmv_28d = floatval($gmv_28d_row->gmv ?? 0);
+            $gmv_28d = ($gmv_28d_q && is_object($gmv_28d_q) && $gmv_28d_q->num_rows() > 0) ? floatval($gmv_28d_q->row()->gmv ?? 0) : 0.0;
 
-            $gmv_7d_row = $this->db->query("
-                SELECT COALESCE(SUM(bc.day7_gmv), 0) as gmv
-                FROM brand_creators bc
-                JOIN creators c ON bc.creator_username = c.username
-                WHERE bc.brand_id = ? AND c.status IN ('PENDING', 'LINK_SWAPPING')
-            ", [$b->id])->row();
-            
-            $gmv_7d = floatval($gmv_7d_row->gmv ?? 0);
+            $gmv_7d = 0.0;
+            if ($has_day7_col) {
+                $gmv_7d_q = $this->db->query("
+                    SELECT COALESCE(SUM(bc.day7_gmv), 0) as gmv
+                    FROM brand_creators bc
+                    JOIN creators c ON bc.creator_username = c.username
+                    WHERE bc.brand_id = ? AND c.status IN ('PENDING', 'LINK_SWAPPING')
+                ", [$b->id]);
+                $gmv_7d = ($gmv_7d_q && is_object($gmv_7d_q) && $gmv_7d_q->num_rows() > 0) ? floatval($gmv_7d_q->row()->gmv ?? 0) : 0.0;
+            }
 
             $brand_stats[$b->id] = [
                 'brand_id' => $b->id,
@@ -805,13 +818,21 @@ public function force_sync($date = null) {
             $is_bestseller = ($stat['gmv_28d'] > 0 && ($rank <= 3 || ($max_gmv_28d > 0 && $stat['gmv_28d'] >= ($max_gmv_28d * 0.2)))) ? 1 : 0;
             $is_trending = ($stat['gmv_7d'] > 0) ? 1 : 0;
 
-            $this->db->where('id', $bid)->update('brands', [
+            $update_data = [
                 'total_gmv' => $stat['gmv_28d'],
-                'day7_gmv' => $stat['gmv_7d'],
-                'is_bestseller' => $is_bestseller,
-                'is_trending' => $is_trending,
                 'updated_at' => date('Y-m-d H:i:s')
-            ]);
+            ];
+            if ($this->db->field_exists('day7_gmv', 'brands')) {
+                $update_data['day7_gmv'] = $stat['gmv_7d'];
+            }
+            if ($this->db->field_exists('is_bestseller', 'brands')) {
+                $update_data['is_bestseller'] = $is_bestseller;
+            }
+            if ($this->db->field_exists('is_trending', 'brands')) {
+                $update_data['is_trending'] = $is_trending;
+            }
+
+            $this->db->where('id', $bid)->update('brands', $update_data);
         }
     }
 
