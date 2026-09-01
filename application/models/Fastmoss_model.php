@@ -544,6 +544,8 @@ class Fastmoss_model extends CI_Model
         // Normalise setiap baris brand — field names sesuai response FastMoss shopList
         $brands = [];
         foreach ($list as $row) {
+            $rating_raw = floatval($row['shop_rating'] ?? 0);
+            $rating_val = $rating_raw > 5 ? round($rating_raw / 10, 1) : $rating_raw;
             $brands[] = [
                 'shop_id'       => $row['id']            ?? '',
                 'shop_name'     => $row['name']          ?? $row['shop_name'] ?? '',
@@ -551,6 +553,8 @@ class Fastmoss_model extends CI_Model
                 'product_count' => intval($row['product_count'] ?? $row['product_cnt'] ?? $row['goods_count'] ?? 0),
                 'sales_count'   => intval($row['sold_count']    ?? $row['sales_count']  ?? 0),
                 'gmv'           => floatval($row['sale_amount'] ?? $row['gmv']          ?? $row['sales_amount'] ?? 0),
+                'day7_gmv'      => floatval($row['day7_sale_amount'] ?? $row['day7_gmv'] ?? 0),
+                'shop_rating'   => $rating_val,
                 'region'        => $row['region']        ?? 'ID',
             ];
         }

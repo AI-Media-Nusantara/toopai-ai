@@ -30,9 +30,12 @@ class Is extends CI_Controller {
 // DASHBOARD UTAMA - IS (3 TASK) - TANPA KOMENTAR DI QUERY
 // ========================================================================
 public function dashboard() {
-    $user_id = $this->session->userdata('user_id');
+    $user_id = intval($this->session->userdata('user_id') ?: 0);
     $is_supervisor = ($user_id == 2);
     
+    // Auto-sync performa brand Bestseller & Trending secara otomatis di background
+    $this->sync_brand_tap_performance();
+
     // ====================================================================
     // 🔥 TASK 1: SCOUTING - AUTO GENERATE LINK
     // ====================================================================
@@ -40,11 +43,18 @@ public function dashboard() {
             c.*,
             b.name as brand_name,
             b.shop_name,
+            b.is_bestseller as brand_is_bestseller,
+            b.is_trending as brand_is_trending,
             (SELECT COALESCE(SUM(bc.total_gmv), 0) 
              FROM brand_creators bc 
              JOIN creators c2 ON bc.creator_username = c2.username
              WHERE bc.brand_id = b.id 
                AND c2.status IN ("PENDING", "LINK_SWAPPING")) as brand_total_gmv,
+            (SELECT COALESCE(SUM(bc.day7_gmv), 0) 
+             FROM brand_creators bc 
+             JOIN creators c2 ON bc.creator_username = c2.username
+             WHERE bc.brand_id = b.id 
+               AND c2.status IN ("PENDING", "LINK_SWAPPING")) as brand_day7_gmv,
             u.username as is_username,
             u.full_name as is_full_name,
             (SELECT COUNT(DISTINCT acl.id) 
@@ -1394,11 +1404,17 @@ public function get_creator_task1_detail() {
                             'creator_nickname' => $creator->full_name ?: $creator->username,
                             'follower_count'   => intval($creator->follower_count ?? 0),
                             'total_gmv'        => floatval($fb['gmv']),
+                            'day7_gmv'         => floatval($fb['day7_gmv'] ?? 0),
+                            'rating'           => floatval($fb['shop_rating'] ?? 0),
                             'total_orders'     => intval($fb['sales_count']),
                             'creator_open_id'  => $fm_uid,
                             'last_sync'        => date('Y-m-d H:i:s'),
                             'updated_at'       => date('Y-m-d H:i:s')
                         ];
+
+                        if (!empty($fb['shop_rating']) && floatval($fb['shop_rating']) > 0) {
+                            $this->db->where('id', $db_brand->id)->update('brands', ['rating' => floatval($fb['shop_rating'])]);
+                        }
 
                         if ($existing_bc) {
                             $this->db->where('id', $existing_bc->id)->update('brand_creators', $bc_data);
@@ -9721,6 +9737,71 @@ public function send_link_task1() {
     ]));
 }
 
+/**
+ * Synchronize Bestseller and Trending status automatically for system brands
+ */
+public function sync_brand_tap_performance() {
+    $brands = $this->db->get('brands')->result();
+    if (empty($brands)) return;
+
+    $brand_stats = [];
+    foreach ($brands as $b) {
+        // Calculate 28-day total GMV
+        $gmv_28d_row = $this->db->query("
+            SELECT COALESCE(SUM(bc.total_gmv), 0) as gmv
+            FROM brand_creators bc
+            JOIN creators c ON bc.creator_username = c.username
+            WHERE bc.brand_id = ? AND c.status IN ('PENDING', 'LINK_SWAPPING')
+        ", [$b->id])->row();
+        
+        $gmv_28d = floatval($gmv_28d_row->gmv ?? 0);
+
+        // Calculate 7-day GMV strictly from FastMoss day7_gmv records
+        $gmv_7d_row = $this->db->query("
+            SELECT COALESCE(SUM(bc.day7_gmv), 0) as gmv
+            FROM brand_creators bc
+            JOIN creators c ON bc.creator_username = c.username
+            WHERE bc.brand_id = ? AND c.status IN ('PENDING', 'LINK_SWAPPING')
+        ", [$b->id])->row();
+        
+        $gmv_7d = floatval($gmv_7d_row->gmv ?? 0);
+
+        $brand_stats[$b->id] = [
+            'brand_id' => $b->id,
+            'gmv_28d' => $gmv_28d,
+            'gmv_7d' => $gmv_7d
+        ];
+    }
+
+    $max_gmv_28d = 0;
+    $max_gmv_7d = 0;
+    foreach ($brand_stats as $bs) {
+        if ($bs['gmv_28d'] > $max_gmv_28d) $max_gmv_28d = $bs['gmv_28d'];
+        if ($bs['gmv_7d'] > $max_gmv_7d) $max_gmv_7d = $bs['gmv_7d'];
+    }
+
+    uasort($brand_stats, function($a, $b) {
+        return ($a['gmv_28d'] < $b['gmv_28d']) ? 1 : -1;
+    });
+
+    $rank = 0;
+    foreach ($brand_stats as $bid => $stat) {
+        $rank++;
+        // Bestseller: Rank Top 3 atau minimal 20% dari GMV 28-hari tertinggi
+        $is_bestseller = ($stat['gmv_28d'] > 0 && ($rank <= 3 || ($max_gmv_28d > 0 && $stat['gmv_28d'] >= ($max_gmv_28d * 0.2)))) ? 1 : 0;
+        // Trending: Harus memiliki data penjualan 7-hari riil (> 0) dari FastMoss API
+        $is_trending = ($stat['gmv_7d'] > 0) ? 1 : 0;
+
+        $this->db->where('id', $bid)->update('brands', [
+            'total_gmv' => $stat['gmv_28d'],
+            'day7_gmv' => $stat['gmv_7d'],
+            'is_bestseller' => $is_bestseller,
+            'is_trending' => $is_trending,
+            'updated_at' => date('Y-m-d H:i:s')
+        ]);
+    }
+}
+
 // =====================================================================
 // AUTO CREATOR SCOUTING — IS ENDPOINTS
 // =====================================================================
@@ -11125,11 +11206,17 @@ public function get_sample_keranjang_trigger() {
                             'creator_nickname' => $c->username,
                             'follower_count'   => 0,
                             'total_gmv'        => floatval($fb['gmv']),
+                            'day7_gmv'         => floatval($fb['day7_gmv'] ?? 0),
+                            'rating'           => floatval($fb['shop_rating'] ?? 0),
                             'total_orders'     => intval($fb['sales_count']),
                             'creator_open_id'  => $c->tiktok_open_id,
                             'last_sync'        => date('Y-m-d H:i:s'),
                             'updated_at'       => date('Y-m-d H:i:s')
                         ];
+
+                        if (!empty($fb['shop_rating']) && floatval($fb['shop_rating']) > 0) {
+                            $this->db->where('id', $db_brand->id)->update('brands', ['rating' => floatval($fb['shop_rating'])]);
+                        }
 
                         if ($existing_bc) {
                             $this->db->where('id', $existing_bc->id)->update('brand_creators', $bc_data);

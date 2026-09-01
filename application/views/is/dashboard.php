@@ -1660,6 +1660,22 @@
 
         <!-- Brand View -->
         <div id="scoutingBrandView" style="display: none;">
+            <!-- TAP-Inspired Category Filter Bar -->
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; padding: 10px 14px; background: rgba(13,23,42,0.6); border: 1px solid rgba(139,92,246,0.2); border-radius: 12px; align-items: center;">
+                <span style="font-size: 11px; font-weight: 600; color: var(--text-secondary); margin-right: 4px;">
+                    <i class="fas fa-filter" style="color: var(--purple);"></i> Kategori TAP:
+                </span>
+                <button class="tap-filter-btn active" data-category="all" onclick="filterBrandCategory('all')" style="background: rgba(139,92,246,0.2); color: #a78bfa; border: 1px solid rgba(139,92,246,0.4); padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 5px;">
+                    <i class="fas fa-store" style="color: #a78bfa;"></i> Semua Brand
+                </button>
+                <button class="tap-filter-btn" data-category="bestseller" onclick="filterBrandCategory('bestseller')" style="background: rgba(30,41,59,0.7); color: var(--text-secondary); border: 1px solid rgba(255,255,255,0.08); padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 5px;">
+                    <i class="fas fa-fire" style="color: #ef4444;"></i> Bestsellers
+                </button>
+                <button class="tap-filter-btn" data-category="trending" onclick="filterBrandCategory('trending')" style="background: rgba(30,41,59,0.7); color: var(--text-secondary); border: 1px solid rgba(255,255,255,0.08); padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 5px;">
+                    <i class="fas fa-chart-line" style="color: #10b981;"></i> Trending (7-Hari)
+                </button>
+            </div>
+
             <?php 
             if (!empty($task1_creators)): 
                 $grouped_by_brand = [];
@@ -1667,6 +1683,9 @@
                     $bname = !empty($item->shop_name) ? $item->shop_name : (!empty($item->brand_name) ? $item->brand_name : 'Belum ada brand');
                     $brand_id = !empty($item->brand_id) ? $item->brand_id : 0;
                     $brand_total_gmv = !empty($item->brand_total_gmv) ? floatval($item->brand_total_gmv) : 0.0;
+                    $brand_day7_gmv = !empty($item->brand_day7_gmv) ? floatval($item->brand_day7_gmv) : 0.0;
+                    $is_bestseller = !empty($item->brand_is_bestseller) ? (intval($item->brand_is_bestseller) === 1) : false;
+                    $is_trending = !empty($item->brand_is_trending) ? (intval($item->brand_is_trending) === 1) : false;
                     
                     if (!isset($grouped_by_brand[$bname])) {
                         $grouped_by_brand[$bname] = [
@@ -1674,6 +1693,9 @@
                             'brand_name' => $bname,
                             'creators_count' => 0,
                             'total_gmv' => $brand_total_gmv,
+                            'day7_gmv' => $brand_day7_gmv,
+                            'is_bestseller' => $is_bestseller,
+                            'is_trending' => $is_trending,
                             'items' => []
                         ];
                     }
@@ -1688,16 +1710,35 @@
                     }
                     return ($a['total_gmv'] < $b['total_gmv']) ? 1 : -1;
                 });
-                
+
                 foreach ($grouped_by_brand as $brand_name => $brand_data):
+                    $is_bestseller = !empty($brand_data['is_bestseller']);
+                    $is_trending = !empty($brand_data['is_trending']);
             ?>
-                <div class="brand-item-card">
+                <div class="brand-item-card" 
+                     data-brand-name="<?= htmlspecialchars($brand_name) ?>"
+                     data-gmv-28d="<?= $brand_data['total_gmv'] ?>"
+                     data-gmv-7d="<?= $brand_data['day7_gmv'] ?>"
+                     data-is-bestseller="<?= $is_bestseller ? '1' : '0' ?>"
+                     data-is-trending="<?= $is_trending ? '1' : '0' ?>">
                     <div style="display: flex; align-items: center; gap: 12px;">
                         <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(139,92,246,0.15); display: flex; align-items: center; justify-content: center; border: 1px solid rgba(139,92,246,0.25);">
                             <i class="fas fa-store" style="color: #a78bfa; font-size: 16px;"></i>
                         </div>
                         <div>
-                            <strong style="font-size: 13px; color: var(--text-primary); display: block; line-height: 1.2;"><?= htmlspecialchars($brand_name) ?></strong>
+                            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                                <strong style="font-size: 13px; color: var(--text-primary); display: block; line-height: 1.2;"><?= htmlspecialchars($brand_name) ?></strong>
+                                <?php if ($is_bestseller): ?>
+                                    <span style="font-size: 8.5px; padding: 1px 6px; background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.3); border-radius: 10px; font-weight: 600;">
+                                        <i class="fas fa-fire"></i> Bestseller
+                                    </span>
+                                <?php endif; ?>
+                                <?php if ($is_trending): ?>
+                                    <span style="font-size: 8.5px; padding: 1px 6px; background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.3); border-radius: 10px; font-weight: 600;">
+                                        <i class="fas fa-chart-line"></i> Trending
+                                    </span>
+                                <?php endif; ?>
+                            </div>
                             <?php 
                             $total_promoting = ($brand_data['brand_id'] > 0 && isset($brand_creator_counts[$brand_data['brand_id']])) 
                                 ? $brand_creator_counts[$brand_data['brand_id']] 
@@ -1708,8 +1749,13 @@
                                     <?= $total_promoting ?> Creator mempromosikan
                                 </span>
                                 <span style="font-size: 10px; color: #34d399; font-weight: 500; display: inline-flex; align-items: center; gap: 3px;">
-                                    <i class="fas fa-chart-line" style="font-size: 8px;"></i> Rp <?= number_format($brand_data['total_gmv'], 0, ',', '.') ?>
+                                    <i class="fas fa-chart-line" style="font-size: 8px;"></i> Rp <?= number_format($brand_data['total_gmv'], 0, ',', '.') ?> (28h)
                                 </span>
+                                <?php if ($brand_data['day7_gmv'] > 0): ?>
+                                <span style="font-size: 10px; color: #60a5fa; font-weight: 500; display: inline-flex; align-items: center; gap: 3px;">
+                                    <i class="fas fa-bolt" style="font-size: 8px;"></i> Rp <?= number_format($brand_data['day7_gmv'], 0, ',', '.') ?> (7h)
+                                </span>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
@@ -4604,9 +4650,75 @@ async function showBrandCreatorsModal(brandId, brandName) {
                 <span style="font-size: 11px; color: var(--text-muted);">${escapeHtml(err.message)}</span>
                 <br>
                 <button onclick="closeBrandCreatorsModal()" style="margin-top:16px; padding: 8px 24px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); cursor: pointer;">Close</button>
-            </div>
         `;
     }
+}
+
+function filterBrandCategory(category) {
+    document.querySelectorAll('.tap-filter-btn').forEach(btn => {
+        if (btn.getAttribute('data-category') === category) {
+            btn.classList.add('active');
+            if (category === 'bestseller') {
+                btn.style.background = 'linear-gradient(135deg, rgba(239,68,68,0.2), rgba(245,158,11,0.2))';
+                btn.style.color = '#f87171';
+                btn.style.border = '1px solid rgba(239,68,68,0.4)';
+            } else if (category === 'trending') {
+                btn.style.background = 'linear-gradient(135deg, rgba(16,185,129,0.2), rgba(59,130,246,0.2))';
+                btn.style.color = '#34d399';
+                btn.style.border = '1px solid rgba(16,185,129,0.4)';
+            } else {
+                btn.style.background = 'rgba(139,92,246,0.2)';
+                btn.style.color = '#a78bfa';
+                btn.style.border = '1px solid rgba(139,92,246,0.4)';
+            }
+        } else {
+            btn.classList.remove('active');
+            btn.style.background = 'rgba(30,41,59,0.7)';
+            btn.style.color = 'var(--text-secondary)';
+            btn.style.border = '1px solid rgba(255,255,255,0.08)';
+        }
+    });
+
+    const container = document.getElementById('scoutingBrandView');
+    if (!container) return;
+
+    const cards = Array.from(container.querySelectorAll('.brand-item-card'));
+
+    cards.forEach(card => {
+        const isBestseller = card.getAttribute('data-is-bestseller') === '1';
+        const isTrending = card.getAttribute('data-is-trending') === '1';
+
+        let show = true;
+        if (category === 'bestseller') {
+            show = isBestseller;
+        } else if (category === 'trending') {
+            show = isTrending;
+        } else {
+            show = true;
+        }
+
+        if (show) {
+            card.style.display = 'flex';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+
+    cards.sort((a, b) => {
+        const gmvA = parseFloat(a.getAttribute('data-gmv-28d') || 0);
+        const gmvB = parseFloat(b.getAttribute('data-gmv-28d') || 0);
+        const day7A = parseFloat(a.getAttribute('data-gmv-7d') || 0);
+        const day7B = parseFloat(b.getAttribute('data-gmv-7d') || 0);
+
+        if (category === 'trending') {
+            return day7B - day7A || gmvB - gmvA;
+        } else {
+            // bestseller or all
+            return gmvB - gmvA;
+        }
+    });
+
+    cards.forEach(card => container.appendChild(card));
 }
 
 let searchTimer = null;

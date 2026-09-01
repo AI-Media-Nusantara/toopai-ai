@@ -754,6 +754,68 @@ public function force_sync($date = null) {
     }
     
     /**
+     * Sync brands data & Bestseller/Trending performance status
+     */
+    public function sync_brands_data() {
+        echo "  Syncing brands performance status (Bestseller & Trending)...\n";
+        $brands = $this->db->get('brands')->result();
+        if (empty($brands)) return;
+
+        $brand_stats = [];
+        foreach ($brands as $b) {
+            $gmv_28d_row = $this->db->query("
+                SELECT COALESCE(SUM(bc.total_gmv), 0) as gmv
+                FROM brand_creators bc
+                JOIN creators c ON bc.creator_username = c.username
+                WHERE bc.brand_id = ? AND c.status IN ('PENDING', 'LINK_SWAPPING')
+            ", [$b->id])->row();
+            
+            $gmv_28d = floatval($gmv_28d_row->gmv ?? 0);
+
+            $gmv_7d_row = $this->db->query("
+                SELECT COALESCE(SUM(bc.day7_gmv), 0) as gmv
+                FROM brand_creators bc
+                JOIN creators c ON bc.creator_username = c.username
+                WHERE bc.brand_id = ? AND c.status IN ('PENDING', 'LINK_SWAPPING')
+            ", [$b->id])->row();
+            
+            $gmv_7d = floatval($gmv_7d_row->gmv ?? 0);
+
+            $brand_stats[$b->id] = [
+                'brand_id' => $b->id,
+                'gmv_28d' => $gmv_28d,
+                'gmv_7d' => $gmv_7d
+            ];
+        }
+
+        $max_gmv_28d = 0;
+        $max_gmv_7d = 0;
+        foreach ($brand_stats as $bs) {
+            if ($bs['gmv_28d'] > $max_gmv_28d) $max_gmv_28d = $bs['gmv_28d'];
+            if ($bs['gmv_7d'] > $max_gmv_7d) $max_gmv_7d = $bs['gmv_7d'];
+        }
+
+        uasort($brand_stats, function($a, $b) {
+            return ($a['gmv_28d'] < $b['gmv_28d']) ? 1 : -1;
+        });
+
+        $rank = 0;
+        foreach ($brand_stats as $bid => $stat) {
+            $rank++;
+            $is_bestseller = ($stat['gmv_28d'] > 0 && ($rank <= 3 || ($max_gmv_28d > 0 && $stat['gmv_28d'] >= ($max_gmv_28d * 0.2)))) ? 1 : 0;
+            $is_trending = ($stat['gmv_7d'] > 0) ? 1 : 0;
+
+            $this->db->where('id', $bid)->update('brands', [
+                'total_gmv' => $stat['gmv_28d'],
+                'day7_gmv' => $stat['gmv_7d'],
+                'is_bestseller' => $is_bestseller,
+                'is_trending' => $is_trending,
+                'updated_at' => date('Y-m-d H:i:s')
+            ]);
+        }
+    }
+
+    /**
      * Update campaign totals based on orders
      */
     private function update_campaign_totals() {
