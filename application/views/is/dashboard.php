@@ -6401,7 +6401,7 @@ document.getElementById('phoneDuplicateModal').addEventListener('click', functio
 
         grid.innerHTML = items.map((p, i) => {
             const pId = String(p.product_id || p.id || i);
-            const isSel = _dbSelProducts.some(sp => String(sp.product_id || sp.id || sp._recKey) === pId);
+            const isSel = _dbSelProducts.some(sp => String(sp.product_id || sp.id) === pId);
             const badgeHtml = p.badge_label ? `
                 <div style="margin-bottom: 5px;">
                     <span style="display:inline-flex;align-items:center;gap:3.5px;font-size:8.5px;padding:2px 7px;border-radius:10px;font-weight:600;background:${p.badge_bg || 'rgba(139,92,246,0.15)'};color:${p.badge_color || '#a78bfa'};border:1px solid ${p.badge_border || 'rgba(139,92,246,0.3)'};">
@@ -6434,14 +6434,14 @@ document.getElementById('phoneDuplicateModal').addEventListener('click', functio
             card.addEventListener('click', function(e) {
                 e.stopPropagation();
                 const key = this.dataset.dbRecKey;
-                const product = items.find((p, i) => String(p.product_id || p.id || i) === key);
+                const product = items.find(p => String(p.product_id || p.id) === key);
                 if (!product) return;
-                const existingIdx = _dbSelProducts.findIndex(sp => String(sp.product_id || sp.id || sp._recKey) === key);
+                const existingIdx = _dbSelProducts.findIndex(sp => String(sp.product_id || sp.id) === key);
                 if (existingIdx >= 0) {
                     _dbSelProducts.splice(existingIdx, 1);
                     this.classList.remove('sel');
                 } else {
-                    _dbSelProducts.push({ ...product, _recKey: key });
+                    _dbSelProducts.push(product);
                     this.classList.add('sel');
                 }
                 document.getElementById('dbRecCount').textContent = _dbSelProducts.length;
@@ -6510,9 +6510,17 @@ document.getElementById('phoneDuplicateModal').addEventListener('click', functio
                 document.getElementById('dbRecGrid').innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:30px;color:#94a3b8"><i class="fas fa-box-open fa-2x"></i><p>Tidak ada rekomendasi produk tersedia</p></div>';
                 return;
             }
+            const catArr = Array.isArray(data.creator_categories) 
+                ? data.creator_categories 
+                : (data.creator_categories && typeof data.creator_categories === 'object' ? Object.values(data.creator_categories) : [data.creator_categories || 'Semua']);
+
+            const brandArr = Array.isArray(data.creator_brands) 
+                ? data.creator_brands 
+                : (data.creator_brands && typeof data.creator_brands === 'object' ? Object.values(data.creator_brands) : [data.creator_brands || '-']);
+
             document.getElementById('dbRecSubtitle').textContent =
-                'Kategori: ' + (data.creator_categories.join(', ') || 'Semua') +
-                ' | Brand creator: ' + (data.creator_brands.join(', ') || '-');
+                'Kategori: ' + (catArr.filter(Boolean).join(', ') || 'Semua') +
+                ' | Brand creator: ' + (brandArr.filter(Boolean).join(', ') || '-');
 
             _dbAllRecommendations = data.recommendations;
             document.getElementById('dbRecTotalMsg').textContent = `Menampilkan ${_dbAllRecommendations.length} data produk sample`;

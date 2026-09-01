@@ -93,9 +93,9 @@ class SampleProduct_model extends CI_Model {
             }
         }
 
-        $creator_product_ids = array_unique($creator_product_ids);
-        $creator_brands      = array_unique($creator_brands);
-        $creator_categories  = array_unique($creator_categories);
+        $creator_product_ids = array_values(array_unique($creator_product_ids));
+        $creator_brands      = array_values(array_unique($creator_brands));
+        $creator_categories  = array_values(array_unique($creator_categories));
 
         // ----------------------------------------------------------------
         // 1c. Fallback sumber kategori: gunakan creators.category
@@ -212,6 +212,16 @@ class SampleProduct_model extends CI_Model {
      */
     private function _tag_and_sort_recommendations(array $recs, array $creator_categories) {
         if (empty($recs)) return [];
+
+        // Deduplicate recommendations by product_id / id to prevent duplicate card entries
+        $unique_recs = [];
+        foreach ($recs as $r) {
+            $pid = !empty($r->product_id) ? $r->product_id : (!empty($r->id) ? $r->id : md5($r->product_name));
+            if (!isset($unique_recs[$pid])) {
+                $unique_recs[$pid] = $r;
+            }
+        }
+        $recs = array_values($unique_recs);
 
         $creator_cat_lower = array_map(function($c) { return strtolower(trim($c)); }, $creator_categories);
 
