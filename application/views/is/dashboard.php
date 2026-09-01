@@ -1677,48 +1677,20 @@
             </div>
 
             <?php 
-            if (!empty($task1_creators)): 
-                $grouped_by_brand = [];
-                foreach ($task1_creators as $item) {
-                    $bname = !empty($item->shop_name) ? $item->shop_name : (!empty($item->brand_name) ? $item->brand_name : 'Belum ada brand');
-                    $brand_id = !empty($item->brand_id) ? $item->brand_id : 0;
-                    $brand_total_gmv = !empty($item->brand_total_gmv) ? floatval($item->brand_total_gmv) : 0.0;
-                    $brand_day7_gmv = !empty($item->brand_day7_gmv) ? floatval($item->brand_day7_gmv) : 0.0;
-                    $is_bestseller = !empty($item->brand_is_bestseller) ? (intval($item->brand_is_bestseller) === 1) : false;
-                    $is_trending = !empty($item->brand_is_trending) ? (intval($item->brand_is_trending) === 1) : false;
-                    
-                    if (!isset($grouped_by_brand[$bname])) {
-                        $grouped_by_brand[$bname] = [
-                            'brand_id' => $brand_id,
-                            'brand_name' => $bname,
-                            'creators_count' => 0,
-                            'total_gmv' => $brand_total_gmv,
-                            'day7_gmv' => $brand_day7_gmv,
-                            'is_bestseller' => $is_bestseller,
-                            'is_trending' => $is_trending,
-                            'items' => []
-                        ];
-                    }
-                    $grouped_by_brand[$bname]['items'][] = $item;
-                    $grouped_by_brand[$bname]['creators_count']++;
-                }
-                
-                // Sort by total_gmv DESC, then brand_name ASC
-                uasort($grouped_by_brand, function($a, $b) {
-                    if ($a['total_gmv'] == $b['total_gmv']) {
-                        return strcmp($a['brand_name'], $b['brand_name']);
-                    }
-                    return ($a['total_gmv'] < $b['total_gmv']) ? 1 : -1;
-                });
-
-                foreach ($grouped_by_brand as $brand_name => $brand_data):
-                    $is_bestseller = !empty($brand_data['is_bestseller']);
-                    $is_trending = !empty($brand_data['is_trending']);
+            if (!empty($task1_brands)): 
+                foreach ($task1_brands as $brand_item):
+                    $brand_name = !empty($brand_item->shop_name) ? $brand_item->shop_name : (!empty($brand_item->brand_name) ? $brand_item->brand_name : 'Belum ada brand');
+                    $brand_id = !empty($brand_item->brand_id) ? $brand_item->brand_id : 0;
+                    $brand_total_gmv = !empty($brand_item->total_gmv) ? floatval($brand_item->total_gmv) : 0.0;
+                    $brand_day7_gmv = !empty($brand_item->day7_gmv) ? floatval($brand_item->day7_gmv) : 0.0;
+                    $is_bestseller = !empty($brand_item->is_bestseller);
+                    $is_trending = !empty($brand_item->is_trending);
+                    $total_promoting = !empty($brand_item->creators_count) ? $brand_item->creators_count : 1;
             ?>
                 <div class="brand-item-card" 
                      data-brand-name="<?= htmlspecialchars($brand_name) ?>"
-                     data-gmv-28d="<?= $brand_data['total_gmv'] ?>"
-                     data-gmv-7d="<?= $brand_data['day7_gmv'] ?>"
+                     data-gmv-28d="<?= $brand_total_gmv ?>"
+                     data-gmv-7d="<?= $brand_day7_gmv ?>"
                      data-is-bestseller="<?= $is_bestseller ? '1' : '0' ?>"
                      data-is-trending="<?= $is_trending ? '1' : '0' ?>">
                     <div style="display: flex; align-items: center; gap: 12px;">
@@ -1739,28 +1711,25 @@
                                     </span>
                                 <?php endif; ?>
                             </div>
-                            <?php 
-                            $total_promoting = ($brand_data['brand_id'] > 0 && isset($brand_creator_counts[$brand_data['brand_id']])) 
-                                ? $brand_creator_counts[$brand_data['brand_id']] 
-                                : $brand_data['creators_count'];
-                            ?>
                             <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 3px;">
                                 <span style="font-size: 10px; color: var(--is-muted-2);">
                                     <?= $total_promoting ?> Creator mempromosikan
                                 </span>
+                                <?php if ($brand_total_gmv > 0): ?>
                                 <span style="font-size: 10px; color: #34d399; font-weight: 500; display: inline-flex; align-items: center; gap: 3px;">
-                                    <i class="fas fa-chart-line" style="font-size: 8px;"></i> Rp <?= number_format($brand_data['total_gmv'], 0, ',', '.') ?> (28h)
+                                    <i class="fas fa-chart-line" style="font-size: 8px;"></i> Rp <?= number_format($brand_total_gmv, 0, ',', '.') ?> (28h)
                                 </span>
-                                <?php if ($brand_data['day7_gmv'] > 0): ?>
+                                <?php endif; ?>
+                                <?php if ($brand_day7_gmv > 0): ?>
                                 <span style="font-size: 10px; color: #60a5fa; font-weight: 500; display: inline-flex; align-items: center; gap: 3px;">
-                                    <i class="fas fa-bolt" style="font-size: 8px;"></i> Rp <?= number_format($brand_data['day7_gmv'], 0, ',', '.') ?> (7h)
+                                    <i class="fas fa-bolt" style="font-size: 8px;"></i> Rp <?= number_format($brand_day7_gmv, 0, ',', '.') ?> (7h)
                                 </span>
                                 <?php endif; ?>
                             </div>
                         </div>
                     </div>
                     <button class="brand-detail-btn" 
-                            onclick="showBrandCreatorsModal(<?= $brand_data['brand_id'] ?>, '<?= htmlspecialchars(addslashes($brand_name)) ?>')" 
+                            onclick="showBrandCreatorsModal(<?= $brand_id ?>, '<?= htmlspecialchars(addslashes($brand_name)) ?>')" 
                             style="background: linear-gradient(135deg, var(--purple-glow), rgba(59,130,246,0.1)); color: var(--purple); border: 1px solid rgba(139,92,246,0.3); padding: 6px 14px; border-radius: 20px; cursor: pointer; font-size: 11px; font-weight: 600; transition: var(--transition); display: inline-flex; align-items: center; gap: 6px; outline: none;">
                         <i class="fas fa-info-circle"></i> Detail
                     </button>

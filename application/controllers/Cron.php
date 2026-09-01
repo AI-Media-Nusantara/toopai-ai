@@ -767,7 +767,14 @@ public function force_sync($date = null) {
             $this->db->query("ALTER TABLE brands ADD COLUMN is_bestseller TINYINT(1) DEFAULT 0, ADD COLUMN is_trending TINYINT(1) DEFAULT 0, ADD COLUMN day7_gmv DECIMAL(15,2) DEFAULT 0.00");
         }
 
-        $brands = $this->db->get('brands')->result();
+        $brands = $this->db->query("
+            SELECT DISTINCT b.id
+            FROM brands b
+            JOIN brand_creators bc ON bc.brand_id = b.id
+            JOIN creators c ON bc.creator_username = c.username
+            WHERE c.status IN ('PENDING', 'LINK_SWAPPING')
+               OR b.id IN (SELECT DISTINCT brand_id FROM creators WHERE status IN ('PENDING', 'LINK_SWAPPING'))
+        ")->result();
         if (empty($brands)) return;
 
         $has_day7_col = $this->db->field_exists('day7_gmv', 'brand_creators');

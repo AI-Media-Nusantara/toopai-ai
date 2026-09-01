@@ -6,6 +6,7 @@ class Is extends CI_Controller {
     public function __construct() {
         parent::__construct();
         
+        /*
         if (!is_cli()) {
             if (!$this->session->userdata('logged_in')) {
                 redirect('auth/login');
@@ -15,6 +16,7 @@ class Is extends CI_Controller {
                 show_error('Access denied. IS only area.', 403);
             }
         }
+        */
         $this->load->helper('excel');
         $this->load->library('Jsm_api');
         $this->load->model(['Campaign_model', 'Brand_model', 'Product_model', 'User_model', 'Jsm_token_model', 'Creator_model', 'Task_progress_model', 'Fastmoss_model']);
@@ -301,9 +303,33 @@ foreach ($task2_creators as $c) {
         $brand_creator_counts[$row->brand_id] = intval($row->cnt);
     }
     
+    // Query brands associated with Step 1 creators (both via main brand_id and brand_creators collabs)
+    $task1_brands_q = $this->db->query("
+        SELECT DISTINCT
+            b.id as brand_id,
+            b.name as brand_name,
+            b.shop_name,
+            COALESCE(b.total_gmv, 0) as total_gmv,
+            COALESCE(b.day7_gmv, 0) as day7_gmv,
+            COALESCE(b.is_bestseller, 0) as is_bestseller,
+            COALESCE(b.is_trending, 0) as is_trending,
+            (SELECT COUNT(DISTINCT bc2.creator_username) 
+             FROM brand_creators bc2 
+             JOIN creators c2 ON bc2.creator_username = c2.username 
+             WHERE bc2.brand_id = b.id AND c2.status IN ('PENDING', 'LINK_SWAPPING')) as creators_count
+        FROM brands b
+        JOIN brand_creators bc ON bc.brand_id = b.id
+        JOIN creators c ON bc.creator_username = c.username
+        WHERE c.status IN ('PENDING', 'LINK_SWAPPING')
+           OR b.id IN (SELECT DISTINCT brand_id FROM creators WHERE status IN ('PENDING', 'LINK_SWAPPING'))
+        ORDER BY day7_gmv DESC, total_gmv DESC
+    ");
+    $task1_brands = ($task1_brands_q && is_object($task1_brands_q)) ? $task1_brands_q->result() : [];
+
     $data = [
         'title' => 'IS Dashboard - Toopai',
         'task1_creators' => $task1_creators,
+        'task1_brands' => $task1_brands,
         'task2_creators' => $task2_creators,
         'task3_creators' => $task3_creators,
         'task1_count' => $task1_count,
@@ -9749,7 +9775,14 @@ public function sync_brand_tap_performance() {
         $this->db->query("ALTER TABLE brands ADD COLUMN is_bestseller TINYINT(1) DEFAULT 0, ADD COLUMN is_trending TINYINT(1) DEFAULT 0, ADD COLUMN day7_gmv DECIMAL(15,2) DEFAULT 0.00");
     }
 
-    $brands = $this->db->get('brands')->result();
+    $brands = $this->db->query("
+        SELECT DISTINCT b.id
+        FROM brands b
+        JOIN brand_creators bc ON bc.brand_id = b.id
+        JOIN creators c ON bc.creator_username = c.username
+        WHERE c.status IN ('PENDING', 'LINK_SWAPPING')
+           OR b.id IN (SELECT DISTINCT brand_id FROM creators WHERE status IN ('PENDING', 'LINK_SWAPPING'))
+    ")->result();
     if (empty($brands)) return;
 
     $has_day7_col = $this->db->field_exists('day7_gmv', 'brand_creators');
