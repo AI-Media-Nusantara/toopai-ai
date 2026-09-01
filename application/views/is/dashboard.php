@@ -1954,14 +1954,12 @@
                                     title="Lihat Detail">
                                     <i class="fas fa-eye"></i>
                                 </button>
-                                <?php if (($creator->total_orders_30d ?? 0) > 0): ?>
                                 <button class="btn-detail"
                                     style="background:rgba(139,92,246,0.15);color:#8b5cf6;border:1px solid rgba(139,92,246,0.3)"
                                     onclick="openDashboardWillingModal(<?= $creator->id ?>, '<?= htmlspecialchars($creator->username) ?>')"
                                     title="Proses Pengiriman Sample">
                                     <i class="fas fa-gift"></i>
                                 </button>
-                                <?php endif; ?>
                                 <a href="<?= base_url('is/monitoring') ?>" 
                                     class="btn-detail"
                                     style="background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.3);text-decoration:none;display:inline-flex;align-items:center;justify-content:center"
@@ -6296,6 +6294,15 @@ document.getElementById('phoneDuplicateModal').addEventListener('click', functio
             </div>
             <button class="db-rec-close" onclick="dbCloseRecModal()">✕</button>
         </div>
+        <!-- Search bar nama produk & nama shop -->
+        <div style="padding: 12px 24px 0 24px;">
+            <div style="position: relative; display: flex; align-items: center;">
+                <i class="fas fa-search" style="position: absolute; left: 14px; color: #94a3b8; font-size: 13px;"></i>
+                <input type="text" id="dbRecSearchInput" placeholder="Cari berdasarkan nama produk atau nama toko/shop..." 
+                       oninput="dbFilterRecProducts()"
+                       style="width: 100%; padding: 9px 14px 9px 38px; background: #0f1420; border: 1px solid rgba(139,92,246,0.3); border-radius: 12px; color: #e2e8f0; font-size: 12px; outline: none; transition: all 0.2s ease;">
+            </div>
+        </div>
         <div id="dbRecGrid" class="db-rec-grid">
             <div style="grid-column:1/-1;text-align:center;padding:30px;color:#94a3b8">
                 <i class="fas fa-spinner fa-pulse fa-2x"></i>
@@ -6349,12 +6356,14 @@ document.getElementById('phoneDuplicateModal').addEventListener('click', functio
     let _dbCreatorId   = null;
     let _dbCreatorName = null;
     let _dbSelProducts = [];
+    let _dbAllRecommendations = [];
 
     // Buka modal konfirmasi kesediaan
     window.openDashboardWillingModal = function(creatorId, username) {
         _dbCreatorId   = creatorId;
         _dbCreatorName = username;
         _dbSelProducts = [];
+        _dbAllRecommendations = [];
         document.getElementById('dbWillingName').textContent = '@' + username;
         document.getElementById('dbWillingNotes').value = '';
         document.getElementById('dbWillingOverlay').classList.add('active');
@@ -6387,10 +6396,75 @@ document.getElementById('phoneDuplicateModal').addEventListener('click', functio
         .catch(() => showToastGlobal('Gagal mengirim konfirmasi', 'error'));
     };
 
+    function dbRenderRecGrid(items) {
+        const grid = document.getElementById('dbRecGrid');
+        if (!grid) return;
+
+        if (!items || !items.length) {
+            const query = (document.getElementById('dbRecSearchInput').value || '').trim();
+            grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:30px;color:#94a3b8"><i class="fas fa-search fa-2x" style="margin-bottom:8px;display:block;"></i><p>Tidak ada produk atau toko yang cocok dengan "${escHtmlDb(query)}"</p></div>`;
+            return;
+        }
+
+        grid.innerHTML = items.map((p, i) => {
+            const pId = String(p.product_id || p.id || i);
+            const isSel = _dbSelProducts.some(sp => String(sp.product_id || sp.id || sp._recKey) === pId);
+            const badgeHtml = p.badge_label ? `
+                <div style="margin-bottom: 5px;">
+                    <span style="display:inline-flex;align-items:center;gap:3.5px;font-size:8.5px;padding:2px 7px;border-radius:10px;font-weight:600;background:${p.badge_bg || 'rgba(139,92,246,0.15)'};color:${p.badge_color || '#a78bfa'};border:1px solid ${p.badge_border || 'rgba(139,92,246,0.3)'};">
+                        <i class="fas ${p.badge_icon || 'fa-tag'}"></i> ${escHtmlDb(p.badge_label)}
+                    </span>
+                </div>` : '';
+            return `
+                <div class="db-rec-item ${isSel ? 'sel' : ''}" data-db-rec-key="${pId}">
+                    <div class="chk">✓</div>
+                    ${p.image_url ? `<img src="${escHtmlDb(p.image_url)}" class="db-rec-img" onerror="this.style.display='none'">` : '<div class="db-rec-img" style="display:flex;align-items:center;justify-content:center;color:#64748b"><i class="fas fa-image fa-2x"></i></div>'}
+                    ${badgeHtml}
+                    <div class="db-rec-name">${escHtmlDb(p.product_name || p.name || '-')}</div>
+                    <div class="db-rec-brand">🏪 ${escHtmlDb(p.shop_name || p.brand_display_name || '-')}</div>
+                </div>`;
+        }).join('');
+
+        grid.querySelectorAll('.db-rec-item').forEach(card => {
+            card.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const key = this.dataset.dbRecKey;
+                const product = items.find((p, i) => String(p.product_id || p.id || i) === key);
+                if (!product) return;
+                const existingIdx = _dbSelProducts.findIndex(sp => String(sp.product_id || sp.id || sp._recKey) === key);
+                if (existingIdx >= 0) {
+                    _dbSelProducts.splice(existingIdx, 1);
+                    this.classList.remove('sel');
+                } else {
+                    _dbSelProducts.push({ ...product, _recKey: key });
+                    this.classList.add('sel');
+                }
+                document.getElementById('dbRecCount').textContent = _dbSelProducts.length;
+            });
+        });
+    }
+
+    window.dbFilterRecProducts = function() {
+        const query = (document.getElementById('dbRecSearchInput') ? document.getElementById('dbRecSearchInput').value : '').toLowerCase().trim();
+        if (!_dbAllRecommendations) return;
+
+        const filtered = _dbAllRecommendations.filter(p => {
+            const nameMatch = (p.product_name || p.name || '').toLowerCase().includes(query);
+            const shopMatch = (p.shop_name || p.brand_display_name || p.brand_name || '').toLowerCase().includes(query);
+            return nameMatch || shopMatch;
+        });
+
+        document.getElementById('dbRecTotalMsg').textContent = query ? `Menampilkan ${filtered.length} dari ${_dbAllRecommendations.length} data produk sample` : `Menampilkan ${_dbAllRecommendations.length} data produk sample`;
+        dbRenderRecGrid(filtered);
+    };
+
     function dbOpenRecModal() {
         _dbSelProducts = [];
-        let _dbRecMap = {};
+        _dbAllRecommendations = [];
         document.getElementById('dbRecCount').textContent = '0';
+        if (document.getElementById('dbRecSearchInput')) {
+            document.getElementById('dbRecSearchInput').value = '';
+        }
         // Reset metode ke Manual setiap kali modal dibuka
         document.querySelectorAll('input[name="dbDeliveryMethod"]').forEach(r => { r.checked = r.value === 'manual'; });
         document.getElementById('dbTapIdWrap').style.display = 'none';
@@ -6413,42 +6487,10 @@ document.getElementById('phoneDuplicateModal').addEventListener('click', functio
                 'Kategori: ' + (data.creator_categories.join(', ') || 'Semua') +
                 ' | Brand creator: ' + (data.creator_brands.join(', ') || '-');
 
-            // Simpan data ke Map — jangan embed JSON ke onclick attribute
-            data.recommendations.forEach((p, i) => { _dbRecMap[i] = p; });
+            _dbAllRecommendations = data.recommendations;
+            document.getElementById('dbRecTotalMsg').textContent = `Menampilkan ${_dbAllRecommendations.length} data produk sample`;
 
-            document.getElementById('dbRecTotalMsg').textContent = `Menampilkan ${data.recommendations.length} data produk sample`;
-
-            const grid = document.getElementById('dbRecGrid');
-            grid.innerHTML = data.recommendations.map((p, i) => `
-                <div class="db-rec-item" data-db-rec-index="${i}">
-                    <div class="chk">✓</div>
-                    ${p.image_url ? `<img src="${escHtmlDb(p.image_url)}" class="db-rec-img" onerror="this.style.display='none'">` : '<div class="db-rec-img" style="display:flex;align-items:center;justify-content:center;color:#64748b"><i class="fas fa-image fa-2x"></i></div>'}
-                    <div class="db-rec-name">${escHtmlDb(p.product_name || p.name || '-')}</div>
-                    <div class="db-rec-brand">🏪 ${escHtmlDb(p.shop_name || p.brand_display_name || '-')}</div>
-                </div>`
-            ).join('');
-
-            // Pasang event listener — hindari bubbling seperti fix di monitoring.php
-            grid.querySelectorAll('.db-rec-item').forEach(card => {
-                card.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    const targetCard = this.closest('[data-db-rec-index]');
-                    if (!targetCard) return;
-                    const idx = parseInt(targetCard.dataset.dbRecIndex, 10);
-                    const product = _dbRecMap[idx];
-                    if (!product) return;
-                    const key = String(idx);
-                    const existingIdx = _dbSelProducts.findIndex(p => p._recIdx === key);
-                    if (existingIdx >= 0) {
-                        _dbSelProducts.splice(existingIdx, 1);
-                        targetCard.classList.remove('sel');
-                    } else {
-                        _dbSelProducts.push({ ...product, _recIdx: key });
-                        targetCard.classList.add('sel');
-                    }
-                    document.getElementById('dbRecCount').textContent = _dbSelProducts.length;
-                });
-            });
+            dbRenderRecGrid(_dbAllRecommendations);
         });
     }
 

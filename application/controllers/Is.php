@@ -6,7 +6,6 @@ class Is extends CI_Controller {
     public function __construct() {
         parent::__construct();
         
-        /*
         if (!is_cli()) {
             if (!$this->session->userdata('logged_in')) {
                 redirect('auth/login');
@@ -16,7 +15,6 @@ class Is extends CI_Controller {
                 show_error('Access denied. IS only area.', 403);
             }
         }
-        */
         $this->load->helper('excel');
         $this->load->library('Jsm_api');
         $this->load->model(['Campaign_model', 'Brand_model', 'Product_model', 'User_model', 'Jsm_token_model', 'Creator_model', 'Task_progress_model', 'Fastmoss_model']);
@@ -216,20 +214,17 @@ $task2_creators = $this->db->query($task2_sql)->result();
              WHERE acl.creator_id = c.id 
                AND acl.status = "ACTIVE") as total_links,
             (SELECT COALESCE(SUM(o.gmv), 0) 
-             FROM affiliate_orders o 
-             WHERE o.creator_username = c.username 
-               AND o.order_date_local >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-               AND o.order_status NOT IN ("CANCELLED", "REFUNDED")) as total_gmv_30d,
+              FROM affiliate_orders o 
+              WHERE o.creator_username = c.username 
+                AND o.order_status NOT IN ("CANCELLED", "REFUNDED")) as total_gmv_30d,
             (SELECT COUNT(DISTINCT o.order_id) 
-             FROM affiliate_orders o 
-             WHERE o.creator_username = c.username 
-               AND o.order_date_local >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-               AND o.order_status NOT IN ("CANCELLED", "REFUNDED")) as total_orders_30d,
+              FROM affiliate_orders o 
+              WHERE o.creator_username = c.username 
+                AND o.order_status NOT IN ("CANCELLED", "REFUNDED")) as total_orders_30d,
             (SELECT COALESCE(SUM(o.estimated_commission), 0) 
-             FROM affiliate_orders o 
-             WHERE o.creator_username = c.username 
-               AND o.order_date_local >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-               AND o.order_status NOT IN ("CANCELLED", "REFUNDED")) as total_commission_30d,
+              FROM affiliate_orders o 
+              WHERE o.creator_username = c.username 
+                AND o.order_status NOT IN ("CANCELLED", "REFUNDED")) as total_commission_30d,
             (SELECT GROUP_CONCAT(product_name SEPARATOR ", ")
               FROM affiliate_creator_links acl3
               WHERE (acl3.creator_id = c.id OR LOWER(TRIM(acl3.creator_username)) = LOWER(TRIM(c.username)))
@@ -463,17 +458,14 @@ public function get_task3_creators() {
             (SELECT COALESCE(SUM(o.gmv), 0) 
              FROM affiliate_orders o 
              WHERE o.creator_username = c.username 
-               AND o.order_date_local >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
                AND o.order_status NOT IN ("CANCELLED", "REFUNDED")) as total_gmv_30d,
             (SELECT COUNT(DISTINCT o.order_id) 
              FROM affiliate_orders o 
              WHERE o.creator_username = c.username 
-               AND o.order_date_local >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
                AND o.order_status NOT IN ("CANCELLED", "REFUNDED")) as total_orders_30d,
             (SELECT COALESCE(SUM(o.estimated_commission), 0) 
              FROM affiliate_orders o 
              WHERE o.creator_username = c.username 
-               AND o.order_date_local >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
                AND o.order_status NOT IN ("CANCELLED", "REFUNDED")) as total_commission_30d,
             (SELECT GROUP_CONCAT(product_name SEPARATOR ", ")
               FROM affiliate_creator_links acl3
@@ -491,7 +483,10 @@ public function get_task3_creators() {
         ->join('brands b', 'c.brand_id = b.id', 'left')
         ->join('users u', 'c.is_id = u.id', 'left')
         ->where_in('c.status', ['ACTIVE', 'SAMPLE_SENT'])
+        ->order_by('total_orders_30d', 'DESC')
         ->order_by('total_gmv_30d', 'DESC')
+        ->order_by('COALESCE(c.fastmoss_gmv_28d, c.imported_gmv, 0)', 'DESC')
+        ->order_by('c.id', 'DESC')
         ->limit(100)
         ->get()
         ->result();

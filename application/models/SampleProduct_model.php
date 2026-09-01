@@ -113,11 +113,13 @@ class SampleProduct_model extends CI_Model {
 
         log_message('debug', "[SampleRec] creator_id={$creator_id} username={$username} | product_ids=" . count($creator_product_ids) . " brands=" . count($creator_brands) . " categories=" . count($creator_categories) . " | brands=[" . implode(',', $creator_brands) . "] | categories=[" . implode(',', $creator_categories) . "]");
 
+        $select_fields = 'ap.*, b.id as brand_db_id, b.name as brand_display_name, b.sample_type, COALESCE(b.is_bestseller, 0) as is_bestseller, COALESCE(b.is_trending, 0) as is_trending, COALESCE(b.day7_gmv, 0) as brand_day7_gmv, COALESCE(b.total_gmv, 0) as brand_total_gmv';
+
         // ----------------------------------------------------------------
         // 2. Query utama: kategori SAMA, brand BERBEDA, produk BERBEDA
         // ----------------------------------------------------------------
         if (!empty($creator_categories)) {
-            $this->db->select('ap.*, b.id as brand_db_id, b.name as brand_display_name, b.sample_type');
+            $this->db->select($select_fields);
             $this->db->from('affiliate_products ap');
             $this->db->join('brands b', 'LOWER(TRIM(ap.shop_name)) = LOWER(TRIM(b.shop_name))', 'left');
             $this->db->where('ap.review_status', 'APPROVED');
@@ -138,7 +140,7 @@ class SampleProduct_model extends CI_Model {
             if (!empty($recs)) {
                 log_message('debug', "[SampleRec] creator_id={$creator_id}: query utama berhasil, " . count($recs) . " produk");
                 return [
-                    'recommendations'     => $recs,
+                    'recommendations'     => $this->_tag_and_sort_recommendations($recs, $creator_categories),
                     'creator_brands'      => $creator_brands,
                     'creator_categories'  => $creator_categories,
                     'creator_product_ids' => $creator_product_ids,
@@ -150,7 +152,7 @@ class SampleProduct_model extends CI_Model {
             // ------------------------------------------------------------
             log_message('debug', "[SampleRec] creator_id={$creator_id}: fallback 1 — hapus filter brand");
 
-            $this->db->select('ap.*, b.id as brand_db_id, b.name as brand_display_name, b.sample_type');
+            $this->db->select($select_fields);
             $this->db->from('affiliate_products ap');
             $this->db->join('brands b', 'LOWER(TRIM(ap.shop_name)) = LOWER(TRIM(b.shop_name))', 'left');
             $this->db->where('ap.review_status', 'APPROVED');
@@ -166,7 +168,7 @@ class SampleProduct_model extends CI_Model {
 
             if (!empty($recs)) {
                 return [
-                    'recommendations'     => $recs,
+                    'recommendations'     => $this->_tag_and_sort_recommendations($recs, $creator_categories),
                     'creator_brands'      => $creator_brands,
                     'creator_categories'  => $creator_categories,
                     'creator_product_ids' => $creator_product_ids,
@@ -180,7 +182,7 @@ class SampleProduct_model extends CI_Model {
         // ----------------------------------------------------------------
         log_message('debug', "[SampleRec] creator_id={$creator_id}: fallback 2 — top-sellers global (exclude brand creator)");
 
-        $this->db->select('ap.*, b.id as brand_db_id, b.name as brand_display_name, b.sample_type');
+        $this->db->select($select_fields);
         $this->db->from('affiliate_products ap');
         $this->db->join('brands b', 'LOWER(TRIM(ap.shop_name)) = LOWER(TRIM(b.shop_name))', 'left');
         $this->db->where('ap.review_status', 'APPROVED');
@@ -198,11 +200,82 @@ class SampleProduct_model extends CI_Model {
         $recs = $this->db->get()->result();
 
         return [
-            'recommendations'     => $recs,
+            'recommendations'     => $this->_tag_and_sort_recommendations($recs, $creator_categories),
             'creator_brands'      => $creator_brands,
             'creator_categories'  => $creator_categories,
             'creator_product_ids' => $creator_product_ids,
         ];
+    }
+
+    /**
+     * Tag dan urutkan produk rekomendasi berdasarkan Best Seller, Trending, Recommended
+     */
+    private function _tag_and_sort_recommendations(array $recs, array $creator_categories) {
+        if (empty($recs)) return [];
+
+        $creator_cat_lower = array_map(function($c) { return strtolower(trim($c)); }, $creator_categories);
+
+        // Find max sales_count in recommendations list
+        $max_sales = 0;
+        foreach ($recs as $p) {
+            $sc = intval($p->sales_count ?? 0);
+            if ($sc > $max_sales) $max_sales = $sc;
+        }
+
+        foreach ($recs as &$p) {
+            $sc = intval($p->sales_count ?? 0);
+
+            // Best Seller: Brand Bestseller di TAP ATAU produk top sales (minimal 30% dari sales tertinggi & min 1000 sales)
+            $is_bestseller = (!empty($p->is_bestseller) && intval($p->is_bestseller) === 1)
+                          || ($max_sales > 0 && $sc >= ($max_sales * 0.3) && $sc >= 1000);
+
+            // Trending: Brand Trending 7-Hari di FastMoss/TAP
+            $is_trending = (!$is_bestseller) && ((!empty($p->is_trending) && intval($p->is_trending) === 1) || floatval($p->brand_day7_gmv ?? 0) > 0);
+
+            // Recommended: Kategori produk cocok dengan kategori profil creator
+            $is_recommended = (!$is_bestseller && !$is_trending) && (!empty($creator_cat_lower) && !empty($p->category) && in_array(strtolower(trim($p->category)), $creator_cat_lower));
+
+            if ($is_bestseller) {
+                $p->badge_type = 'bestseller';
+                $p->badge_label = 'Best Seller';
+                $p->badge_icon = 'fa-fire';
+                $p->badge_color = '#f87171';
+                $p->badge_bg = 'rgba(239,68,68,0.15)';
+                $p->badge_border = 'rgba(239,68,68,0.3)';
+                $p->sort_rank = 1;
+            } elseif ($is_trending) {
+                $p->badge_type = 'trending';
+                $p->badge_label = 'Trending';
+                $p->badge_icon = 'fa-chart-line';
+                $p->badge_color = '#34d399';
+                $p->badge_bg = 'rgba(16,185,129,0.15)';
+                $p->badge_border = 'rgba(16,185,129,0.3)';
+                $p->sort_rank = 2;
+            } elseif ($is_recommended) {
+                $p->badge_type = 'recommended';
+                $p->badge_label = 'Recommended';
+                $p->badge_icon = 'fa-bullseye';
+                $p->badge_color = '#a78bfa';
+                $p->badge_bg = 'rgba(139,92,246,0.15)';
+                $p->badge_border = 'rgba(139,92,246,0.3)';
+                $p->sort_rank = 3;
+            } else {
+                $p->badge_type = '';
+                $p->badge_label = '';
+                $p->badge_icon = '';
+                $p->sort_rank = 4;
+            }
+        }
+        unset($p);
+
+        usort($recs, function($a, $b) {
+            if ($a->sort_rank == $b->sort_rank) {
+                return (intval($a->sales_count ?? 0) < intval($b->sales_count ?? 0)) ? 1 : -1;
+            }
+            return ($a->sort_rank > $b->sort_rank) ? 1 : -1;
+        });
+
+        return $recs;
     }
 
     /**
