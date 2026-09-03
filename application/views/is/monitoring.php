@@ -1156,18 +1156,24 @@ function openRecModal() {
         });
 
         const grid = document.getElementById('recGridContent');
-        grid.innerHTML = data.recommendations.map((p, i) => `
-            <div class="mon-rec-card" data-rec-index="${i}">
-                <div class="mon-rec-check">✓</div>
-                ${p.image_url ? `<img src="${escHtml(p.image_url)}" class="mon-rec-card-img" onerror="this.style.display='none'">` : '<div class="mon-rec-card-img" style="display:flex;align-items:center;justify-content:center;color:var(--mon-muted)"><i class="ri-image-line" style="font-size:28px"></i></div>'}
-                <div class="mon-rec-card-name">${escHtml(p.product_name || p.name || '-')}</div>
-                <div class="mon-rec-card-brand">🏪 ${escHtml(p.shop_name || p.brand_display_name || '-')}</div>
-                <div class="mon-rec-card-meta">
-                    <span style="color:var(--mon-muted)">📦 ${escHtml(p.category || '-')}</span>
-                    <span style="color:var(--mon-green);font-weight:600">${fmtRp(p.price || 0)}</span>
-                </div>
-            </div>
-        `).join('');
+        grid.innerHTML = data.recommendations.map((p, i) => {
+            // commission_rate sudah dikonversi ke persen di backend (700 basis pts → 7%)
+            const commRate = parseFloat(p.commission_rate || 0);
+
+            return `
+                <div class="mon-rec-card" data-rec-index="${i}">
+                    <div class="mon-rec-check">✓</div>
+                    ${p.image_url ? `<img src="${escHtml(p.image_url)}" class="mon-rec-card-img" onerror="this.style.display='none'">` : '<div class="mon-rec-card-img" style="display:flex;align-items:center;justify-content:center;color:var(--mon-muted)"><i class="ri-image-line" style="font-size:28px"></i></div>'}
+                    <div class="mon-rec-card-name">${escHtml(p.product_name || p.name || '-')}</div>
+                    <div class="mon-rec-card-brand">🏪 ${escHtml(p.shop_name || p.brand_display_name || '-')}</div>
+                    <div style="font-size:10px;color:var(--mon-muted);margin-bottom:4px;">📦 ${escHtml(p.category || '-')}</div>
+                    <div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:flex-end;font-size:10px;">
+                        <span style="display:inline-flex;align-items:center;gap:3px;padding:2px 6px;border-radius:6px;background:rgba(245,158,11,0.15);color:#fbbf24;border:1px solid rgba(245,158,11,0.3);font-weight:600;font-size:9.5px;" title="Komisi Creator">
+                            <i class="ri-coins-line"></i> Komisi: ${commRate > 0 ? commRate + '%' : '-'}
+                        </span>
+                    </div>
+                </div>`;
+        }).join('');
 
         // Pasang event listener via JS, bukan onclick attribute
         // Ini menghindari masalah event bubbling dari child elements

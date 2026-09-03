@@ -296,6 +296,15 @@ class SampleProduct_model extends CI_Model {
             return ($a->sort_rank > $b->sort_rank) ? 1 : -1;
         });
 
+        // Konversi open_commission_rate dari basis points ke persen (700 = 7%)
+        // dan satukan ke field commission_rate agar konsisten di frontend
+        foreach ($recs as &$p) {
+            $raw = floatval($p->open_commission_rate ?? $p->commission_rate ?? 0);
+            // Jika nilai > 100 maka hampir pasti disimpan dalam basis points (centesimal)
+            $p->commission_rate = ($raw > 100) ? round($raw / 100, 2) : $raw;
+        }
+        unset($p);
+
         return $recs;
     }
 

@@ -6535,6 +6535,16 @@ document.getElementById('phoneDuplicateModal').addEventListener('click', functio
                     🚚 Manual
                 </span>`;
 
+            // commission_rate sudah dikonversi ke persen di backend (700 basis pts → 7%)
+            const commRate = parseFloat(p.commission_rate || 0);
+
+            const commHtml = `
+                <div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: flex-end; font-size: 10px;">
+                    <span style="display:inline-flex; align-items:center; gap:3px; padding:2px 6px; border-radius:6px; background:rgba(245,158,11,0.15); color:#fbbf24; border:1px solid rgba(245,158,11,0.3); font-weight:600; font-size:9.5px;" title="Komisi Creator">
+                        <i class="fas fa-coins" style="font-size:9px;"></i> Komisi: ${commRate > 0 ? commRate + '%' : '-'}
+                    </span>
+                </div>`;
+
             return `
                 <div class="db-rec-item ${isSel ? 'sel' : ''}" data-db-rec-key="${pId}">
                     <div class="chk">✓</div>
@@ -6545,6 +6555,7 @@ document.getElementById('phoneDuplicateModal').addEventListener('click', functio
                         <span>🏪 ${escHtmlDb(p.shop_name || p.brand_display_name || '-')}</span>
                         ${methodBadge}
                     </div>
+                    ${commHtml}
                 </div>`;
         }).join('');
 
