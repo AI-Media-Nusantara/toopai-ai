@@ -408,7 +408,7 @@
     .scout-btn-dashboard:hover{background:#7c3cff !important;color:#fff !important;}
     .stages-scroll-dashboard{padding:16px;margin-bottom:18px;border:1px solid var(--is-border);border-radius:20px;background:linear-gradient(160deg,rgba(9,17,34,.72),rgba(4,10,22,.86));overflow-x:auto;}
     .stages-container-dashboard{display:grid !important;grid-template-columns:repeat(4,minmax(250px,1fr));gap:16px !important;width:100%;min-width:1180px !important;}
-    .stage-card-dashboard{width:auto !important;min-width:0 !important;height:520px !important;padding:16px !important;border-radius:18px !important;overflow:hidden !important;display:flex !important;flex-direction:column !important;border:1px solid var(--is-border) !important;background:linear-gradient(160deg,rgba(13,23,46,.90),rgba(6,12,25,.92)) !important;box-shadow:inset 0 1px 0 rgba(255,255,255,.04);}
+    .stage-card-dashboard{width:auto !important;min-width:0 !important;height:560px !important;padding:16px !important;border-radius:18px !important;overflow:hidden !important;display:flex !important;flex-direction:column !important;border:1px solid var(--is-border) !important;background:linear-gradient(160deg,rgba(13,23,46,.90),rgba(6,12,25,.92)) !important;box-shadow:inset 0 1px 0 rgba(255,255,255,.04);}
     .stage-card-dashboard[data-stage="1"]{border-top:2px solid var(--is-purple) !important;background:linear-gradient(160deg,rgba(31,20,55,.86),rgba(7,14,30,.92)) !important;}
     .stage-card-dashboard[data-stage="2"]{border-top:2px solid var(--is-blue) !important;background:linear-gradient(160deg,rgba(13,30,62,.82),rgba(7,14,30,.92)) !important;}
     .stage-card-dashboard[data-stage="3"]{border-top:2px solid var(--is-cyan) !important;background:linear-gradient(160deg,rgba(6,42,50,.78),rgba(7,14,30,.92)) !important;}
@@ -1427,7 +1427,7 @@
      <!-- ============================================================ -->
 <!-- TASK 1: SCOUTING & AUTO GENERATE LINK -->
 <!-- ============================================================ -->
-<div class="stage-card-dashboard" data-stage="1" style="display: flex; flex-direction: column; height: 500px;">
+<div class="stage-card-dashboard" data-stage="1" style="display: flex; flex-direction: column; height: 560px;">
     <div class="stage-title-dashboard" style="flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; width: 100%;">
         <span><i class="fas fa-search" style="color: var(--purple);"></i> 1. SCOUTING</span>
         <div style="display: flex; align-items: center; gap: 8px;">
@@ -5759,7 +5759,7 @@ document.getElementById('phoneDuplicateModal').addEventListener('click', functio
     // STATE
     // ============================================================
     let _scoutingOffset   = 0;
-    const _scoutingLimit  = 50;
+    const _scoutingLimit  = 20;
     let _scoutingTotal    = 0;
     let _scoutingTimer    = null;
     let _scoutingLoading  = false;
@@ -6018,7 +6018,7 @@ document.getElementById('phoneDuplicateModal').addEventListener('click', functio
 
                 _scoutingOffset += res.data.length;
 
-                // Tidak load lebih dari _scoutingLimit (50 teratas GMV sudah cukup)
+                // Tidak load lebih dari _scoutingLimit (20 teratas GMV sudah cukup)
                 _disconnectObserver();
 
                 // Tampilkan/sembunyikan fade kanan

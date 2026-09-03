@@ -1,4 +1,240 @@
 </div>
+    
+    <style>
+    /* TOOPAI MODERN FOOTER */
+    .toopai-modern-footer {
+        background-color: var(--bg-primary, #0a0a0f);
+        color: var(--text-secondary, #94a3b8);
+        padding: 40px 20px 20px;
+        font-family: 'Inter', sans-serif;
+        position: relative;
+        overflow: hidden;
+        margin-top: 50px;
+        border-top: 1px solid rgba(255,255,255,0.03);
+    }
+
+    /* Subtle background curve */
+    .toopai-modern-footer::before {
+        content: '';
+        position: absolute;
+        top: -150px;
+        left: 0;
+        width: 100%;
+        height: 300px;
+        background: radial-gradient(ellipse at top, rgba(139, 92, 246, 0.05) 0%, transparent 70%);
+        pointer-events: none;
+    }
+
+    .toopai-footer-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        max-width: 1200px;
+        margin: 0 auto 40px;
+        flex-wrap: wrap;
+        gap: 20px;
+    }
+
+    .footer-feature {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex: 1;
+        min-width: 250px;
+    }
+
+    .footer-feature-icon {
+        width: 46px;
+        height: 46px;
+        border-radius: 12px;
+        background: rgba(139, 92, 246, 0.1);
+        border: 1px solid rgba(139, 92, 246, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--purple, #8b5cf6);
+        font-size: 20px;
+        box-shadow: 0 0 15px rgba(139, 92, 246, 0.15);
+    }
+
+    .footer-feature-text h4 {
+        color: #ffffff;
+        font-size: 14px;
+        font-weight: 600;
+        margin: 0 0 4px 0;
+        letter-spacing: 0.3px;
+    }
+
+    .footer-feature-text p {
+        font-size: 12px;
+        margin: 0;
+        line-height: 1.5;
+        color: rgba(255,255,255,0.5);
+    }
+
+    .footer-center-wrapper {
+        flex: 1;
+        min-width: 250px;
+        display: flex;
+        justify-content: center;
+        border-left: 1px solid rgba(255,255,255,0.05);
+        border-right: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .footer-center-content {
+        text-align: center;
+    }
+
+    .footer-center-content p.powered {
+        font-size: 14px;
+        color: #ffffff;
+        margin: 0 0 6px 0;
+        font-weight: 500;
+    }
+
+    .footer-center-content p.powered span {
+        color: var(--purple, #8b5cf6);
+        font-weight: 700;
+    }
+
+    .footer-center-content p.copyright {
+        font-size: 11px;
+        color: rgba(255,255,255,0.4);
+        margin: 0;
+    }
+
+    .toopai-footer-bottom {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding-top: 25px;
+        border-top: 1px solid rgba(255,255,255,0.06);
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+
+
+    .footer-made-with {
+        font-size: 12px;
+        color: rgba(255,255,255,0.5);
+    }
+    
+    .footer-made-with i {
+        color: #ef4444;
+        margin: 0 3px;
+    }
+
+    .footer-back-top {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 13px;
+        color: #ffffff;
+        cursor: pointer;
+        font-weight: 500;
+        transition: opacity 0.2s;
+    }
+
+    .footer-back-top:hover {
+        opacity: 0.8;
+    }
+
+    .footer-back-top-btn {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.05);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: 0.3s;
+        border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .footer-back-top:hover .footer-back-top-btn {
+        background: rgba(255,255,255,0.1);
+    }
+
+    @media (max-width: 992px) {
+        .footer-center-wrapper {
+            border-left: none;
+            border-right: none;
+            order: -1;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        .toopai-footer-top {
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+        .footer-feature {
+            flex-direction: column;
+            justify-content: center !important;
+            text-align: center !important;
+        }
+        .toopai-footer-bottom {
+            flex-direction: column;
+            justify-content: center;
+            text-align: center;
+            gap: 20px;
+        }
+    }
+    </style>
+
+    <footer class="toopai-modern-footer">
+        <div class="toopai-footer-top">
+            
+            <!-- Left Feature -->
+            <div class="footer-feature">
+                <div class="footer-feature-icon">
+                    <i class="fas fa-shield-alt"></i>
+                </div>
+                <div class="footer-feature-text">
+                    <h4>Keamanan Terjamin</h4>
+                    <p>Data Anda aman dengan enkripsi<br>berstandar enterprise-grade</p>
+                </div>
+            </div>
+            
+            <!-- Center Branding -->
+            <div class="footer-center-wrapper">
+                <div class="footer-center-content">
+                    <p class="powered">Powered by <span>Toopai.ai</span></p>
+                    <p class="copyright">&copy; 2026 Toopai.ai. All rights reserved.</p>
+                </div>
+            </div>
+            
+            <!-- Right Feature -->
+            <div class="footer-feature" style="justify-content: flex-end; text-align: left;">
+                <div class="footer-feature-icon">
+                    <i class="fas fa-check-shield"></i>
+                </div>
+                <div class="footer-feature-text">
+                    <h4>Enterprise Grade</h4>
+                    <p>Sistem handal untuk skalabilitas<br>bisnis Anda</p>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="toopai-footer-bottom">
+
+            <!-- Center Side: Made with love -->
+            <div class="footer-made-with">
+                Dibuat dengan <i class="fas fa-heart"></i> untuk membantu bisnis Anda berkembang
+            </div>
+            
+            <!-- Right Side: Back to top -->
+            <div class="footer-back-top" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">
+                Kembali ke atas
+                <div class="footer-back-top-btn">
+                    <i class="fas fa-arrow-up"></i>
+                </div>
+            </div>
+        </div>
+    </footer>
 <div id="globalToastContainer"></div>
 <style>
 #globalToastContainer{position:fixed;right:24px;bottom:24px;z-index:99999;pointer-events:none}.global-toast{min-width:320px;margin-top:12px;padding:15px 18px;border-radius:18px;background:linear-gradient(135deg,#7c3cff,#10dff0);color:#fff;font-size:13px;font-weight:800;box-shadow:0 0 28px rgba(124,60,255,.28);animation:toastIn .25s ease;pointer-events:auto}@keyframes toastIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}@media(max-width:768px){#globalToastContainer{left:14px;right:14px;bottom:14px}.global-toast{min-width:auto;width:100%}}
