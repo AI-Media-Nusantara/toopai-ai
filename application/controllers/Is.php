@@ -9760,6 +9760,10 @@ public function send_link_task1() {
 
 /**
  * Synchronize Bestseller and Trending status automatically for system brands
+ * Menggunakan data TAP API (get_bestselling_products) sebagai sumber utama:
+ * - Ambil produk bestselling dari TAP → group by shop_name → hitung total GMV per brand
+ * - Cocokkan shop_name dengan tabel brands → update is_bestseller
+ * - Fallback ke data internal (brand_creators.total_gmv) jika TAP API tidak tersedia
  */
 public function sync_brand_tap_performance() {
     // Auto-migrate database columns if missing on server database
@@ -9770,8 +9774,54 @@ public function sync_brand_tap_performance() {
         $this->db->query("ALTER TABLE brands ADD COLUMN is_bestseller TINYINT(1) DEFAULT 0, ADD COLUMN is_trending TINYINT(1) DEFAULT 0, ADD COLUMN day7_gmv DECIMAL(15,2) DEFAULT 0.00");
     }
 
+    // =========================================================
+    // STEP 1: Coba ambil data dari TAP API (get_bestselling_products)
+    // =========================================================
+    $tap_brand_gmv   = [];  // [ shop_name_lower => gmv_total ]
+    $tap_api_success = false;
+
+    try {
+        // Ambil 7-hari dan 28-hari dari TAP API
+        $time_slots = ['7D' => 'gmv_7d', '28D' => 'gmv_28d'];
+        foreach ($time_slots as $slot => $gmv_key) {
+            $result = $this->jsm_api->get_bestselling_products([
+                'time_slot' => $slot,
+                'page_size' => 100,
+            ]);
+
+            if (!empty($result['success']) && !empty($result['data']['products'])) {
+                $tap_api_success = true;
+                foreach ($result['data']['products'] as $item) {
+                    $shop_name = strtolower(trim($item['shop_name'] ?? ''));
+                    if (empty($shop_name)) continue;
+
+                    // Parse GMV dari string range, e.g. "IDR1000000~IDR5000000"
+                    $gmv_range = $item['gmv_range'] ?? '';
+                    $gmv_value = 0.0;
+                    if (preg_match('/IDR([0-9.]+)~IDR([0-9.]+)/', $gmv_range, $matches)) {
+                        // Gunakan nilai maksimum sebagai estimasi GMV
+                        $gmv_value = floatval($matches[2]);
+                    } elseif (preg_match('/IDR([0-9.]+)/', $gmv_range, $matches)) {
+                        $gmv_value = floatval($matches[1]);
+                    }
+
+                    if (!isset($tap_brand_gmv[$shop_name])) {
+                        $tap_brand_gmv[$shop_name] = ['gmv_7d' => 0.0, 'gmv_28d' => 0.0];
+                    }
+                    $tap_brand_gmv[$shop_name][$gmv_key] += $gmv_value;
+                }
+            }
+        }
+    } catch (Exception $e) {
+        log_message('error', 'sync_brand_tap_performance TAP API error: ' . $e->getMessage());
+        $tap_api_success = false;
+    }
+
+    // =========================================================
+    // STEP 2: Ambil daftar brands yang aktif di Step 1
+    // =========================================================
     $brands = $this->db->query("
-        SELECT DISTINCT b.id
+        SELECT DISTINCT b.id, b.shop_name, b.name as brand_name
         FROM brands b
         JOIN brand_creators bc ON bc.brand_id = b.id
         JOIN creators c ON bc.creator_username = c.username
@@ -9784,40 +9834,47 @@ public function sync_brand_tap_performance() {
 
     $brand_stats = [];
     foreach ($brands as $b) {
-        // Calculate 28-day total GMV safely
-        $gmv_28d_q = $this->db->query("
-            SELECT COALESCE(SUM(bc.total_gmv), 0) as gmv
-            FROM brand_creators bc
-            JOIN creators c ON bc.creator_username = c.username
-            WHERE bc.brand_id = ? AND c.status IN ('PENDING', 'LINK_SWAPPING')
-        ", [$b->id]);
-        
-        $gmv_28d = ($gmv_28d_q && is_object($gmv_28d_q) && $gmv_28d_q->num_rows() > 0) ? floatval($gmv_28d_q->row()->gmv ?? 0) : 0.0;
+        $shop_key = strtolower(trim($b->shop_name ?? $b->brand_name ?? ''));
 
-        // Calculate 7-day GMV safely
-        $gmv_7d = 0.0;
-        if ($has_day7_col) {
-            $gmv_7d_q = $this->db->query("
-                SELECT COALESCE(SUM(bc.day7_gmv), 0) as gmv
+        if ($tap_api_success && isset($tap_brand_gmv[$shop_key])) {
+            // ✅ Gunakan data GMV dari TAP API
+            $gmv_28d = $tap_brand_gmv[$shop_key]['gmv_28d'];
+            $gmv_7d  = $tap_brand_gmv[$shop_key]['gmv_7d'];
+        } else {
+            // 🔁 Fallback: hitung dari data internal brand_creators
+            $gmv_28d_q = $this->db->query("
+                SELECT COALESCE(SUM(bc.total_gmv), 0) as gmv
                 FROM brand_creators bc
                 JOIN creators c ON bc.creator_username = c.username
                 WHERE bc.brand_id = ? AND c.status IN ('PENDING', 'LINK_SWAPPING')
             ", [$b->id]);
-            $gmv_7d = ($gmv_7d_q && is_object($gmv_7d_q) && $gmv_7d_q->num_rows() > 0) ? floatval($gmv_7d_q->row()->gmv ?? 0) : 0.0;
+            $gmv_28d = ($gmv_28d_q && is_object($gmv_28d_q) && $gmv_28d_q->num_rows() > 0) ? floatval($gmv_28d_q->row()->gmv ?? 0) : 0.0;
+
+            $gmv_7d = 0.0;
+            if ($has_day7_col) {
+                $gmv_7d_q = $this->db->query("
+                    SELECT COALESCE(SUM(bc.day7_gmv), 0) as gmv
+                    FROM brand_creators bc
+                    JOIN creators c ON bc.creator_username = c.username
+                    WHERE bc.brand_id = ? AND c.status IN ('PENDING', 'LINK_SWAPPING')
+                ", [$b->id]);
+                $gmv_7d = ($gmv_7d_q && is_object($gmv_7d_q) && $gmv_7d_q->num_rows() > 0) ? floatval($gmv_7d_q->row()->gmv ?? 0) : 0.0;
+            }
         }
 
         $brand_stats[$b->id] = [
-            'brand_id' => $b->id,
-            'gmv_28d' => $gmv_28d,
-            'gmv_7d' => $gmv_7d
+            'brand_id'   => $b->id,
+            'gmv_28d'    => $gmv_28d,
+            'gmv_7d'     => $gmv_7d,
+            'source'     => ($tap_api_success && isset($tap_brand_gmv[$shop_key])) ? 'tap_api' : 'internal',
         ];
     }
 
     $max_gmv_28d = 0;
-    $max_gmv_7d = 0;
+    $max_gmv_7d  = 0;
     foreach ($brand_stats as $bs) {
         if ($bs['gmv_28d'] > $max_gmv_28d) $max_gmv_28d = $bs['gmv_28d'];
-        if ($bs['gmv_7d'] > $max_gmv_7d) $max_gmv_7d = $bs['gmv_7d'];
+        if ($bs['gmv_7d']  > $max_gmv_7d)  $max_gmv_7d  = $bs['gmv_7d'];
     }
 
     uasort($brand_stats, function($a, $b) {
@@ -9827,11 +9884,20 @@ public function sync_brand_tap_performance() {
     $rank = 0;
     foreach ($brand_stats as $bid => $stat) {
         $rank++;
-        $is_bestseller = ($stat['gmv_28d'] > 0 && ($rank <= 3 || ($max_gmv_28d > 0 && $stat['gmv_28d'] >= ($max_gmv_28d * 0.2)))) ? 1 : 0;
+
+        // Bestseller dari TAP API: semua brand yang muncul di data TAP dengan GMV > 0 langsung dianggap Bestseller
+        // Bestseller dari internal (fallback): gunakan rank top-3 atau GMV >= 20% dari tertinggi
+        if ($stat['source'] === 'tap_api') {
+            $is_bestseller = ($stat['gmv_28d'] > 0) ? 1 : 0;
+        } else {
+            $is_bestseller = ($stat['gmv_28d'] > 0 && ($rank <= 3 || ($max_gmv_28d > 0 && $stat['gmv_28d'] >= ($max_gmv_28d * 0.2)))) ? 1 : 0;
+        }
+
+        // Trending: ada GMV 7-hari (lebih akurat kalau dari TAP)
         $is_trending = ($stat['gmv_7d'] > 0) ? 1 : 0;
 
         $update_data = [
-            'total_gmv' => $stat['gmv_28d'],
+            'total_gmv'  => $stat['gmv_28d'],
             'updated_at' => date('Y-m-d H:i:s')
         ];
         if ($this->db->field_exists('day7_gmv', 'brands')) {
@@ -9846,6 +9912,8 @@ public function sync_brand_tap_performance() {
 
         $this->db->where('id', $bid)->update('brands', $update_data);
     }
+
+    log_message('info', 'sync_brand_tap_performance: updated ' . count($brand_stats) . ' brands. TAP API used: ' . ($tap_api_success ? 'YES' : 'NO (fallback to internal)'));
 }
 
 // =====================================================================

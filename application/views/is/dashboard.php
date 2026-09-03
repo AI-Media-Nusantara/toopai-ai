@@ -1440,7 +1440,7 @@
     
     <!-- Search input -->
     <div style="flex-shrink: 0; padding: 8px 12px 4px 12px;">
-        <input type="text" id="searchScoutingDashboard" placeholder=" Cari creator atau brand..." 
+        <input type="text" id="searchScoutingDashboard" placeholder=" Cari creator..." 
                onkeyup="filterTaskAjax('task1', this.value)"
                style="width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; font-size: 12px; background: rgba(255,255,255,0.05); color: var(--text-primary); outline: none; transition: var(--transition);">
     </div>
@@ -4434,6 +4434,23 @@ function changeScoutingDisplayMode(mode) {
     if (currentScoutingDisplayMode === mode) return;
     currentScoutingDisplayMode = mode;
     
+    // Reset search input saat ganti mode
+    const searchInput = document.getElementById('searchScoutingDashboard');
+    if (searchInput) {
+        searchInput.value = '';
+        // Update placeholder sesuai mode aktif
+        searchInput.placeholder = (mode === 'brand') ? ' Cari brand...' : ' Cari creator...';
+    }
+    // Restore konten awal (hapus hasil search sebelumnya)
+    if (_taskOriginalContent['task1'] !== undefined) {
+        const container = document.getElementById('scoutingContainerDashboard');
+        if (container) container.innerHTML = _taskOriginalContent['task1'];
+    }
+    if (_taskOriginalCount['task1'] !== undefined) {
+        const countBadge = document.getElementById('scoutingCountDashboard');
+        if (countBadge) countBadge.textContent = _taskOriginalCount['task1'];
+    }
+
     // Update button styles
     const btnCreator = document.getElementById('btnScoutingModeCreator');
     const btnBrand = document.getElementById('btnScoutingModeBrand');
@@ -4741,7 +4758,30 @@ function filterTaskAjax(task, keyword) {
         return;
     }
     
+    // Task 1: cek mode aktif (creator vs brand)
     if (task === 'task1') {
+        // =======================================================
+        // MODE BRAND: filter client-side pada .brand-item-card
+        // =======================================================
+        if (currentScoutingDisplayMode === 'brand') {
+            const brandView = document.getElementById('scoutingBrandView');
+            if (!brandView) return;
+            const cards = Array.from(brandView.querySelectorAll('.brand-item-card'));
+            const kw = keyword.trim().toLowerCase();
+            let visibleCount = 0;
+            cards.forEach(card => {
+                const brandName = (card.getAttribute('data-brand-name') || '').toLowerCase();
+                const match = brandName.includes(kw);
+                card.style.display = match ? 'flex' : 'none';
+                if (match) visibleCount++;
+            });
+            if (countBadge) countBadge.textContent = visibleCount;
+            return;
+        }
+
+        // =======================================================
+        // MODE CREATOR: tampilkan search view dan panggil AJAX
+        // =======================================================
         const searchView = document.getElementById('scoutingSearchResultsView');
         if (searchView) {
             searchView.innerHTML = `
