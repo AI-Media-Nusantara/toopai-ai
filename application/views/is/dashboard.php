@@ -4430,6 +4430,34 @@ window.checkShowcaseSingle = async function(linkId, btn) {
 // State and functions for Task 1 Scouting Display Mode (Creator vs Brand)
 let currentScoutingDisplayMode = 'creator'; // 'creator' atau 'brand'
 
+function updateScoutingCount() {
+    const countBadge = document.getElementById('scoutingCountDashboard');
+    if (!countBadge) return;
+
+    const searchInput = document.getElementById('searchScoutingDashboard');
+    const isSearching = searchInput && searchInput.value.trim() !== '';
+
+    if (currentScoutingDisplayMode === 'brand') {
+        const brandView = document.getElementById('scoutingBrandView');
+        if (!brandView) return;
+        const visibleBrandCards = Array.from(brandView.querySelectorAll('.brand-item-card')).filter(card => card.style.display !== 'none');
+        countBadge.textContent = visibleBrandCards.length;
+    } else {
+        if (isSearching) {
+            const searchView = document.getElementById('scoutingSearchResultsView');
+            if (searchView) {
+                const visibleItems = searchView.querySelectorAll('.scouting-item-dashboard');
+                countBadge.textContent = visibleItems.length;
+            }
+        } else {
+            const creatorView = document.getElementById('scoutingCreatorView');
+            if (!creatorView) return;
+            const visibleCreators = creatorView.querySelectorAll('.scouting-item-dashboard');
+            countBadge.textContent = visibleCreators.length;
+        }
+    }
+}
+
 function changeScoutingDisplayMode(mode) {
     if (currentScoutingDisplayMode === mode) return;
     currentScoutingDisplayMode = mode;
@@ -4445,10 +4473,6 @@ function changeScoutingDisplayMode(mode) {
     if (_taskOriginalContent['task1'] !== undefined) {
         const container = document.getElementById('scoutingContainerDashboard');
         if (container) container.innerHTML = _taskOriginalContent['task1'];
-    }
-    if (_taskOriginalCount['task1'] !== undefined) {
-        const countBadge = document.getElementById('scoutingCountDashboard');
-        if (countBadge) countBadge.textContent = _taskOriginalCount['task1'];
     }
 
     // Update button styles
@@ -4476,6 +4500,14 @@ function changeScoutingDisplayMode(mode) {
     }
     
     applyScoutingViewMode();
+
+    if (mode === 'brand') {
+        const activeBtn = document.querySelector('.tap-filter-btn.active');
+        const cat = activeBtn ? activeBtn.getAttribute('data-category') : 'all';
+        filterBrandCategory(cat);
+    } else {
+        updateScoutingCount();
+    }
 }
 
 function applyScoutingViewMode() {
@@ -4666,11 +4698,15 @@ function filterBrandCategory(category) {
     const container = document.getElementById('scoutingBrandView');
     if (!container) return;
 
+    const searchInput = document.getElementById('searchScoutingDashboard');
+    const kw = (searchInput && searchInput.value) ? searchInput.value.trim().toLowerCase() : '';
+
     const cards = Array.from(container.querySelectorAll('.brand-item-card'));
 
     cards.forEach(card => {
         const isBestseller = card.getAttribute('data-is-bestseller') === '1';
         const isTrending = card.getAttribute('data-is-trending') === '1';
+        const brandName = (card.getAttribute('data-brand-name') || '').toLowerCase();
 
         let show = true;
         if (category === 'bestseller') {
@@ -4679,6 +4715,10 @@ function filterBrandCategory(category) {
             show = isTrending;
         } else {
             show = true;
+        }
+
+        if (kw) {
+            show = show && brandName.includes(kw);
         }
 
         if (show) {
@@ -4703,6 +4743,7 @@ function filterBrandCategory(category) {
     });
 
     cards.forEach(card => container.appendChild(card));
+    updateScoutingCount();
 }
 
 let searchTimer = null;
@@ -4749,11 +4790,13 @@ function filterTaskAjax(task, keyword) {
         if (container && _taskOriginalContent[task] !== undefined) {
             container.innerHTML = _taskOriginalContent[task];
         }
-        if (countBadge && _taskOriginalCount[task] !== undefined) {
-            countBadge.textContent = _taskOriginalCount[task];
-        }
         if (task === 'task1') {
             applyScoutingViewMode();
+            updateScoutingCount();
+        } else {
+            if (countBadge && _taskOriginalCount[task] !== undefined) {
+                countBadge.textContent = _taskOriginalCount[task];
+            }
         }
         return;
     }
@@ -4764,18 +4807,9 @@ function filterTaskAjax(task, keyword) {
         // MODE BRAND: filter client-side pada .brand-item-card
         // =======================================================
         if (currentScoutingDisplayMode === 'brand') {
-            const brandView = document.getElementById('scoutingBrandView');
-            if (!brandView) return;
-            const cards = Array.from(brandView.querySelectorAll('.brand-item-card'));
-            const kw = keyword.trim().toLowerCase();
-            let visibleCount = 0;
-            cards.forEach(card => {
-                const brandName = (card.getAttribute('data-brand-name') || '').toLowerCase();
-                const match = brandName.includes(kw);
-                card.style.display = match ? 'flex' : 'none';
-                if (match) visibleCount++;
-            });
-            if (countBadge) countBadge.textContent = visibleCount;
+            const activeBtn = document.querySelector('.tap-filter-btn.active');
+            const cat = activeBtn ? activeBtn.getAttribute('data-category') : 'all';
+            filterBrandCategory(cat);
             return;
         }
 

@@ -201,7 +201,7 @@
             <!-- Center Branding -->
             <div class="footer-center-wrapper">
                 <div class="footer-center-content">
-                    <p class="powered">Powered by <span>Toopai.ai</span></p>
+                    <p class="powered">Powered by <span>Toopai.ai</span> <span style="font-size:10px; background:rgba(139,92,246,0.2); color:#a78bfa; border:1px solid rgba(139,92,246,0.35); padding:1px 7px; border-radius:10px; font-weight:700; margin-left:4px; display:inline-flex; align-items:center;">v2.0</span></p>
                     <p class="copyright">&copy; 2026 Toopai.ai. All rights reserved.</p>
                 </div>
             </div>
