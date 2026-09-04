@@ -117,34 +117,19 @@ public function dashboard() {
     }
     
     // ========== 🔥 AUTO-UPDATE: FOLLOW_UP -> CAMPAIGN_READY ==========
-    $followup_brands = $this->db->select('id, name, deal_confirmed_at')
+    // Brand yang sudah konfirmasi deal (deal_confirmed_at terisi) otomatis pindah ke Step 3
+    // Pengecekan produk TIDAK dilakukan di sini karena produk baru disubmit saat Step 3
+    $updated_brands = $this->db
         ->where('status', 'FOLLOW_UP')
         ->where('deal_confirmed_at IS NOT NULL')
-        ->get('brands')
-        ->result();
+        ->update('brands', [
+            'status'       => 'CAMPAIGN_READY',
+            'current_task' => 3,
+            'updated_at'   => date('Y-m-d H:i:s')
+        ]);
 
-    $updated_brands = 0;
-    foreach ($followup_brands as $brand) {
-        $has_products = $this->db->select('COUNT(*) as total')
-            ->from('affiliate_products')
-            ->where('shop_name', $brand->name)
-            ->get()
-            ->row()
-            ->total > 0;
-        
-        if ($has_products) {
-            $this->db->where('id', $brand->id)
-                     ->update('brands', [
-                         'status' => 'CAMPAIGN_READY',
-                         'current_task' => 3,
-                         'updated_at' => date('Y-m-d H:i:s')
-                     ]);
-            $updated_brands++;
-        }
-    }
-
-    if ($updated_brands > 0) {
-        log_message('info', "Auto-updated {$updated_brands} brands from FOLLOW_UP to CAMPAIGN_READY on dashboard load");
+    if ($this->db->affected_rows() > 0) {
+        log_message('info', 'Auto-updated ' . $this->db->affected_rows() . ' brands from FOLLOW_UP to CAMPAIGN_READY on dashboard load');
     }
     
     // ========== 🔥 AUTO-UPDATE: CAMPAIGN_READY -> ACTIVE ==========
@@ -316,7 +301,7 @@ public function dashboard() {
             ->result();
     }
 
-    // CEK PRODUK DI AFFILIATE_PRODUCTS
+    // Tambahkan info produk dan klik count untuk tampilan di view
     foreach ($followup_items as $item) {
         $product_count = $this->db->select('COUNT(*) as total')
             ->from('affiliate_products')
@@ -325,19 +310,7 @@ public function dashboard() {
             ->row()
             ->total ?? 0;
         
-        $item->has_products = $product_count > 0;
-        
-        if ($product_count > 0 && !empty($item->deal_confirmed_at) && $item->status == 'FOLLOW_UP') {
-            $this->db->where('id', $item->id)
-                     ->update('brands', [
-                         'status' => 'CAMPAIGN_READY',
-                         'current_task' => 3,
-                         'updated_at' => date('Y-m-d H:i:s')
-                     ]);
-            $item->status = 'CAMPAIGN_READY';
-            $item->current_task = 3;
-        }
-        
+        $item->has_products    = $product_count > 0;
         $item->follow_up_click_count = intval($item->follow_up_click_count ?? 0);
     }
     
@@ -2811,15 +2784,13 @@ public function save_follow_up() {
         'updated_at' => date('Y-m-d H:i:s')
     ];
     
-    // Hanya pindah ke CAMPAIGN_READY jika sudah ada produk
+    // Pindah ke CAMPAIGN_READY setelah deal dikonfirmasi (tidak perlu tunggu produk)
+    // Produk akan disubmit oleh brand saat berada di Step 3
+    $update_data['status']       = 'CAMPAIGN_READY';
+    $update_data['current_task'] = 3;
+    $message = '✅ Deal dikonfirmasi! Brand dipindahkan ke Setup Campaign (Task 3).';
     if ($has_products) {
-        $update_data['status'] = 'CAMPAIGN_READY';
-        $update_data['current_task'] = 3;
-        $message = '✅ Brand sudah registrasi! Pindah ke Setup Campaign (Task 3).';
-    } else {
-        $update_data['status'] = 'FOLLOW_UP';
-        $update_data['current_task'] = 2;
-        $message = '⚠️ Brand belum registrasi. Menunggu registrasi campaign.';
+        $message .= ' Brand sudah memiliki ' . $product_count . ' produk.';
     }
     
     $this->db->where('id', $brand_id);
@@ -2836,11 +2807,11 @@ public function save_follow_up() {
     ]);
     
     return $this->output->set_output(json_encode([
-        'success' => true,
-        'message' => $message,
-        'has_products' => $has_products,
+        'success'       => true,
+        'message'       => $message,
+        'has_products'  => $has_products,
         'product_count' => $product_count,
-        'new_status' => $has_products ? 'CAMPAIGN_READY' : 'FOLLOW_UP'
+        'new_status'    => 'CAMPAIGN_READY'
     ]));
 } 
 
@@ -2872,15 +2843,21 @@ public function check_brand_registration() {
     
     $has_products = $product_count > 0;
     
-    // 🔥 JIKA ADA PRODUK, AUTO-UPDATE STATUS KE CAMPAIGN_READY
-    if ($has_products && $brand->status == 'FOLLOW_UP') {
-        $this->db->where('id', $brand_id)
-                 ->update('brands', [
-                     'status' => 'CAMPAIGN_READY',
-                     'current_task' => 3,
-                     'updated_at' => date('Y-m-d H:i:s')
-                 ]);
-        $brand->status = 'CAMPAIGN_READY';
+    // 🔥 JIKA MASIH DI FOLLOW_UP TAPI SUDAH ADA PRODUK, AUTO-UPDATE KE CAMPAIGN_READY
+    // (fallback manual check — seharusnya sudah dipindahkan saat deal dikonfirmasi)
+    if ($brand->status == 'FOLLOW_UP') {
+        $deal_confirmed = $this->db->select('deal_confirmed_at')
+            ->where('id', $brand_id)
+            ->get('brands')->row()->deal_confirmed_at ?? null;
+        if (!empty($deal_confirmed) || $has_products) {
+            $this->db->where('id', $brand_id)
+                     ->update('brands', [
+                         'status'       => 'CAMPAIGN_READY',
+                         'current_task' => 3,
+                         'updated_at'   => date('Y-m-d H:i:s')
+                     ]);
+            $brand->status = 'CAMPAIGN_READY';
+        }
     }
     
     return $this->output->set_output(json_encode([
