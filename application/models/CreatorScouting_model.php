@@ -554,6 +554,27 @@ class CreatorScouting_model extends CI_Model {
     }
 
     public function get_brands_in_scouting() {
+        // Ambil brand Step 4 Monitoring di user BA:
+        // status=ACTIVE dan tidak punya affiliate_products dengan review_status=PENDING
+        // Logika identik dengan Task 4 di Bd.php
+        $q = $this->db->query("
+            SELECT
+                b.id  AS brand_id,
+                COALESCE(NULLIF(b.shop_name, ''), b.name) AS brand_name
+            FROM brands b
+            LEFT JOIN affiliate_products ap
+                   ON TRIM(b.name) = TRIM(ap.shop_name)
+                  AND ap.review_status = 'PENDING'
+            WHERE b.status = 'ACTIVE'
+              AND ap.id IS NULL
+            GROUP BY b.id
+            ORDER BY brand_name ASC
+        ");
+
+        if ($q && $q->num_rows() > 0) {
+            return $q->result();
+        }
+
         if (!$this->_table_exists()) return [];
 
         $query = $this->db->select('brand_id, brand_name')

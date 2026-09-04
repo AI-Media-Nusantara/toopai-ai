@@ -298,28 +298,56 @@ foreach ($task2_creators as $c) {
         $brand_creator_counts[$row->brand_id] = intval($row->cnt);
     }
     
-    // Query brands associated with Step 1 creators (both via main brand_id and brand_creators collabs)
+    // Query all active brands from Step 4 Monitoring di user BA for Step 1 user CA
+    // Logika identik dengan Task 4 di Bd.php: status=ACTIVE dan tidak punya produk PENDING
+    // GMV dihitung LANGSUNG dari affiliate_orders (bukan dari cached brands.total_gmv)
     $task1_brands_q = $this->db->query("
-        SELECT DISTINCT
+        SELECT 
             b.id as brand_id,
             b.name as brand_name,
-            b.shop_name,
-            COALESCE(b.total_gmv, 0) as total_gmv,
-            COALESCE(b.day7_gmv, 0) as day7_gmv,
+            COALESCE(NULLIF(b.shop_name, ''), b.name) as shop_name,
+            COALESCE((
+                SELECT SUM(o.gmv)
+                FROM affiliate_orders o
+                JOIN affiliate_products ap2 ON o.product_id = ap2.product_id AND o.campaign_id = ap2.campaign_id
+                WHERE ap2.shop_name = b.name
+                  AND ap2.review_status = 'APPROVED'
+                  AND o.order_status NOT IN ('CANCELLED', 'REFUNDED')
+                  AND o.order_date_local >= DATE_SUB(CURDATE(), INTERVAL 28 DAY)
+            ), COALESCE(b.total_gmv, 0)) as total_gmv,
+            COALESCE((
+                SELECT SUM(o.gmv)
+                FROM affiliate_orders o
+                JOIN affiliate_products ap3 ON o.product_id = ap3.product_id AND o.campaign_id = ap3.campaign_id
+                WHERE ap3.shop_name = b.name
+                  AND ap3.review_status = 'APPROVED'
+                  AND o.order_status NOT IN ('CANCELLED', 'REFUNDED')
+                  AND o.order_date_local >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+            ), COALESCE(b.day7_gmv, 0)) as day7_gmv,
             COALESCE(b.is_bestseller, 0) as is_bestseller,
             COALESCE(b.is_trending, 0) as is_trending,
-            (SELECT COUNT(DISTINCT bc2.creator_username) 
-             FROM brand_creators bc2 
-             JOIN creators c2 ON bc2.creator_username = c2.username 
-             WHERE bc2.brand_id = b.id AND c2.status IN ('PENDING', 'LINK_SWAPPING')) as creators_count
+            (
+                SELECT COUNT(DISTINCT c2.username)
+                FROM creators c2
+                WHERE c2.brand_id = b.id
+                  AND c2.status NOT IN ('REJECTED', 'BLACKLISTED')
+            ) as creators_count
         FROM brands b
-        JOIN brand_creators bc ON bc.brand_id = b.id
-        JOIN creators c ON bc.creator_username = c.username
-        WHERE c.status IN ('PENDING', 'LINK_SWAPPING')
-           OR b.id IN (SELECT DISTINCT brand_id FROM creators WHERE status IN ('PENDING', 'LINK_SWAPPING'))
-        ORDER BY day7_gmv DESC, total_gmv DESC
+        LEFT JOIN affiliate_products ap ON TRIM(b.name) = TRIM(ap.shop_name) AND ap.review_status = 'PENDING'
+        WHERE b.status = 'ACTIVE'
+          AND ap.id IS NULL
+        GROUP BY b.id
+        ORDER BY total_gmv DESC, day7_gmv DESC, b.name ASC
     ");
     $task1_brands = ($task1_brands_q && is_object($task1_brands_q)) ? $task1_brands_q->result() : [];
+
+    // Update is_bestseller & is_trending di memory berdasarkan GMV real-time
+    // (tanpa query tambahan ke DB, langsung dari data yang sudah diambil)
+    foreach ($task1_brands as &$tb) {
+        $tb->is_bestseller = ($tb->total_gmv > 0) ? 1 : 0;
+        $tb->is_trending   = ($tb->day7_gmv  > 0) ? 1 : 0;
+    }
+    unset($tb);
 
     $data = [
         'title' => 'IS Dashboard - Toopai',
@@ -9818,15 +9846,16 @@ public function sync_brand_tap_performance() {
     }
 
     // =========================================================
-    // STEP 2: Ambil daftar brands yang aktif di Step 1
+    // STEP 2: Ambil semua brand aktif (Step 4 Monitoring di BA)
+    // Sebelumnya hanya mengambil brand yg terhubung creator Step 1 — perbaikan:
+    // ambil SEMUA brand ACTIVE agar brand seperti Hanasui juga ikut di-sync
     // =========================================================
     $brands = $this->db->query("
         SELECT DISTINCT b.id, b.shop_name, b.name as brand_name
         FROM brands b
-        JOIN brand_creators bc ON bc.brand_id = b.id
-        JOIN creators c ON bc.creator_username = c.username
-        WHERE c.status IN ('PENDING', 'LINK_SWAPPING')
-           OR b.id IN (SELECT DISTINCT brand_id FROM creators WHERE status IN ('PENDING', 'LINK_SWAPPING'))
+        LEFT JOIN affiliate_products ap ON TRIM(b.name) = TRIM(ap.shop_name) AND ap.review_status = 'PENDING'
+        WHERE b.status = 'ACTIVE'
+          AND ap.id IS NULL
     ")->result();
     if (empty($brands)) return;
 
@@ -9841,24 +9870,55 @@ public function sync_brand_tap_performance() {
             $gmv_28d = $tap_brand_gmv[$shop_key]['gmv_28d'];
             $gmv_7d  = $tap_brand_gmv[$shop_key]['gmv_7d'];
         } else {
-            // 🔁 Fallback: hitung dari data internal brand_creators
+            // 🔁 Fallback: hitung dari affiliate_orders (data penjualan nyata)
+            // Ini lebih akurat untuk brand seperti Hanasui yang creatornya sudah ACTIVE
+            $brand_name_match = $b->shop_name ?: $b->brand_name;
+
             $gmv_28d_q = $this->db->query("
-                SELECT COALESCE(SUM(bc.total_gmv), 0) as gmv
-                FROM brand_creators bc
-                JOIN creators c ON bc.creator_username = c.username
-                WHERE bc.brand_id = ? AND c.status IN ('PENDING', 'LINK_SWAPPING')
-            ", [$b->id]);
-            $gmv_28d = ($gmv_28d_q && is_object($gmv_28d_q) && $gmv_28d_q->num_rows() > 0) ? floatval($gmv_28d_q->row()->gmv ?? 0) : 0.0;
+                SELECT COALESCE(SUM(o.gmv), 0) as gmv
+                FROM affiliate_orders o
+                JOIN affiliate_products ap ON o.product_id = ap.product_id
+                WHERE TRIM(ap.shop_name) = TRIM(?)
+                  AND ap.review_status = 'APPROVED'
+                  AND o.order_status NOT IN ('CANCELLED', 'REFUNDED')
+                  AND o.order_date_local >= DATE_SUB(CURDATE(), INTERVAL 28 DAY)
+            ", [$brand_name_match]);
+            $gmv_28d = ($gmv_28d_q && is_object($gmv_28d_q) && $gmv_28d_q->num_rows() > 0)
+                       ? floatval($gmv_28d_q->row()->gmv ?? 0) : 0.0;
+
+            // Fallback ke brand_creators jika orders kosong
+            if ($gmv_28d == 0.0) {
+                $bc_q = $this->db->query("
+                    SELECT COALESCE(SUM(bc.total_gmv), 0) as gmv
+                    FROM brand_creators bc
+                    WHERE bc.brand_id = ?
+                ", [$b->id]);
+                $gmv_28d = ($bc_q && is_object($bc_q) && $bc_q->num_rows() > 0)
+                           ? floatval($bc_q->row()->gmv ?? 0) : 0.0;
+            }
 
             $gmv_7d = 0.0;
-            if ($has_day7_col) {
-                $gmv_7d_q = $this->db->query("
+            $gmv_7d_q = $this->db->query("
+                SELECT COALESCE(SUM(o.gmv), 0) as gmv
+                FROM affiliate_orders o
+                JOIN affiliate_products ap ON o.product_id = ap.product_id
+                WHERE TRIM(ap.shop_name) = TRIM(?)
+                  AND ap.review_status = 'APPROVED'
+                  AND o.order_status NOT IN ('CANCELLED', 'REFUNDED')
+                  AND o.order_date_local >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+            ", [$brand_name_match]);
+            $gmv_7d = ($gmv_7d_q && is_object($gmv_7d_q) && $gmv_7d_q->num_rows() > 0)
+                      ? floatval($gmv_7d_q->row()->gmv ?? 0) : 0.0;
+
+            // Fallback ke brand_creators.day7_gmv
+            if ($gmv_7d == 0.0 && $has_day7_col) {
+                $bc7_q = $this->db->query("
                     SELECT COALESCE(SUM(bc.day7_gmv), 0) as gmv
                     FROM brand_creators bc
-                    JOIN creators c ON bc.creator_username = c.username
-                    WHERE bc.brand_id = ? AND c.status IN ('PENDING', 'LINK_SWAPPING')
+                    WHERE bc.brand_id = ?
                 ", [$b->id]);
-                $gmv_7d = ($gmv_7d_q && is_object($gmv_7d_q) && $gmv_7d_q->num_rows() > 0) ? floatval($gmv_7d_q->row()->gmv ?? 0) : 0.0;
+                $gmv_7d = ($bc7_q && is_object($bc7_q) && $bc7_q->num_rows() > 0)
+                          ? floatval($bc7_q->row()->gmv ?? 0) : 0.0;
             }
         }
 
@@ -9885,16 +9945,13 @@ public function sync_brand_tap_performance() {
     foreach ($brand_stats as $bid => $stat) {
         $rank++;
 
-        // Bestseller dari TAP API: semua brand yang muncul di data TAP dengan GMV > 0 langsung dianggap Bestseller
-        // Bestseller dari internal (fallback): gunakan rank top-3 atau GMV >= 20% dari tertinggi
-        if ($stat['source'] === 'tap_api') {
-            $is_bestseller = ($stat['gmv_28d'] > 0) ? 1 : 0;
-        } else {
-            $is_bestseller = ($stat['gmv_28d'] > 0 && ($rank <= 3 || ($max_gmv_28d > 0 && $stat['gmv_28d'] >= ($max_gmv_28d * 0.2)))) ? 1 : 0;
-        }
-
-        // Trending: ada GMV 7-hari (lebih akurat kalau dari TAP)
-        $is_trending = ($stat['gmv_7d'] > 0) ? 1 : 0;
+        // Kategorisasi brand:
+        // ✅ Bestseller  = brand yang punya GMV 28 hari > 0 (aktif berjualan)
+        // ✅ Trending    = brand yang punya GMV 7 hari > 0 (aktif dalam seminggu terakhir)
+        // Jika dari TAP API: langsung ikut klasifikasi TAP
+        // Jika dari internal: berdasarkan data affiliate_orders
+        $is_bestseller = ($stat['gmv_28d'] > 0) ? 1 : 0;
+        $is_trending   = ($stat['gmv_7d']  > 0) ? 1 : 0;
 
         $update_data = [
             'total_gmv'  => $stat['gmv_28d'],

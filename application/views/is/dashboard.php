@@ -1679,13 +1679,14 @@
             <?php 
             if (!empty($task1_brands)): 
                 foreach ($task1_brands as $brand_item):
-                    $brand_name = !empty($brand_item->shop_name) ? $brand_item->shop_name : (!empty($brand_item->brand_name) ? $brand_item->brand_name : 'Belum ada brand');
-                    $brand_id = !empty($brand_item->brand_id) ? $brand_item->brand_id : 0;
-                    $brand_total_gmv = !empty($brand_item->total_gmv) ? floatval($brand_item->total_gmv) : 0.0;
-                    $brand_day7_gmv = !empty($brand_item->day7_gmv) ? floatval($brand_item->day7_gmv) : 0.0;
-                    $is_bestseller = !empty($brand_item->is_bestseller);
-                    $is_trending = !empty($brand_item->is_trending);
-                    $total_promoting = !empty($brand_item->creators_count) ? $brand_item->creators_count : 1;
+                    // shop_name sudah di-COALESCE di query (COALESCE(NULLIF(shop_name,''), name))
+                    $brand_name = !empty($brand_item->shop_name) ? $brand_item->shop_name : (!empty($brand_item->brand_name) ? $brand_item->brand_name : 'Brand Aktif');
+                    $brand_id = !empty($brand_item->brand_id) ? intval($brand_item->brand_id) : 0;
+                    $brand_total_gmv = floatval($brand_item->total_gmv ?? 0);
+                    $brand_day7_gmv  = floatval($brand_item->day7_gmv ?? 0);
+                    $is_bestseller   = !empty($brand_item->is_bestseller);
+                    $is_trending     = !empty($brand_item->is_trending);
+                    $total_promoting = isset($brand_item->creators_count) ? intval($brand_item->creators_count) : 0;
             ?>
                 <div class="brand-item-card" 
                      data-brand-name="<?= htmlspecialchars($brand_name) ?>"
