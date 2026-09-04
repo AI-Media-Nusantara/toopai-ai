@@ -1380,7 +1380,7 @@ label {
             <button class="tab-btn-dashboard" data-tab="tabBrandStatusDashboard"><i class="fas fa-tags"></i> Status Brand</button>
             <button class="tab-btn-dashboard" data-tab="tabLeaderboardDashboard"><i class="fas fa-trophy"></i> Leaderboard</button>
         </div>
-        <!-- „1¤79„1¤77 LEADERBOARD BD BERJALAN -->
+        <!-- ï¿½1ï¿½79ï¿½1ï¿½77 LEADERBOARD BD BERJALAN -->
 <div class="bd-leaderboard-mini" style="display: flex; align-items: center; gap: 8px; background: rgba(139, 92, 246, 0.08); padding: 4px 12px; border-radius: 40px; border: 1px solid rgba(139, 92, 246, 0.2); flex-shrink: 0;">
     <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
         <i class="fas fa-trophy" style="color: #fbbf24; font-size: 11px;"></i>
@@ -1443,7 +1443,7 @@ label {
             <div class="stage-item-dashboard brand-item-dashboard" data-brand-id="<?= $item->id ?>" data-brand-name="<?= htmlspecialchars($item->name) ?>" data-stage="1">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                     <strong><i class="fas fa-building"></i> <?= htmlspecialchars($item->name) ?></strong>
-                    <!-- ”9æ7 TOMBOL EDIT DENGAN ONCLICK LANGSUNG -->
+                    <!-- ï¿½9ï¿½7 TOMBOL EDIT DENGAN ONCLICK LANGSUNG -->
                     <button class="edit-brand-btn" 
                             data-brand-id="<?= $item->id ?>" 
                             data-brand-name="<?= htmlspecialchars($item->name) ?>" 
@@ -1504,17 +1504,17 @@ label {
             $click_count = intval($item->follow_up_click_count ?? 0);
             $whatsapp_count = intval($item->whatsapp_count ?? 0);
             
-            // ”9æ7 TENTUKAN APAKAH BISA DIKLIK
-            // - Jika sudah deal DAN sudah ada produk ¡ú Bisa klik (pindah ke Task 3)
-            // - Jika sudah deal TAPI belum ada produk ¡ú TIDAK bisa klik (menunggu registrasi)
-            // - Jika belum deal ¡ú Bisa klik (follow up)
+            // ï¿½9ï¿½7 TENTUKAN APAKAH BISA DIKLIK
+            // - Jika sudah deal DAN sudah ada produk ï¿½ï¿½ Bisa klik (pindah ke Task 3)
+            // - Jika sudah deal TAPI belum ada produk ï¿½ï¿½ TIDAK bisa klik (menunggu registrasi)
+            // - Jika belum deal ï¿½ï¿½ Bisa klik (follow up)
             $is_clickable = true;
             if ($has_deal && !$has_products) {
                 $is_clickable = false;
             }
             $cursor_style = $is_clickable ? 'cursor: pointer;' : 'cursor: not-allowed; opacity: 0.8;';
             
-            // ”9æ7 STATUS BADGE
+            // ï¿½9ï¿½7 STATUS BADGE
             if ($has_deal && $has_products) {
                 $status_badge = '<span class="badge-dashboard" style="background: rgba(139, 92, 246, 0.15); color: #8b5cf6;"><i class="fas fa-rocket"></i> Siap Setup</span>';
             } elseif ($has_deal && !$has_products) {
@@ -1523,7 +1523,7 @@ label {
                 $status_badge = '<span class="badge-dashboard" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b;"><i class="fas fa-clock"></i> Waiting Deal</span>';
             }
             
-            // ”9æ7 NOTIFIKASI BAWAH
+            // ï¿½9ï¿½7 NOTIFIKASI BAWAH
             $bottom_notification = '';
             if ($has_deal && !$has_products) {
                 // Sedang menunggu registrasi brand
@@ -1621,7 +1621,7 @@ label {
             $approved_count = intval($item->approved_products_count ?? 0);
             $has_submitted = $item->has_submitted_products ?? false;
             
-            // ”9æ7 STATUS BADGE
+            // ï¿½9ï¿½7 STATUS BADGE
             if ($is_active_brand) {
                 $status_badge = '<span class="badge-dashboard" style="background: rgba(16, 185, 129, 0.15); color: #10b981;">
                     <i class="fas fa-check-circle"></i> ACTIVE
@@ -1632,7 +1632,7 @@ label {
                 </span>';
             }
             
-            // ”9æ7 NOTIFIKASI
+            // ï¿½9ï¿½7 NOTIFIKASI
             $requirement_note = '';
             if ($is_active_brand && $has_requirements) {
                 $requirement_note = '
@@ -1652,7 +1652,7 @@ label {
                 ';
             }
             
-            // ”9æ7 TOMBOL CEK STATUS (jika sudah submit dan tidak ada pending)
+            // ï¿½9ï¿½7 TOMBOL CEK STATUS (jika sudah submit dan tidak ada pending)
             $checkStatusBtn = '';
             if ($has_submitted && $pending_count == 0 && $approved_count > 0 && $item->status != 'ACTIVE') {
                 $checkStatusBtn = `
@@ -2168,7 +2168,7 @@ function copyToClipboard(text, productName, productId, buttonElement) {
     
     let copyText = '';
     if (productName && productId) {
-        copyText = ` Product: ${productName}\n Product ID: ${productId}\n”9å3 Link: ${text}`;
+        copyText = ` Product: ${productName}\n Product ID: ${productId}\nï¿½9ï¿½3 Link: ${text}`;
     } else {
         copyText = text;
     }
@@ -2424,12 +2424,12 @@ function sendWhatsAppDealDashboard(brandId, phoneNumber, message, bannerUrl, bra
         return;
     }
     
-    // ”9æ7 AUTO FORMAT +62
+    // ï¿½9ï¿½7 AUTO FORMAT +62
     let formattedPhone = formatWhatsAppNumber(phoneNumber);
     // Hapus + untuk URL (WA.me butuh tanpa +)
     let phoneForUrl = formattedPhone.replace('+', '');
     
-    // ”9æ7 INSERT KE DATABASE WHATSAPP_LOGS
+    // ï¿½9ï¿½7 INSERT KE DATABASE WHATSAPP_LOGS
     const logData = {
         brand_id: brandId,
         brand_name: brandName || '',
@@ -2463,13 +2463,13 @@ function sendWhatsAppDealDashboard(brandId, phoneNumber, message, bannerUrl, bra
     const whatsappUrl = `https://wa.me/${phoneForUrl}?text=${encodeURIComponent(finalMessage)}`;
     
     console.log('WhatsApp URL:', whatsappUrl);
-    console.log('Formatted phone:', formattedPhone, '¡ú URL:', phoneForUrl);
+    console.log('Formatted phone:', formattedPhone, 'ï¿½ï¿½ URL:', phoneForUrl);
     
     window.open(whatsappUrl, 'whatsapp_tab');
     
     if (bannerUrl) {
         setTimeout(() => {
-            showToastInModal('”9â2 Jangan lupa kirim gambar banner secara terpisah!', 'info');
+            showToastInModal('ï¿½9ï¿½2 Jangan lupa kirim gambar banner secara terpisah!', 'info');
         }, 1000);
     }
 }
@@ -2481,11 +2481,11 @@ function sendWhatsAppDirect(brandId, phoneNumber, message, stage) {
         return;
     }
     
-    // ”9æ7 AUTO FORMAT +62
+    // ï¿½9ï¿½7 AUTO FORMAT +62
     let formattedPhone = formatWhatsAppNumber(phoneNumber);
     let phoneForUrl = formattedPhone.replace('+', '');
     
-    // ”9æ7 INSERT KE DATABASE
+    // ï¿½9ï¿½7 INSERT KE DATABASE
     fetch(baseUrlDashboard + 'bd/log_whatsapp_deal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -2510,11 +2510,11 @@ function sendWhatsAppOnlyDashboard(brandId, phoneNumber, message, stage) {
         return;
     }
     
-    // ”9æ7 AUTO FORMAT +62
+    // ï¿½9ï¿½7 AUTO FORMAT +62
     let formattedPhone = formatWhatsAppNumber(phoneNumber);
     let phoneForUrl = formattedPhone.replace('+', '');
     
-    // ”9æ7 INSERT KE DATABASE
+    // ï¿½9ï¿½7 INSERT KE DATABASE
     fetch(baseUrlDashboard + 'bd/log_whatsapp_deal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -2584,13 +2584,13 @@ async function showTask2FollowUpModal(brandId, brandName) {
     let recommendedMin = result.recommended_commission_min;
     let recommendedMax = result.recommended_commission_max;
     let currentCommission = result.current_commission;
-    let maxCommission = result.max_commission || recommendedMax; // ”9æ7 MAX FLEKSIBEL
+    let maxCommission = result.max_commission || recommendedMax; // ï¿½9ï¿½7 MAX FLEKSIBEL
     
-    // ”9æ7 SLIDER: MIN = recommendedMin, MAX = maxCommission (bisa diubah user)
+    // ï¿½9ï¿½7 SLIDER: MIN = recommendedMin, MAX = maxCommission (bisa diubah user)
     const sliderMin = recommendedMin;
     const sliderMax = Math.max(50, maxCommission + 10);
     
-    // ”9æ7 CEK STATUS REGISTRASI BRAND
+    // ï¿½9ï¿½7 CEK STATUS REGISTRASI BRAND
     const regResponse = await fetch(baseUrlDashboard + 'bd/check_brand_registration', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -2606,7 +2606,7 @@ async function showTask2FollowUpModal(brandId, brandName) {
     const modalTitleElem = document.getElementById('modalTitleDashboard');
     const modalBodyElem = document.getElementById('modalBodyDashboard');
     
-    // ”9æ7 BUILD CAMPAIGN OPTIONS HTML
+    // ï¿½9ï¿½7 BUILD CAMPAIGN OPTIONS HTML
     let campaignOptionsHtml = '';
     if (availableCampaigns.length > 0) {
         campaignOptionsHtml = `
@@ -2642,7 +2642,7 @@ async function showTask2FollowUpModal(brandId, brandName) {
         `;
     }
     
-    // ”9æ7 BUILD REGISTRATION STATUS HTML
+    // ï¿½9ï¿½7 BUILD REGISTRATION STATUS HTML
     let registrationStatusHtml = '';
     if (isRegistered) {
         registrationStatusHtml = `
@@ -2702,15 +2702,15 @@ async function showTask2FollowUpModal(brandId, brandName) {
                 <span style="font-size:9px; color:#9aaebe; margin-left:8px;">(max bisa diubah)</span>
             </div>
             <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-                <!-- ”9æ7 MIN: Rekomendasi Min (tidak bisa diubah) -->
+                <!-- ï¿½9ï¿½7 MIN: Rekomendasi Min (tidak bisa diubah) -->
                 <div style="display:flex; align-items:center; gap:4px;">
                     <span style="color:#9aaebe; font-size:12px;">Min:</span>
                     <span style="color:#4ade80; font-weight:700; font-size:16px;">${recommendedMin}%</span>
                 </div>
                 
-                <span style="color:#2a3346;">¡ª</span>
+                <span style="color:#2a3346;">ï¿½ï¿½</span>
                 
-                <!-- ”9æ7 MAX: Bisa diubah dengan slider -->
+                <!-- ï¿½9ï¿½7 MAX: Bisa diubah dengan slider -->
                 <div style="flex:1; display:flex; align-items:center; gap:8px;">
                     <span style="color:#9aaebe; font-size:12px;">Max:</span>
                     <input type="range" id="commissionSlider" min="${sliderMin}" max="${sliderMax}" step="0.5" value="${maxCommission}" 
@@ -2758,7 +2758,7 @@ Terima kasih! </textarea>
     
     openModalDashboard();
     
-    // ”9æ7 CAMPAIGN SELECT HANDLER
+    // ï¿½9ï¿½7 CAMPAIGN SELECT HANDLER
     const campaignSelect = document.getElementById('campaignSelect');
     const messageTextarea = document.getElementById('dealConfirmationMessage');
     const commissionSlider = document.getElementById('commissionSlider');
@@ -2766,18 +2766,18 @@ Terima kasih! </textarea>
     const increaseBtn = document.getElementById('increaseCommissionBtn');
     const decreaseBtn = document.getElementById('decreaseCommissionBtn');
     
-    // ”9æ7 UPDATE PESAN BERDASARKAN CAMPAIGN & KOMISI
+    // ï¿½9ï¿½7 UPDATE PESAN BERDASARKAN CAMPAIGN & KOMISI
 function updateDealMessage() {
     const selectedOption = campaignSelect?.options[campaignSelect.selectedIndex];
     const campaignId = campaignSelect?.value || '';
     const campaignName = selectedOption?.getAttribute('data-campaign-name') || '[Pilih campaign di atas]';
     const campaignLink = selectedOption?.getAttribute('data-campaign-link') || `https://partner.tiktokshop.com/campaign/${campaignId}`;
     
-    // ”9æ7 AMBIL NILAI MAX DARI SLIDER / INPUT
+    // ï¿½9ï¿½7 AMBIL NILAI MAX DARI SLIDER / INPUT
     const maxVal = document.getElementById('commissionValue')?.value || recommendedMax;
     const minVal = recommendedMin;
     
-    // ”9æ7 PASTIKAN MIN < MAX
+    // ï¿½9ï¿½7 PASTIKAN MIN < MAX
     const finalMin = Math.min(minVal, maxVal);
     const finalMax = Math.max(minVal, maxVal);
     
@@ -2801,12 +2801,12 @@ Terima kasih! `;
     if (maxDisplay) maxDisplay.innerText = finalMax;
 }
 
-    // ”9æ7 CAMPAIGN CHANGE
+    // ï¿½9ï¿½7 CAMPAIGN CHANGE
     if (campaignSelect) {
         campaignSelect.addEventListener('change', updateDealMessage);
     }
     
-    // ”9æ7 COMMISSION SLIDER
+    // ï¿½9ï¿½7 COMMISSION SLIDER
     if (commissionSlider && commissionValue) {
         commissionSlider.addEventListener('input', function() {
             commissionValue.value = this.value;
@@ -2854,7 +2854,7 @@ Terima kasih! `;
         }
     }
     
-    // ”9æ7 TOMBOL KONFIRMASI DEAL
+    // ï¿½9ï¿½7 TOMBOL KONFIRMASI DEAL
     const confirmBtn = document.getElementById('confirmDealBtn');
     if (confirmBtn) {
         confirmBtn.addEventListener('click', async () => {
@@ -2876,7 +2876,7 @@ Terima kasih! `;
             confirmBtn.disabled = true;
             confirmBtn.innerHTML = '<i class="fas fa-spinner fa-pulse"></i> Memproses...';
             
-            // ”9æ7 SAVE FOLLOW UP
+            // ï¿½9ï¿½7 SAVE FOLLOW UP
             const saveResponse = await fetch(baseUrlDashboard + 'bd/save_follow_up', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -2892,7 +2892,7 @@ Terima kasih! `;
             const saveResult = await saveResponse.json();
             
             if (saveResult.success) {
-                // ”9æ7 BUKA WHATSAPP
+                // ï¿½9ï¿½7 BUKA WHATSAPP
                 sendWhatsAppDealDashboard(brandId, phoneNumber, message);
                 
                 showToastInModal(saveResult.message, saveResult.has_products ? 'success' : 'warning');
@@ -2935,7 +2935,7 @@ async function showTask3SetupModalWithRecommendations(brandId, brandName) {
     currentCampaignIdForSetup = null;
     currentCampaignNameForSetup = null;
     
-    // ”9æ7 AMBIL DATA REQUIREMENT BRAND
+    // ï¿½9ï¿½7 AMBIL DATA REQUIREMENT BRAND
     const brandReqResponse = await fetch(baseUrlDashboard + 'bd/get_brand_requirements', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -2946,19 +2946,19 @@ async function showTask3SetupModalWithRecommendations(brandId, brandName) {
     const existingRequirements = brandReqResult.success ? brandReqResult.data : null;
     const isSupervisor = document.getElementById('isSupervisorHidden')?.value === 'true';
     
-    // ”9æ7 CEK APAKAH REQUIREMENT SUDAH TERISI
+    // ï¿½9ï¿½7 CEK APAKAH REQUIREMENT SUDAH TERISI
     const hasRequirements = existingRequirements && 
         existingRequirements.creator_level && 
         existingRequirements.creator_gmv > 0 && 
         existingRequirements.content_type;
     
-    // ”9æ7 CEK APAKAH BRAND SUDAH AKTIF
+    // ï¿½9ï¿½7 CEK APAKAH BRAND SUDAH AKTIF
     const isActiveBrand = document.querySelector(`.brand-item-dashboard[data-brand-id="${brandId}"]`)?.getAttribute('data-is-active') === 'true';
     
-    // ”9æ7 JIKA BRAND AKTIF DAN SUDAH PUNYA REQUIREMENT, AUTO-FILL
+    // ï¿½9ï¿½7 JIKA BRAND AKTIF DAN SUDAH PUNYA REQUIREMENT, AUTO-FILL
     let requirementsFilled = hasRequirements;
     
-    // ”9æ7 AMBIL PRODUK PENDING
+    // ï¿½9ï¿½7 AMBIL PRODUK PENDING
     const response = await fetch(baseUrlDashboard + 'bd/get_pending_products_with_recommendations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -2984,8 +2984,14 @@ async function showTask3SetupModalWithRecommendations(brandId, brandName) {
       // ðŸ”¥ CLAIM BRAND UI
     let claimHtml = '';
     let disableApproval = false;
-    
-    if (result.brand_status === 'NEED_CLAIM' || (result.owner_id === null && result.can_claim !== undefined && result.brand_status === 'NEED_CLAIM')) {
+
+    // Trigger claim UI jika:
+    // (a) status NEED_CLAIM, ATAU
+    // (b) backend melaporkan needs_claim_resolution (ada duplikat tapi owner belum di-set)
+    const needsClaimResolution = result.needs_claim_resolution === true ||
+                                  result.brand_status === 'NEED_CLAIM';
+
+    if (needsClaimResolution) {
         if (result.can_claim) {
             // BA yang pernah kontak, tapi belum claim
             claimHtml = `
@@ -2995,10 +3001,13 @@ async function showTask3SetupModalWithRecommendations(brandId, brandName) {
                             <i class="fas fa-hand-paper"></i> Brand Ini Membutuhkan Claim!
                         </div>
                         <div style="color:#9aaebe; font-size:12px;">
-                            Sistem mendeteksi bahwa brand ini dihubungi oleh lebih dari 1 BA. Silakan claim jika ini brand Anda.
+                            Sistem mendeteksi bahwa brand ini dihubungi oleh lebih dari 1 BA. Silakan claim jika Anda yang berhasil deal dengan brand ini.
                         </div>
                         <div style="margin-top: 8px; font-size: 11px; color: #ef4444;">
                             <strong>Dihubungi oleh BA:</strong> ${result.contacted_bas ? result.contacted_bas.join(', ') : '-'}
+                        </div>
+                        <div style="margin-top: 6px; font-size: 11px; color: #fbbf24;">
+                            <i class="fas fa-info-circle"></i> Setelah klaim berhasil, Anda bisa mengisi Requirement brand.
                         </div>
                     </div>
                     <div>
@@ -3021,6 +3030,19 @@ async function showTask3SetupModalWithRecommendations(brandId, brandName) {
                     </div>
                     <div style="margin-top: 8px; font-size: 11px; color: #fbbf24;">
                         <strong>Dihubungi oleh BA:</strong> ${result.contacted_bas ? result.contacted_bas.join(', ') : '-'}
+                    </div>
+                </div>
+            `;
+            disableApproval = true;
+        } else {
+            // BA lain yang tidak punya riwayat kontak â€” hanya lihat info
+            claimHtml = `
+                <div style="background:rgba(239,68,68,0.07); border-radius:12px; padding:16px; margin-bottom:16px; border:1px solid #ef4444;">
+                    <div style="color:#ef4444; font-size:14px; font-weight:bold; margin-bottom:4px;">
+                        <i class="fas fa-lock"></i> Brand Sudah Di-Claim oleh BA Lain
+                    </div>
+                    <div style="color:#9aaebe; font-size:12px;">
+                        Brand ini sudah di-claim. Anda tidak memiliki riwayat kontak dengan brand ini sehingga tidak bisa melakukan claim.
                     </div>
                 </div>
             `;
@@ -3061,11 +3083,11 @@ async function showTask3SetupModalWithRecommendations(brandId, brandName) {
     
     modalTitleElem.innerHTML = `<i class="fas fa-rocket"></i> Setup Campaign - ${escapeHtml(brandName)}`;
     
-    // ”9æ7 BUILD REQUIREMENT FORM HTML
+    // ï¿½9ï¿½7 BUILD REQUIREMENT FORM HTML
     let requirementFormHtml = '';
     let requirementStatusHtml = '';
     
-    // ”9æ7 JIKA BRAND AKTIF DAN SUDAH PUNYA REQUIREMENT ¡ú AUTO-FILL
+    // ï¿½9ï¿½7 JIKA BRAND AKTIF DAN SUDAH PUNYA REQUIREMENT ï¿½ï¿½ AUTO-FILL
     if (isActiveBrand && hasRequirements) {
         requirementFormHtml = `
             <div style="background:#1a1f2e; border-radius:12px; padding:16px; margin-bottom:16px; border:1px solid #4ade80;">
@@ -3112,7 +3134,7 @@ async function showTask3SetupModalWithRecommendations(brandId, brandName) {
         `;
         requirementsFilled = true;
     } 
-    // ”9æ7 JIKA SUPERVISOR DAN REQUIREMENT SUDAH DIISI
+    // ï¿½9ï¿½7 JIKA SUPERVISOR DAN REQUIREMENT SUDAH DIISI
     else if (isSupervisor && hasRequirements) {
         requirementFormHtml = `
             <div style="background:#1a1f2e; border-radius:12px; padding:16px; margin-bottom:16px; border:1px solid #4ade80;">
@@ -3154,7 +3176,7 @@ async function showTask3SetupModalWithRecommendations(brandId, brandName) {
         `;
         requirementsFilled = true;
     } 
-    // ”9æ7 JIKA BUKAN SUPERVISOR DAN REQUIREMENT BELUM DIISI
+    // ï¿½9ï¿½7 JIKA BUKAN SUPERVISOR DAN REQUIREMENT BELUM DIISI
     else if (!isSupervisor && !hasRequirements) {
         requirementFormHtml = `
             <div id="requirementSection" style="background:#1a1f2e; border-radius:12px; padding:16px; margin-bottom:16px; border:1px solid #8b5cf6;">
@@ -3163,7 +3185,7 @@ async function showTask3SetupModalWithRecommendations(brandId, brandName) {
                         <i class="fas fa-clipboard-list"></i> Requirement Brand (Wajib Diisi)
                     </h4>
                     <span id="requirementStatus" style="font-size:10px; padding:2px 8px; border-radius:20px; background:rgba(245,158,11,0.15); color:#f59e0b;">
-                        7²2 Belum diisi
+                        ï¿½7ï¿½2 Belum diisi
                     </span>
                 </div>
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
@@ -3229,7 +3251,7 @@ async function showTask3SetupModalWithRecommendations(brandId, brandName) {
             </div>
         `;
     }
-    // ”9æ7 JIKA SUPERVISOR TAPI REQUIREMENT BELUM DIISI
+    // ï¿½9ï¿½7 JIKA SUPERVISOR TAPI REQUIREMENT BELUM DIISI
     else if (isSupervisor && !hasRequirements) {
         requirementFormHtml = `
             <div id="requirementSection" style="background:rgba(245,158,11,0.1); border-radius:12px; padding:16px; margin-bottom:16px; border:1px solid #f59e0b;">
@@ -3251,7 +3273,7 @@ async function showTask3SetupModalWithRecommendations(brandId, brandName) {
         requirementsFilled = false;
     }
     
-    // ”9æ7 APPROVE SECTION (hanya untuk supervisor)
+    // ï¿½9ï¿½7 APPROVE SECTION (hanya untuk supervisor)
     let approveSection = '';
     let linkSection = '';
     
@@ -3310,7 +3332,7 @@ async function showTask3SetupModalWithRecommendations(brandId, brandName) {
         `;
     }
     
-    // ”9æ7 BUILD PRODUCT CARD HTML
+    // ï¿½9ï¿½7 BUILD PRODUCT CARD HTML
     let productsHtml = '';
     if (pendingProducts.length > 0) {
         productsHtml = `
@@ -3440,7 +3462,7 @@ async function showTask3SetupModalWithRecommendations(brandId, brandName) {
         `;
     }
     
-    // ”9æ7 RENDER MODAL
+    // ï¿½9ï¿½7 RENDER MODAL
     // ðŸ”¥ JIKA DISABLE APPROVAL (NEED CLAIM), KUNCI FORM & ACTIONS
     if (disableApproval) {
         requirementFormHtml = '';
@@ -3476,7 +3498,7 @@ async function showTask3SetupModalWithRecommendations(brandId, brandName) {
     
     openModalDashboard();
     
-    // ”9æ7 SAVE REQUIREMENT BUTTON
+    // ï¿½9ï¿½7 SAVE REQUIREMENT BUTTON
     // ðŸ”¥ CLAIM BRAND BUTTON
     const claimBrandBtn = document.getElementById('claimBrandBtn');
     if (claimBrandBtn) {
@@ -3495,8 +3517,13 @@ async function showTask3SetupModalWithRecommendations(brandId, brandName) {
                 const claimResult = await claimResponse.json();
                 
                 if (claimResult.success) {
-                    showToastInModal(claimResult.message, 'success');
-                    setTimeout(() => location.reload(), 1500);
+                    showToastInModal('âœ… ' + claimResult.message, 'success');
+                    // Refresh modal dengan brand_id milik BA yang klaim (dari response)
+                    // sehingga form requirement langsung muncul setelah claim
+                    const refreshBrandId = claimResult.brand_id || brandId;
+                    setTimeout(() => {
+                        showTask3SetupModalWithRecommendations(refreshBrandId, brandName);
+                    }, 1000);
                 } else {
                     showToastInModal(claimResult.message, 'error');
                     claimBrandBtn.disabled = false;
@@ -3544,7 +3571,7 @@ async function showTask3SetupModalWithRecommendations(brandId, brandName) {
             const saveReqResult = await saveReqResponse.json();
             
             if (saveReqResult.success) {
-                showToastInModal('7¼3 Requirement berhasil disimpan!', 'success');
+                showToastInModal('ï¿½7ï¿½3 Requirement berhasil disimpan!', 'success');
                 setTimeout(() => {
                     showTask3SetupModalWithRecommendations(brandId, brandName);
                 }, 1000);
@@ -3556,7 +3583,7 @@ async function showTask3SetupModalWithRecommendations(brandId, brandName) {
         });
     }
     
-    // ”9æ7 SINGLE APPROVE BUTTON
+    // ï¿½9ï¿½7 SINGLE APPROVE BUTTON
     document.querySelectorAll('.approve-single-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
             const productId = btn.getAttribute('data-product-id');
@@ -3583,15 +3610,15 @@ async function showTask3SetupModalWithRecommendations(brandId, brandName) {
 const approveResult = await approveResponse.json();
 
 if (approveResult.success) {
-    showToastInModal(`7¼3 Produk "${productName}" berhasil diapprove!`, 'success');
+    showToastInModal(`ï¿½7ï¿½3 Produk "${productName}" berhasil diapprove!`, 'success');
     const productCard = btn.closest('.product-card-landscape');
     if (productCard) productCard.remove();
     
-    // ”9æ7 CEK APAKAH SEMUA PRODUK SUDAH APPROVE ¡ú PINDAH KE ACTIVE
+    // ï¿½9ï¿½7 CEK APAKAH SEMUA PRODUK SUDAH APPROVE ï¿½ï¿½ PINDAH KE ACTIVE
     const remainingProducts = document.querySelectorAll('.product-card-landscape').length;
     
     if (remainingProducts === 0) {
-        // ”9æ7 PANGGIL ENDPOINT UNTUK CEK DAN PINDAH KE ACTIVE
+        // ï¿½9ï¿½7 PANGGIL ENDPOINT UNTUK CEK DAN PINDAH KE ACTIVE
         try {
             const moveResponse = await fetch(baseUrlDashboard + 'bd/check_and_move_to_active', {
                 method: 'POST',
@@ -3601,8 +3628,8 @@ if (approveResult.success) {
             const moveResult = await moveResponse.json();
             
             if (moveResult.moved_to_active) {
-                showToastInModal('”9½5 ' + moveResult.message, 'success');
-                // ”9æ7 TUTUP MODAL DAN REFRESH HALAMAN
+                showToastInModal('ï¿½9ï¿½5 ' + moveResult.message, 'success');
+                // ï¿½9ï¿½7 TUTUP MODAL DAN REFRESH HALAMAN
                 setTimeout(() => {
                     closeModalDashboard();
                     location.reload();
@@ -3647,7 +3674,7 @@ if (approveResult.success) {
         });
     });
     
-    // ”9æ7 REJECT SINGLE BUTTON
+    // ï¿½9ï¿½7 REJECT SINGLE BUTTON
     document.querySelectorAll('.reject-single-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
             const productId = btn.getAttribute('data-product-id');
@@ -3672,7 +3699,7 @@ if (approveResult.success) {
             const rejectResult = await rejectResponse.json();
             
             if (rejectResult.success) {
-                showToastInModal(`7Ã4 Produk ditolak!`, 'warning');
+                showToastInModal(`ï¿½7ï¿½4 Produk ditolak!`, 'warning');
                 const productCard = btn.closest('.product-card-landscape');
                 if (productCard) productCard.remove();
             } else {
@@ -3683,7 +3710,7 @@ if (approveResult.success) {
         });
     });
     
-    // ”9æ7 APPROVE SECTION (batch) untuk supervisor
+    // ï¿½9ï¿½7 APPROVE SECTION (batch) untuk supervisor
     if (isSupervisor && requirementsFilled) {
         let selectedProducts = [];
         
@@ -3783,9 +3810,9 @@ if (approveSelectedBtn) {
             }
         }
         
-        showToastInModal(`7¼3 ${successCount} produk diapprove, ${failCount} gagal`, successCount > 0 ? 'success' : 'error');
+        showToastInModal(`ï¿½7ï¿½3 ${successCount} produk diapprove, ${failCount} gagal`, successCount > 0 ? 'success' : 'error');
         
-        // ”9æ7 CEK APAKAH SEMUA PRODUK SUDAH APPROVE ¡ú PINDAH KE ACTIVE
+        // ï¿½9ï¿½7 CEK APAKAH SEMUA PRODUK SUDAH APPROVE ï¿½ï¿½ PINDAH KE ACTIVE
         const remainingProducts = document.querySelectorAll('.product-card-landscape').length;
         
         if (remainingProducts === 0 && successCount > 0) {
@@ -3798,7 +3825,7 @@ if (approveSelectedBtn) {
                 const moveResult = await moveResponse.json();
                 
                 if (moveResult.moved_to_active) {
-                    showToastInModal('”9½5 ' + moveResult.message, 'success');
+                    showToastInModal('ï¿½9ï¿½5 ' + moveResult.message, 'success');
                     setTimeout(() => {
                         closeModalDashboard();
                         location.reload();
@@ -3867,7 +3894,7 @@ if (approveSelectedBtn) {
                     if (linkResult.success) {
                         linksHtml += `
                             <div style="background:#0f1420; border-radius:8px; padding:10px; margin-bottom:10px;">
-                                <div style="font-weight:500; margin-bottom:6px;">”9à4 ${escapeHtml(product.product_name)}</div>
+                                <div style="font-weight:500; margin-bottom:6px;">ï¿½9ï¿½4 ${escapeHtml(product.product_name)}</div>
                                 <code style="font-size:10px; word-break:break-all;">${escapeHtml(linkResult.link)}</code>
                                 <button class="copy-link-btn" data-link="${escapeHtml(linkResult.link)}" style="margin-top:6px; background:#1e293b; color:#4ade80; border:1px solid #4ade80; padding:4px 12px; border-radius:20px; font-size:10px; cursor:pointer;">
                                     <i class="fas fa-copy"></i> Copy
@@ -4174,7 +4201,7 @@ function renderSearchResults(containerId, brands, searchEndpoint) {
     const currentStage = getStageFromEndpoint(searchEndpoint);
     
     for (const brand of brands) {
-        // ”9æ7 TASK 1: HUNTING
+        // ï¿½9ï¿½7 TASK 1: HUNTING
         if (searchEndpoint === 'search_hunting_brands') {
             html += `
                 <div class="stage-item-dashboard brand-item-dashboard" 
@@ -4183,7 +4210,7 @@ function renderSearchResults(containerId, brands, searchEndpoint) {
                      data-stage="1">
                     <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                         <strong><i class="fas fa-building"></i> ${escapeHtml(brand.name)}</strong>
-                        <!-- ”9æ7 TOMBOL EDIT DENGAN ONCLICK LANGSUNG -->
+                        <!-- ï¿½9ï¿½7 TOMBOL EDIT DENGAN ONCLICK LANGSUNG -->
                         <button class="edit-brand-btn" 
                                 data-brand-id="${brand.id}" 
                                 data-brand-name="${escapeHtml(brand.name)}" 
@@ -4209,7 +4236,7 @@ function renderSearchResults(containerId, brands, searchEndpoint) {
                 </div>
             `;
         }
-        // ”9æ7 TASK 2: FOLLOW UP
+        // ï¿½9ï¿½7 TASK 2: FOLLOW UP
         else if (searchEndpoint === 'search_followup_brands') {
             const hasDeal = brand.deal_confirmed_at && brand.deal_confirmed_at !== null && brand.deal_confirmed_at !== '';
             const hasProducts = brand.has_products === true || brand.has_products === 1;
@@ -4289,7 +4316,7 @@ function renderSearchResults(containerId, brands, searchEndpoint) {
                 </div>
             `;
         }
-        // ”9æ7 TASK 3: SETUP CAMPAIGN
+        // ï¿½9ï¿½7 TASK 3: SETUP CAMPAIGN
         else if (searchEndpoint === 'search_setup_brands') {
             const isActive = brand.status === 'ACTIVE' || brand.is_active_brand === true;
             const hasRequirements = brand.has_requirements === true;
@@ -4361,7 +4388,7 @@ function renderSearchResults(containerId, brands, searchEndpoint) {
                 </div>
             `;
         }
-        // ”9æ7 TASK 4: MONITORING
+        // ï¿½9ï¿½7 TASK 4: MONITORING
         else if (searchEndpoint === 'search_monitoring_brands') {
             html += `
                 <div class="stage-item-dashboard brand-item-dashboard" 
@@ -4387,7 +4414,7 @@ function renderSearchResults(containerId, brands, searchEndpoint) {
     }
     
    
-    // ”9æ7 ATTACH EVENT LISTENER UNTUK TOMBOL EDIT (hasil search Task 1)
+    // ï¿½9ï¿½7 ATTACH EVENT LISTENER UNTUK TOMBOL EDIT (hasil search Task 1)
  container.innerHTML = html;
      document.querySelectorAll(`#${containerId} .edit-brand-btn`).forEach(btn => {
         // Jangan override onclick yang sudah ada
@@ -4398,7 +4425,7 @@ function renderSearchResults(containerId, brands, searchEndpoint) {
             });
         }
     });
-    // ”9æ7 ATTACH EVENT LISTENER UNTUK TOMBOL CHECK REGISTRATION (Task 2)
+    // ï¿½9ï¿½7 ATTACH EVENT LISTENER UNTUK TOMBOL CHECK REGISTRATION (Task 2)
     document.querySelectorAll(`#${containerId} .check-registration-btn`).forEach(btn => {
         btn.addEventListener('click', async function(e) {
             e.stopPropagation();
@@ -4418,10 +4445,10 @@ function renderSearchResults(containerId, brands, searchEndpoint) {
                 const result = await response.json();
                 
                 if (result.success && result.has_products) {
-                    showToastInModal('7¼3 Brand ' + brandName + ' sudah registrasi! Memindahkan ke Task 3...', 'success');
+                    showToastInModal('ï¿½7ï¿½3 Brand ' + brandName + ' sudah registrasi! Memindahkan ke Task 3...', 'success');
                     setTimeout(() => location.reload(), 1500);
                 } else {
-                    showToastInModal('77 Brand ' + brandName + ' belum registrasi. Silakan tunggu.', 'warning');
+                    showToastInModal('ï¿½7ï¿½7 Brand ' + brandName + ' belum registrasi. Silakan tunggu.', 'warning');
                     this.disabled = false;
                     this.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh';
                 }
@@ -4433,7 +4460,7 @@ function renderSearchResults(containerId, brands, searchEndpoint) {
         });
     });
     
-    // ”9æ7 ATTACH EVENT LISTENER UNTUK BRAND ITEMS
+    // ï¿½9ï¿½7 ATTACH EVENT LISTENER UNTUK BRAND ITEMS
     
 }
 function getStageFromEndpoint(endpoint) {
@@ -4560,7 +4587,7 @@ function displaySearchResultsInDropdown(results) {
     // ========== TAMPILKAN TOKO DENGAN TOTAL KOMISI & RANGE KOMISI ==========
     if (shops.length > 0) {
         shops.forEach(shop => {
-            // ”9æ7 HITUNG RANGE KOMISI (min - max) dari semua produk
+            // ï¿½9ï¿½7 HITUNG RANGE KOMISI (min - max) dari semua produk
             let minCommission = 100;
             let maxCommission = 0;
             let totalCommissionSum = 0;
@@ -4763,7 +4790,7 @@ function attachSearchResultEvents() {
                 // Tampilkan info komisi (Total Komisi & Range Komisi)
                 if (commissionInfo && rangeCommission) {
                     commissionInfo.style.display = 'block';
-                    commissionInfo.innerHTML = `<i class="fas fa-chart-line"></i> ”9æ7 Total Komisi: ${highestCommission}% | Range: ${rangeCommission} | Total Produk: ${totalProducts || '0'}`;
+                    commissionInfo.innerHTML = `<i class="fas fa-chart-line"></i> ï¿½9ï¿½7 Total Komisi: ${highestCommission}% | Range: ${rangeCommission} | Total Produk: ${totalProducts || '0'}`;
                     commissionInfo.style.color = '#fbbf24';
                 }
                 
@@ -4778,7 +4805,7 @@ function attachSearchResultEvents() {
                     commissionRateHidden.value = highestCommission;
                 }
                 
-                // ”9æ7 Simpan range komisi ke hidden input
+                // ï¿½9ï¿½7 Simpan range komisi ke hidden input
                 let rangeHidden = document.getElementById('selectedRangeCommission');
                 if (!rangeHidden) {
                     const newInput = document.createElement('input');
@@ -4798,7 +4825,7 @@ function attachSearchResultEvents() {
                 
                 if (sellerId && sellerId !== '' && sellerId !== 'null' && sellerId !== 'undefined') {
                     if (!whatsappNumber || whatsappNumber.includes('*')) {
-                        showToastInModal('”9ä3 Mencari kontak brand...', 'info');
+                        showToastInModal('ï¿½9ï¿½3 Mencari kontak brand...', 'info');
                         try {
                             const contactResult = await fetchBrandContact(sellerId, shopName);
                             if (contactResult.success && contactResult.whatsapp && !contactResult.whatsapp.includes('*')) {
@@ -4943,13 +4970,13 @@ function attachSearchResultEvents() {
                     console.log('Seller ID saved to hidden input:', sellerId);
                 }
                 
-                // ”9æ7 SIMPAN OPEN COMMISSION RATE (KOMISI TERTINGGI)
+                // ï¿½9ï¿½7 SIMPAN OPEN COMMISSION RATE (KOMISI TERTINGGI)
                 if (commissionRateHidden && highestCommission) {
                     commissionRateHidden.value = highestCommission;
                     console.log('Open commission rate saved:', highestCommission);
                 }
                 
-                // ”9æ7 TAMBAHKAN HIDDEN INPUT UNTUK OPEN COMMISSION RATE
+                // ï¿½9ï¿½7 TAMBAHKAN HIDDEN INPUT UNTUK OPEN COMMISSION RATE
                 let openCommissionHidden = document.getElementById('selectedOpenCommission');
                 if (!openCommissionHidden) {
                     // Buat hidden input jika belum ada
@@ -4973,7 +5000,7 @@ function attachSearchResultEvents() {
                 // Auto fetch kontak menggunakan seller_id
                 if (sellerId && sellerId !== '' && sellerId !== 'null' && sellerId !== 'undefined') {
                     if (!whatsappNumber || whatsappNumber.includes('*')) {
-                        showToastInModal('”9ä3 Mencari kontak brand...', 'info');
+                        showToastInModal('ï¿½9ï¿½3 Mencari kontak brand...', 'info');
                         
                         try {
                             const contactResult = await fetchBrandContact(sellerId, shopName);
@@ -5058,7 +5085,7 @@ function attachSearchResultEvents() {
                 // Auto fetch kontak
                 if (sellerId && sellerId !== '' && sellerId !== 'null' && sellerId !== 'undefined') {
                     if (!whatsappNumber || whatsappNumber.includes('*')) {
-                        showToastInModal('”9ä3 Mencari kontak brand...', 'info');
+                        showToastInModal('ï¿½9ï¿½3 Mencari kontak brand...', 'info');
                         
                         try {
                             const contactResult = await fetchBrandContact(sellerId, shopName);
@@ -5427,7 +5454,7 @@ function showNewBrandModal() {
             refreshBtn.disabled = true;
             refreshBtn.innerHTML = '<i class="fas fa-spinner fa-pulse"></i>';
             
-            showToastInModal('”9ä3 Mencari ulang kontak brand...', 'info');
+            showToastInModal('ï¿½9ï¿½3 Mencari ulang kontak brand...', 'info');
             
             const contactResult = await fetchBrandContact(sellerId, brandName);
             
@@ -5492,7 +5519,7 @@ function showNewBrandModal() {
                 return; 
             }
             
-            // ”9æ7 PERUBAHAN: Validasi seller_id hanya jika user memilih dari hasil pencarian
+            // ï¿½9ï¿½7 PERUBAHAN: Validasi seller_id hanya jika user memilih dari hasil pencarian
             // Jika brandName diisi manual dan sellerId kosong, tetap bisa simpan
             const warningDiv = document.getElementById('noShopSelectedWarning');
             
@@ -5613,7 +5640,7 @@ function initSearchTask(searchInputId, containerId, countId) {
 document.addEventListener('DOMContentLoaded', () => {
     updateStageUIDashboard();
     
-        // ”9æ7 SEARCH TASKS DENGAN API (mencari ke database)
+        // ï¿½9ï¿½7 SEARCH TASKS DENGAN API (mencari ke database)
     initSearchTaskWithAPI('searchHuntingDashboard', 'huntingItemsContainerDashboard', 'huntingCountDashboard', 'search_hunting_brands');
     initSearchTaskWithAPI('searchFollowupDashboard', 'followupItemsContainerDashboard', 'followupCountDashboard', 'search_followup_brands');
     initSearchTaskWithAPI('searchSetupDashboard', 'setupItemsContainerDashboard', 'setupCountDashboard', 'search_setup_brands');
@@ -5997,7 +6024,7 @@ Toopai Team`;
 
 // Variable untuk menyimpan banner yang dipilih
 let currentSelectedBannerUrl = '';
-// ”9æ7 LOAD AVAILABLE TEMPLATES
+// ï¿½9ï¿½7 LOAD AVAILABLE TEMPLATES
 async function loadAvailableTemplates() {
     try {
         const response = await fetch(baseUrlDashboard + 'message_template/get_all?type=bd');
@@ -6241,7 +6268,7 @@ function showEditBrandModal(brandId, brandName, currentWhatsapp, currentCommissi
                 const result = await response.json();
                 
                 if (result.success) {
-                    showToastInModal(`7¼3 Data brand "${newName}" berhasil diupdate!`, 'success');
+                    showToastInModal(`ï¿½7ï¿½3 Data brand "${newName}" berhasil diupdate!`, 'success');
                     closeModalDashboard();
                     setTimeout(() => location.reload(), 1500);
                 } else {
@@ -6270,7 +6297,7 @@ function showEditBrandModal(brandId, brandName, currentWhatsapp, currentCommissi
     }
 }
 
-// ”9æ7 EDIT BRAND BUTTON (di list item)
+// ï¿½9ï¿½7 EDIT BRAND BUTTON (di list item)
 document.querySelectorAll('.edit-brand-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -6422,7 +6449,7 @@ function sendWhatsAppDirect(brandId, phoneNumber, message, stage) {
     const cleanPhone = phone.replace(/^\+/, '');
     const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
     
-    // ”9æ7 PASTIKAN MEMBUKA TAB BARU
+    // ï¿½9ï¿½7 PASTIKAN MEMBUKA TAB BARU
     window.open(whatsappUrl, '_blank');
 }
 
@@ -6841,12 +6868,12 @@ document.addEventListener('click', async function(e) {
         
         if (result.success) {
             if (result.has_products) {
-                // ”9æ7 BRAND SUDAH REGISTRASI - REFRESH HALAMAN
-                showToastInModal('7¼3 Brand ' + brandName + ' sudah registrasi! Memindahkan ke Task 3...', 'success');
+                // ï¿½9ï¿½7 BRAND SUDAH REGISTRASI - REFRESH HALAMAN
+                showToastInModal('ï¿½7ï¿½3 Brand ' + brandName + ' sudah registrasi! Memindahkan ke Task 3...', 'success');
                 setTimeout(() => location.reload(), 1500);
             } else {
                 // Belum registrasi
-                showToastInModal('77 Brand ' + brandName + ' belum registrasi. Silakan tunggu.', 'warning');
+                showToastInModal('ï¿½7ï¿½7 Brand ' + brandName + ' belum registrasi. Silakan tunggu.', 'warning');
                 checkBtn.disabled = false;
                 checkBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh';
             }
@@ -6874,7 +6901,7 @@ document.addEventListener('click', async function(e) {
         return;
     }
     
-    // ”9æ7 KONFIRMASI
+    // ï¿½9ï¿½7 KONFIRMASI
     if (!confirm(`Anda yakin ingin MENOLAK ${selectedProducts.length} produk yang dipilih?`)) {
         return;
     }
@@ -6919,14 +6946,14 @@ document.addEventListener('click', async function(e) {
         }
     }
     
-    // ”9æ7 TAMPILKAN HASIL
+    // ï¿½9ï¿½7 TAMPILKAN HASIL
     if (successCount > 0) {
-        showToastInModal(`7¼3 ${successCount} produk ditolak, ${failCount} gagal`, successCount > 0 ? 'warning' : 'error');
+        showToastInModal(`ï¿½7ï¿½3 ${successCount} produk ditolak, ${failCount} gagal`, successCount > 0 ? 'warning' : 'error');
     } else {
-        showToastInModal(`7Ã4 Gagal menolak ${failCount} produk`, 'error');
+        showToastInModal(`ï¿½7ï¿½4 Gagal menolak ${failCount} produk`, 'error');
     }
     
-    // ”9æ7 UPDATE COUNT
+    // ï¿½9ï¿½7 UPDATE COUNT
     const remainingProducts = document.querySelectorAll('.product-card-landscape').length;
     const setupCountSpan = document.getElementById('setupCountDashboard');
     if (setupCountSpan) {
@@ -6934,7 +6961,7 @@ document.addEventListener('click', async function(e) {
         setupCountSpan.innerText = Math.max(0, currentCount - successCount);
     }
     
-    // ”9æ7 CEK APAKAH SEMUA PRODUK SUDAH DIPROSES (APPROVE ATAU REJECT)
+    // ï¿½9ï¿½7 CEK APAKAH SEMUA PRODUK SUDAH DIPROSES (APPROVE ATAU REJECT)
     if (remainingProducts === 0) {
         try {
             const moveResponse = await fetch(baseUrlDashboard + 'bd/check_and_move_to_active', {
@@ -6948,7 +6975,7 @@ document.addEventListener('click', async function(e) {
             const moveResult = await moveResponse.json();
             
             if (moveResult.moved_to_active) {
-                showToastInModal('”9½5 ' + moveResult.message, 'success');
+                showToastInModal('ï¿½9ï¿½5 ' + moveResult.message, 'success');
                 setTimeout(() => {
                     closeModalDashboard();
                     location.reload();
@@ -6960,11 +6987,11 @@ document.addEventListener('click', async function(e) {
         }
     }
     
-    // ”9æ7 RESET BUTTON
+    // ï¿½9ï¿½7 RESET BUTTON
     rejectBtn.disabled = false;
     rejectBtn.innerHTML = '<i class="fas fa-times-circle"></i> Reject Selected (0)';
     
-    // ”9æ7 RESET SELECTED
+    // ï¿½9ï¿½7 RESET SELECTED
     selectedProducts = [];
     updateSelectedCount();
 });
@@ -7053,7 +7080,7 @@ document.addEventListener('click', async function(e) {
         const result = await response.json();
         
         if (result.moved_to_active) {
-            showToastInModal('”9½5 ' + result.message, 'success');
+            showToastInModal('ï¿½9ï¿½5 ' + result.message, 'success');
             setTimeout(() => location.reload(), 1500);
         } else {
             showToastInModal(result.message, 'info');

@@ -3061,8 +3061,11 @@ public function get_pending_products_with_recommendations() {
         
         // Ambil daftar BA yang pernah menghubungi brand ini
         $contacted_bas = [];
+        $has_duplicates = false;
         if (isset($brand)) {
-            $original_id = ($brand->is_duplicate && $brand->duplicate_of) ? $brand->duplicate_of : ($brand_id ?: $brand->id);
+            $is_dup = ($brand->is_duplicate || !empty($brand->duplicate_of));
+            $original_id = ($is_dup && $brand->duplicate_of) ? $brand->duplicate_of : ($brand_id ?: $brand->id);
+
             $bas_query = $this->db->select('u.full_name, u.username')
                                  ->from('brands b')
                                  ->join('users u', 'b.bd_id = u.id')
@@ -3075,23 +3078,40 @@ public function get_pending_products_with_recommendations() {
             foreach ($bas_query as $bq) {
                 $contacted_bas[] = $bq->full_name . ' (@' . $bq->username . ')';
             }
-            // hilangkan duplikasi nama jika ada
             $contacted_bas = array_values(array_unique($contacted_bas));
+
+            // Cek apakah ada lebih dari 1 BD yang input brand ini (ada entry duplikat)
+            $duplicate_count = $this->db->group_start()
+                ->where('id', $original_id)
+                ->or_where('duplicate_of', $original_id)
+            ->group_end()
+            ->count_all_results('brands');
+            $has_duplicates = ($duplicate_count > 1);
         }
 
         // Cek riwayat kontak untuk menentukan hak claim
         $user_id = $this->session->userdata('user_id');
         $can_claim = false;
-        
-        if (isset($brand) && $brand->status == 'NEED_CLAIM') {
-            $original_id = ($brand->is_duplicate && $brand->duplicate_of) ? $brand->duplicate_of : ($brand_id ?: $brand->id);
-            $contacted = $this->db->where('bd_id', $user_id)
-                                  ->group_start()
-                                      ->where('id', $original_id)
-                                      ->or_where('duplicate_of', $original_id)
-                                  ->group_end()
-                                  ->count_all_results('brands');
-            $can_claim = ($contacted > 0);
+
+        // can_claim aktif jika:
+        // (a) status NEED_CLAIM, ATAU
+        // (b) status CAMPAIGN_READY tapi ada duplikat dan owner belum di-set
+        $needs_claim_resolution = (
+            (isset($brand) && $brand->status == 'NEED_CLAIM') ||
+            (isset($brand) && $has_duplicates && empty($brand->owner_id))
+        );
+
+        if ($needs_claim_resolution) {
+            $original_id = isset($original_id) ? $original_id : ($brand_id ?: (isset($brand) ? $brand->id : null));
+            if ($original_id) {
+                $contacted = $this->db->where('bd_id', $user_id)
+                                      ->group_start()
+                                          ->where('id', $original_id)
+                                          ->or_where('duplicate_of', $original_id)
+                                      ->group_end()
+                                      ->count_all_results('brands');
+                $can_claim = ($contacted > 0);
+            }
         }
 
         return $this->output->set_output(json_encode([
@@ -3099,6 +3119,8 @@ public function get_pending_products_with_recommendations() {
             'brand_status' => (isset($brand) && isset($brand->status)) ? $brand->status : '',
             'owner_id' => (isset($brand) && isset($brand->owner_id)) ? $brand->owner_id : null,
             'can_claim' => $can_claim,
+            'has_duplicates' => $has_duplicates,
+            'needs_claim_resolution' => $needs_claim_resolution,
             'contacted_bas' => $contacted_bas,
             'brand_name' => $brand_name,
             'brand_category' => $brand_category,
@@ -7244,30 +7266,48 @@ public function get_active_brands_list() {
             return $this->output->set_output(json_encode(['success' => false, 'message' => 'Anda tidak memiliki riwayat kontak dengan Brand ini sehingga tidak berhak melakukan claim.']));
         }
         
-        // Lock Ownership
+        // Lock Ownership — set owner_id ke semua entry (original + semua duplikat)
         $this->db->trans_start();
-        
-        $this->db->where('id', $original_id)->or_where('duplicate_of', $original_id)->update('brands', [
-            'owner_id' => $user_id
-        ]);
-        
-        // Set original brand back to CAMPAIGN_READY to resume Step 3
-        if ($brand->status == 'NEED_CLAIM') {
-            $this->db->where('id', $brand_id)->update('brands', [
-                'status' => 'CAMPAIGN_READY',
-                'current_task' => 3
-            ]);
-        }
+
+        $this->db->group_start()
+                     ->where('id', $original_id)
+                     ->or_where('duplicate_of', $original_id)
+                 ->group_end()
+                 ->update('brands', ['owner_id' => $user_id]);
+
+        // Set SEMUA entry brand yang NEED_CLAIM kembali ke CAMPAIGN_READY
+        $this->db->group_start()
+                     ->where('id', $original_id)
+                     ->or_where('duplicate_of', $original_id)
+                 ->group_end()
+                 ->where('status', 'NEED_CLAIM')
+                 ->update('brands', [
+                     'status'       => 'CAMPAIGN_READY',
+                     'current_task' => 3,
+                     'updated_at'   => date('Y-m-d H:i:s')
+                 ]);
         
         $this->db->trans_complete();
         
         if ($this->db->trans_status() === FALSE) {
             return $this->output->set_output(json_encode(['success' => false, 'message' => 'Gagal melakukan claim brand.']));
         }
-        
+
+        // Ambil entry brand milik BA yang klaim (untuk refresh modal dengan ID yang benar)
+        $my_brand_entry = $this->db->where('bd_id', $user_id)
+            ->group_start()
+                ->where('id', $original_id)
+                ->or_where('duplicate_of', $original_id)
+            ->group_end()
+            ->get('brands')
+            ->row();
+        $my_brand_id = $my_brand_entry ? $my_brand_entry->id : $brand_id;
+
         return $this->output->set_output(json_encode([
-            'success' => true,
-            'message' => 'Berhasil! Anda sekarang adalah Owner dari Brand ini.'
+            'success'      => true,
+            'message'      => 'Berhasil! Anda sekarang adalah Owner dari Brand ini. Silakan isi Requirement brand.',
+            'brand_id'     => $my_brand_id,
+            'original_id'  => $original_id
         ]));
     }
 
