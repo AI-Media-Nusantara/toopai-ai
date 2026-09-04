@@ -320,18 +320,16 @@ public function dashboard() {
         $setup_items_campaign_ready = $this->db->select('b.*, u.username as bd_username, u.full_name as bd_name, b.input_by, b.input_by_name')
             ->from('brands b')
             ->join('users u', 'b.bd_id = u.id', 'left')
-            ->where('b.is_duplicate', 0)
             ->where_in('b.status', ['CAMPAIGN_READY', 'NEED_CLAIM'])
             ->order_by('b.updated_at', 'DESC')
             ->limit(1000)
             ->get()
             ->result();
     } else {
-        // Ambil brand yang didelegasikan ke user, ATAU brand NEED_CLAIM yang pernah dihubungi user (termasuk duplikatnya)
+        // Ambil brand yang didelegasikan ke user, ATAU brand NEED_CLAIM yang pernah dihubungi user
         $setup_items_campaign_ready = $this->db->select('b.*, u.username as bd_username, u.full_name as bd_name, b.input_by, b.input_by_name')
             ->from('brands b')
             ->join('users u', 'b.bd_id = u.id', 'left')
-            ->where('b.is_duplicate', 0)
             ->group_start()
                 ->where('b.bd_id', $user_id)
                 ->or_group_start()
@@ -1612,13 +1610,8 @@ public function scout_match_brand() {
         $data_source_message = "🆕 Brand baru tanpa data kontak. Akan diproses oleh sistem.";
     }
     
-    // Tambahkan informasi duplikat jika brand sudah ada milik BD lain
-    if ($existing_other_brand) {
-        $brand_data['is_duplicate'] = 1;
-        $brand_data['duplicate_of'] = $existing_other_brand->id;
-    } else {
-        $brand_data['is_duplicate'] = 0;
-    }
+    // Pengecekan duplikasi disembunyikan/dinonaktifkan saat create brand baru
+    $brand_data['is_duplicate'] = 0;
     
     // ========== 🔥 SIMPAN BRAND ==========
     $this->db->insert('brands', $brand_data);
@@ -1666,24 +1659,7 @@ public function scout_match_brand() {
             $message .= "\n Seller ID: {$brand_data['seller_id']}";
         }
     }
-    
-    if ($existing_other_brand) {
-        $owner_name = $existing_other_brand->input_by ?? $existing_other_brand->bd_username ?? 'BD lain';
-        $message = "✅ Brand '{$brand_name}' berhasil ditambahkan!\n\n⚠️ PERINGATAN: Brand ini sedang di-hunt oleh {$owner_name}. Siapa yang deal duluan yang akan mendapatkan brand ini.";
-        
-        return $this->output->set_output(json_encode([
-            'success' => true,
-            'is_duplicate' => true,
-            'message' => $message,
-            'brand_id' => $brand_id,
-            'brand' => $brand_name,
-            'warning' => true,
-            'competing_with' => $owner_name,
-            'data_source' => $data_source,
-            'whatsapp_found' => $has_whatsapp,
-            'seller_id_found' => $has_seller_id
-        ]));
-    }
+
     
     return $this->output->set_output(json_encode([
         'success' => true,
@@ -3839,7 +3815,6 @@ public function search_setup_brands() {
         $this->db->select('b.*, u.username as bd_username, u.full_name as bd_name, b.input_by, b.input_by_name')
             ->from('brands b')
             ->join('users u', 'b.bd_id = u.id', 'left')
-            ->where('b.is_duplicate', 0)
             ->where_in('b.status', ['CAMPAIGN_READY', 'NEED_CLAIM'])
             ->group_start()
                 ->like('b.name', $keyword)
