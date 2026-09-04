@@ -1512,12 +1512,14 @@ public function scout_match_brand() {
     $bd_username = $this->session->userdata('username');
     $bd_fullname = $this->session->userdata('full_name');
     
-    // ========== 🔥 CEK APAKAH BRAND SUDAH PERNAH DEAL ==========
+    // ========== 🔥 CEK APAKAH BRAND SUDAH PERNAH DEAL (BENAR-BENAR AKTIF) ==========
+    // Hanya cek brand yang sudah ACTIVE (punya campaign berjalan) atau DEAL_CLOSED
+    // CAMPAIGN_READY masih dalam setup dan belum deal final
     $existing_deal = $this->db->select('b.*, u.username as owner_username')
         ->from('brands b')
         ->join('users u', 'b.bd_id = u.id', 'left')
         ->where('b.name', $brand_name)
-        ->where_in('b.status', ['CAMPAIGN_READY', 'ACTIVE', 'DEAL_CLOSED'])
+        ->where_in('b.status', ['ACTIVE', 'DEAL_CLOSED'])
         ->get()
         ->row();
     
