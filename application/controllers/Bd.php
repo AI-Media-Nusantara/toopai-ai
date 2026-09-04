@@ -325,10 +325,13 @@ public function dashboard() {
     // ========== 🔥 TASK 3: SETUP CAMPAIGN ==========
     // Ambil brand CAMPAIGN_READY
     if ($is_supervisor) {
+        // Supervisor: tampilkan hanya entry original (is_duplicate=0)
+        // Ini memastikan brand yang sama dari BD berbeda hanya muncul 1 kali
         $setup_items_campaign_ready = $this->db->select('b.*, u.username as bd_username, u.full_name as bd_name, b.input_by, b.input_by_name')
             ->from('brands b')
             ->join('users u', 'b.bd_id = u.id', 'left')
             ->where('b.is_duplicate', 0)
+            ->where('b.duplicate_of IS NULL', NULL, FALSE)
             ->where_in('b.status', ['CAMPAIGN_READY', 'NEED_CLAIM'])
             ->order_by('b.updated_at', 'DESC')
             ->limit(1000)
@@ -3933,8 +3936,12 @@ public function search_setup_brands() {
             ->group_end()
             ->order_by('b.updated_at', 'DESC')
             ->limit(100);
-        
-        if (!$is_supervisor) {
+
+        if ($is_supervisor) {
+            // Supervisor: hanya tampilkan entry original, cegah double
+            $this->db->where('b.is_duplicate', 0)
+                     ->where('b.duplicate_of IS NULL', NULL, FALSE);
+        } else {
             $this->db->group_start()
                 ->where('b.bd_id', $user_id)
                 ->or_group_start()
