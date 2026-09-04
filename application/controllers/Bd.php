@@ -1572,27 +1572,60 @@ public function scout_match_brand() {
         ->row();
     
     // ========== 🔥 CEK APAKAH BRAND SUDAH ADA MILIK BD LAIN ==========
+    // ========== 🔥 CEK APAKAH BRAND SUDAH ADA MILIK BD LAIN ==========
+    // Ambil entry ORIGINAL (bukan duplikat) dari brand yang sama milik BD lain
+    // Ini memastikan duplicate_of selalu menunjuk ke entry utama
     $existing_other_brand = $this->db->get_where('brands', [
-        'name' => $brand_name,
-        'bd_id !=' => $bd_id
+        'name'     => $brand_name,
+        'bd_id !=' => $bd_id,
+        'duplicate_of' => NULL   // hanya entry original, bukan duplikat dari duplikat
     ])->row();
+
+    // Fallback: jika semua entry punya duplicate_of (edge case), ambil yang paling lama
+    if (!$existing_other_brand) {
+        $existing_other_brand = $this->db->select('*')
+            ->from('brands')
+            ->where('name', $brand_name)
+            ->where('bd_id !=', $bd_id)
+            ->order_by('id', 'ASC')
+            ->limit(1)
+            ->get()
+            ->row();
+        // Kalau dia sendiri adalah duplikat, ikuti ke root original
+        if ($existing_other_brand && !empty($existing_other_brand->duplicate_of)) {
+            $root = $this->db->where('id', $existing_other_brand->duplicate_of)->get('brands')->row();
+            if ($root) $existing_other_brand = $root;
+        }
+    }
     
     // ========== 🔥 PREPARE BRAND DATA ==========
+    // PENTING: jangan copy field requirements/deal dari brand lain
+    // Hanya field identitas kontak yang boleh di-share antar entry brand
     $brand_data = [
-        'name' => $brand_name,
-        'shop_name' => $brand_name,
-        'category' => $category,
-        'bd_id' => $bd_id,
-        'whatsapp_number' => $whatsapp_number,
-        'email' => $email,
-        'seller_id' => $seller_id,
+        'name'               => $brand_name,
+        'shop_name'          => $brand_name,
+        'category'           => $category,
+        'bd_id'              => $bd_id,
+        'whatsapp_number'    => $whatsapp_number,
+        'email'              => $email,
+        'seller_id'          => $seller_id,
         'proposed_commission' => $commission,
         'open_commission_rate' => $open_commission_rate,
-        'status' => 'PENDING',
-        'current_task' => 1,
-        'input_by' => $bd_username,
-        'input_by_name' => $bd_fullname,
-        'created_at' => date('Y-m-d H:i:s')
+        'status'             => 'PENDING',
+        'current_task'       => 1,
+        'input_by'           => $bd_username,
+        'input_by_name'      => $bd_fullname,
+        // Field requirements & deal selalu NULL/kosong untuk entry baru
+        'deal_confirmed_at'       => NULL,
+        'requirements_filled_at'  => NULL,
+        'requirements_filled_by'  => NULL,
+        'creator_level'           => NULL,
+        'creator_gmv'             => NULL,
+        'content_type'            => NULL,
+        'sample_method'           => NULL,
+        'campaign_notes'          => NULL,
+        'owner_id'                => NULL,
+        'created_at'             => date('Y-m-d H:i:s')
     ];
     
     // 🔥 FLAG UNTUK MENGETAHUI SUMBER DATA
@@ -3262,45 +3295,86 @@ public function get_brand_requirements() {
  */
 public function save_brand_requirements() {
     $this->output->set_content_type('application/json');
-    
-    $brand_id = $this->input->post('brand_id');
-    $creator_level = $this->input->post('creator_level');
-    $creator_gmv = $this->input->post('creator_gmv');
-    $content_type = $this->input->post('content_type');
-    $sample_method = $this->input->post('sample_method');
+
+    $user_id     = $this->session->userdata('user_id');
+    $brand_id    = $this->input->post('brand_id');
+    $creator_level  = $this->input->post('creator_level');
+    $creator_gmv    = $this->input->post('creator_gmv');
+    $content_type   = $this->input->post('content_type');
+    $sample_method  = $this->input->post('sample_method');
     $campaign_notes = $this->input->post('campaign_notes');
-    
+
     if (!$brand_id || !$creator_level || !$creator_gmv || !$content_type || !$sample_method) {
         return $this->output->set_output(json_encode([
-            'success' => false, 
+            'success' => false,
             'message' => 'Semua field requirement wajib diisi'
         ]));
     }
-    
+
+    // ========== 🔥 VALIDASI: BRAND PERLU DI-CLAIM DULU SEBELUM ISI REQUIREMENTS ==========
+    $brand = $this->db->select('id, status, owner_id, bd_id, is_duplicate, duplicate_of')
+        ->where('id', $brand_id)
+        ->get('brands')
+        ->row();
+
+    if (!$brand) {
+        return $this->output->set_output(json_encode([
+            'success' => false,
+            'message' => 'Brand tidak ditemukan.'
+        ]));
+    }
+
+    if ($brand->status === 'NEED_CLAIM') {
+        // Jika brand NEED_CLAIM, hanya BD yang sudah menjadi owner yang boleh isi requirements
+        if (empty($brand->owner_id)) {
+            return $this->output->set_output(json_encode([
+                'success'      => false,
+                'need_claim'   => true,
+                'message'      => 'Brand ini perlu di-claim terlebih dahulu sebelum mengisi requirements. Klik tombol Claim Brand.'
+            ]));
+        }
+        if ($brand->owner_id != $user_id) {
+            return $this->output->set_output(json_encode([
+                'success'    => false,
+                'need_claim' => true,
+                'message'    => 'Brand ini sudah di-claim oleh BA lain. Anda tidak bisa mengisi requirements.'
+            ]));
+        }
+    }
+
+    // ========== 🔥 VALIDASI: HANYA BD PEMILIK BRAND INI YANG BOLEH ISI ==========
+    // BD hanya boleh update entry brand miliknya sendiri
+    if ($brand->bd_id != $user_id) {
+        return $this->output->set_output(json_encode([
+            'success' => false,
+            'message' => 'Anda tidak memiliki akses untuk mengisi requirements brand ini.'
+        ]));
+    }
+
     $update_data = [
-        'creator_level' => $creator_level,
-        'creator_gmv' => $creator_gmv,
-        'content_type' => $content_type,
-        'sample_method' => $sample_method,
-        'campaign_notes' => $campaign_notes,
-        'requirements_filled_by' => $this->session->userdata('user_id'),
+        'creator_level'          => $creator_level,
+        'creator_gmv'            => $creator_gmv,
+        'content_type'           => $content_type,
+        'sample_method'          => $sample_method,
+        'campaign_notes'         => $campaign_notes,
+        'requirements_filled_by' => $user_id,
         'requirements_filled_at' => date('Y-m-d H:i:s'),
-        'updated_at' => date('Y-m-d H:i:s')
+        'updated_at'             => date('Y-m-d H:i:s')
     ];
-    
+
     $this->db->where('id', $brand_id);
     $this->db->update('brands', $update_data);
-    
+
     // Log activity
     $this->load->model('User_log_model');
     $this->User_log_model->log(
-        $this->session->userdata('user_id'),
+        $user_id,
         $this->session->userdata('username'),
         'BD',
         'SAVE_BRAND_REQUIREMENTS',
         "Saved requirements for brand ID {$brand_id}: Level={$creator_level}, GMV={$creator_gmv}, Content={$content_type}"
     );
-    
+
     return $this->output->set_output(json_encode([
         'success' => true,
         'message' => 'Requirement berhasil disimpan'
@@ -7078,18 +7152,27 @@ public function get_active_brands_list() {
     private function _check_brand_ownership($brand_id) {
         $brand = $this->db->select('id, name, is_duplicate, duplicate_of, owner_id, status')->where('id', $brand_id)->get('brands')->row();
         if (!$brand) return;
-        
+
         if ($brand->owner_id) return; // Already claimed
 
-        // Find original ID
-        $original_id = ($brand->is_duplicate && $brand->duplicate_of) ? $brand->duplicate_of : $brand->id;
+        // Gunakan duplicate_of sebagai indicator duplikat meskipun is_duplicate=0
+        // (ini menangani kasus di mana is_duplicate tidak ter-set dengan benar saat insert)
+        $is_dup = ($brand->is_duplicate || !empty($brand->duplicate_of));
+        $original_id = ($is_dup && $brand->duplicate_of) ? $brand->duplicate_of : $brand->id;
 
-        // Get all unique bd_ids who contacted this brand
+        // Pastikan is_duplicate konsisten di database
+        if (!$brand->is_duplicate && !empty($brand->duplicate_of)) {
+            $this->db->where('id', $brand_id)->update('brands', ['is_duplicate' => 1]);
+        }
+
+        // Ambil semua unique bd_id yang pernah input brand ini (original + semua duplikat)
         $bds = $this->db->select('DISTINCT(bd_id) as bd_id')
-                         ->where('id', $original_id)
-                         ->or_where('duplicate_of', $original_id)
+                         ->group_start()
+                             ->where('id', $original_id)
+                             ->or_where('duplicate_of', $original_id)
+                         ->group_end()
                          ->get('brands')->result();
-                         
+
         $unique_bds = [];
         foreach ($bds as $b) {
             if ($b->bd_id && !in_array($b->bd_id, $unique_bds)) {
@@ -7098,22 +7181,24 @@ public function get_active_brands_list() {
         }
 
         if (count($unique_bds) == 1) {
-            // Only 1 BA contacted this brand, auto assign ownership
-            $this->db->where('id', $original_id)->or_where('duplicate_of', $original_id)->update('brands', [
-                'owner_id' => $unique_bds[0]
-            ]);
+            // Hanya 1 BD yang kontak → auto assign ownership ke semua entry brand ini
+            $this->db->group_start()
+                         ->where('id', $original_id)
+                         ->or_where('duplicate_of', $original_id)
+                     ->group_end()
+                     ->update('brands', ['owner_id' => $unique_bds[0]]);
             return ['status' => 'AUTO_ASSIGNED', 'owner_id' => $unique_bds[0]];
         } else if (count($unique_bds) > 1) {
-            // Multiple BAs contacted, need claim
-            // ONLY set to NEED_CLAIM if it's CAMPAIGN_READY
-            if ($brand->status == 'CAMPAIGN_READY') {
-                $this->db->where('id', $brand_id)->update('brands', [
-                    'status' => 'NEED_CLAIM'
-                ]);
-            }
+            // Lebih dari 1 BD kontak → semua entry yang CAMPAIGN_READY harus berubah ke NEED_CLAIM
+            $this->db->group_start()
+                         ->where('id', $original_id)
+                         ->or_where('duplicate_of', $original_id)
+                     ->group_end()
+                     ->where('status', 'CAMPAIGN_READY')
+                     ->update('brands', ['status' => 'NEED_CLAIM']);
             return ['status' => 'NEED_CLAIM', 'owner_id' => null];
         }
-        
+
         return null;
     }
 
