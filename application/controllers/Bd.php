@@ -54,7 +54,15 @@ public function dashboard() {
     // Task 3: SETUP CAMPAIGN (status CAMPAIGN_READY + NEED_CLAIM + ACTIVE dengan produk pending)
     $this->db->where_in('status', ['CAMPAIGN_READY', 'NEED_CLAIM']);
     if (!$is_supervisor) {
-        $this->db->where('bd_id', $user_id);
+        // Hitung brand milik BD ini (termasuk is_duplicate=1) + NEED_CLAIM yang pernah dihubungi
+        $this->db->group_start()
+            ->where('bd_id', $user_id)
+            ->or_group_start()
+                ->where('is_duplicate', 0)
+                ->where('status', 'NEED_CLAIM')
+                ->where("id IN (SELECT DISTINCT(duplicate_of) FROM brands WHERE bd_id = $user_id AND is_duplicate = 1)", NULL, FALSE)
+            ->group_end()
+        ->group_end();
     }
     $total_setup = $this->db->count_all_results('brands');
     
@@ -327,14 +335,17 @@ public function dashboard() {
             ->get()
             ->result();
     } else {
-        // Ambil brand yang didelegasikan ke user, ATAU brand NEED_CLAIM yang pernah dihubungi user (termasuk duplikatnya)
+        // Ambil brand milik BD sendiri (is_duplicate 0 atau 1),
+        // ATAU brand NEED_CLAIM (is_duplicate=0) yang pernah dihubungi user via entry duplikatnya
         $setup_items_campaign_ready = $this->db->select('b.*, u.username as bd_username, u.full_name as bd_name, b.input_by, b.input_by_name')
             ->from('brands b')
             ->join('users u', 'b.bd_id = u.id', 'left')
-            ->where('b.is_duplicate', 0)
             ->group_start()
+                // Brand yang langsung milik BD ini (terlepas is_duplicate)
                 ->where('b.bd_id', $user_id)
                 ->or_group_start()
+                    // Brand NEED_CLAIM milik BD lain, tapi BD ini pernah input sebagai duplikat
+                    ->where('b.is_duplicate', 0)
                     ->where('b.status', 'NEED_CLAIM')
                     ->where("b.id IN (SELECT DISTINCT(duplicate_of) FROM brands WHERE bd_id = $user_id AND is_duplicate = 1)", NULL, FALSE)
                 ->group_end()
@@ -3839,7 +3850,6 @@ public function search_setup_brands() {
         $this->db->select('b.*, u.username as bd_username, u.full_name as bd_name, b.input_by, b.input_by_name')
             ->from('brands b')
             ->join('users u', 'b.bd_id = u.id', 'left')
-            ->where('b.is_duplicate', 0)
             ->where_in('b.status', ['CAMPAIGN_READY', 'NEED_CLAIM'])
             ->group_start()
                 ->like('b.name', $keyword)
@@ -3854,6 +3864,7 @@ public function search_setup_brands() {
             $this->db->group_start()
                 ->where('b.bd_id', $user_id)
                 ->or_group_start()
+                    ->where('b.is_duplicate', 0)
                     ->where('b.status', 'NEED_CLAIM')
                     ->where("b.id IN (SELECT DISTINCT(duplicate_of) FROM brands WHERE bd_id = $user_id AND is_duplicate = 1)", NULL, FALSE)
                 ->group_end()
