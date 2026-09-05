@@ -355,7 +355,16 @@ class CreatorScouting_model extends CI_Model {
         // sudah dimiliki CA lain di tabel creators (is_id terisi).
         // Creator yang sama untuk brand BERBEDA tetap tampil (poin 6).
         $sql = "
-            SELECT cs.*, b.name AS brand_label, u.full_name AS contacted_by_name
+            SELECT cs.*, b.name AS brand_label, u.full_name AS contacted_by_name,
+            (SELECT GROUP_CONCAT(DISTINCT u2.full_name SEPARATOR ', ')
+             FROM users u2
+             WHERE u2.role = 'IS'
+               AND (
+                   u2.id = cs.contacted_by
+                   OR u2.id IN (SELECT c.is_id FROM creators c WHERE LOWER(TRIM(c.username)) = LOWER(TRIM(cs.username)) AND c.is_id IS NOT NULL AND c.is_id > 0)
+                   OR u2.id IN (SELECT DISTINCT ul.user_id FROM user_logs ul WHERE ul.role = 'IS' AND ul.action = 'GENERATE_AFFILIATE_LINK' AND ul.description LIKE CONCAT('%creator @', cs.username, ',%'))
+               )
+            ) AS contacted_ca_names
             FROM {$this->table} cs
             LEFT JOIN brands b ON cs.brand_id = b.id
             LEFT JOIN users u ON cs.contacted_by = u.id

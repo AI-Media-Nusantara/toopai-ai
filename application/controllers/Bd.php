@@ -7437,4 +7437,162 @@ public function get_active_brands_list() {
         ]));
     }
 
+    /**
+     * Helper — Pastikan tabel ba_reminder_reads tersedia untuk tracking per user
+     */
+    private function _ensure_ba_reminder_reads_table() {
+        $this->db->query("
+            CREATE TABLE IF NOT EXISTS ba_reminder_reads (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                reminder_id INT NOT NULL,
+                user_id INT NOT NULL,
+                read_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY idx_reminder_user (reminder_id, user_id),
+                KEY idx_user_id (user_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+    }
+
+    /**
+     * AJAX — Ambil data notifikasi Remind BA dari tim CA (Per-User Read State)
+     */
+    public function get_ba_reminders() {
+        $this->output->set_content_type('application/json');
+
+        if (!$this->session->userdata('logged_in')) {
+            return $this->output->set_output(json_encode(['success' => false, 'message' => 'Session expired']));
+        }
+
+        $user_id = $this->session->userdata('user_id');
+
+        try {
+            if (!$this->db->table_exists('ba_reminders')) {
+                return $this->output->set_output(json_encode([
+                    'success' => true,
+                    'unread_count' => 0,
+                    'reminders' => []
+                ]));
+            }
+
+            $this->_ensure_ba_reminder_reads_table();
+
+            $reminders = $this->db->order_by('created_at', 'DESC')
+                                  ->limit(30)
+                                  ->get('ba_reminders')
+                                  ->result();
+
+            // Ambil daftar reminder_id yang SUDAH DIBACA oleh user_id yang sedang login ini
+            $read_ids = [];
+            if ($user_id) {
+                $read_rows = $this->db->select('reminder_id')
+                                      ->where('user_id', $user_id)
+                                      ->get('ba_reminder_reads')
+                                      ->result();
+                foreach ($read_rows as $rr) {
+                    $read_ids[] = (int)$rr->reminder_id;
+                }
+            }
+
+            // Set status per-user untuk tiap reminder item
+            foreach ($reminders as $r) {
+                $is_read = in_array((int)$r->id, $read_ids, true);
+                $r->status = $is_read ? 'READ' : 'PENDING';
+            }
+
+            // Hitung unread count khusus user ini
+            $total_reminders = $this->db->count_all('ba_reminders');
+            if ($total_reminders > 0) {
+                if (!empty($read_ids)) {
+                    $unread_count = $this->db->where_not_in('id', $read_ids)->count_all_results('ba_reminders');
+                } else {
+                    $unread_count = $total_reminders;
+                }
+            } else {
+                $unread_count = 0;
+            }
+
+            return $this->output->set_output(json_encode([
+                'success'      => true,
+                'unread_count' => (int)$unread_count,
+                'reminders'    => $reminders
+            ]));
+        } catch (\Exception $e) {
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => $e->getMessage()
+            ]));
+        }
+    }
+
+    /**
+     * AJAX — Tandai notifikasi Remind BA sebagai dibaca (READ) khusus untuk user yang sedang login
+     */
+    public function mark_ba_reminder_read() {
+        $this->output->set_content_type('application/json');
+
+        if (!$this->session->userdata('logged_in')) {
+            return $this->output->set_output(json_encode(['success' => false, 'message' => 'Session expired']));
+        }
+
+        $user_id = $this->session->userdata('user_id');
+        $id      = $this->input->post('id');
+
+        try {
+            if (!$this->db->table_exists('ba_reminders')) {
+                return $this->output->set_output(json_encode(['success' => true]));
+            }
+
+            $this->_ensure_ba_reminder_reads_table();
+
+            if ($id === 'all') {
+                if ($user_id) {
+                    $this->db->query("
+                        INSERT IGNORE INTO ba_reminder_reads (reminder_id, user_id, read_at)
+                        SELECT id, ?, NOW() FROM ba_reminders
+                    ", [$user_id]);
+                }
+            } else if (!empty($id) && $user_id) {
+                $this->db->query("
+                    INSERT IGNORE INTO ba_reminder_reads (reminder_id, user_id, read_at)
+                    VALUES (?, ?, NOW())
+                ", [(int)$id, $user_id]);
+            }
+
+            // Ambil unread count terbaru untuk user ini
+            $read_ids = [];
+            if ($user_id) {
+                $read_rows = $this->db->select('reminder_id')
+                                      ->where('user_id', $user_id)
+                                      ->get('ba_reminder_reads')
+                                      ->result();
+                foreach ($read_rows as $rr) {
+                    $read_ids[] = (int)$rr->reminder_id;
+                }
+            }
+
+            $total_reminders = $this->db->count_all('ba_reminders');
+            if ($total_reminders > 0) {
+                if (!empty($read_ids)) {
+                    $unread_count = $this->db->where_not_in('id', $read_ids)->count_all_results('ba_reminders');
+                } else {
+                    $unread_count = $total_reminders;
+                }
+            } else {
+                $unread_count = 0;
+            }
+
+            return $this->output->set_output(json_encode([
+                'success'      => true,
+                'unread_count' => (int)$unread_count
+            ]));
+        } catch (\Exception $e) {
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => $e->getMessage()
+            ]));
+        }
+    }
+
 }
+
+

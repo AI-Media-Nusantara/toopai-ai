@@ -261,6 +261,29 @@
                 <span><?= htmlspecialchars($this->session->userdata('full_name') ?: $this->session->userdata('username')) ?></span>
             </span>
             <div class="user-actions">
+                <?php 
+                $nav_user_role = strtolower($this->session->userdata('role') ?? '');
+                if (in_array($nav_user_role, ['bd', 'admin', 'is'])): 
+                ?>
+                <div class="ba-notification-wrapper" style="position:relative; display:inline-block;">
+                    <button onclick="toggleBaNotificationDropdown(event)" class="btn-icon" title="Notifikasi" style="position:relative;">
+                        <i class="fas fa-bell"></i>
+                        <span id="baNotificationBadge" class="ba-notification-badge" style="display:none;">0</span>
+                    </button>
+                    <div id="baNotificationDropdownMenu" class="ba-notification-dropdown">
+                        <div class="ba-notification-header">
+                            <h4><i class="fas fa-bell"></i> Notifikasi Remind BA</h4>
+                            <button onclick="markBaReminderRead('all', event)" class="ba-mark-all-btn">Tandai semua dibaca</button>
+                        </div>
+                        <div id="baNotificationList" class="ba-notification-body">
+                            <div class="ba-notification-empty">
+                                <i class="fas fa-bell-slash"></i>
+                                <p>Memuat notifikasi...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>
                 <button onclick="showChangePasswordModal()" class="btn-icon" title="Ganti Password">
                     <i class="fas fa-key"></i>
                 </button>
@@ -271,6 +294,7 @@
                     <i class="fas fa-history"></i>
                 </button>
             </div>
+
             <a href="<?= base_url('auth/logout') ?>" class="logout-btn">
                 <i class="fas fa-sign-out-alt"></i> 
                 <span>Logout</span>

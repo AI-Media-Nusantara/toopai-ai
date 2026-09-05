@@ -1,5 +1,132 @@
 <!-- file: application/views/is/dashboard.php -->
+<script>
+    const LOGGED_USER_ID   = <?= json_encode((string)$this->session->userdata('user_id')) ?>;
+    const LOGGED_USERNAME  = <?= json_encode((string)$this->session->userdata('username')) ?>;
+    const LOGGED_EMAIL     = <?= json_encode((string)$this->session->userdata('email')) ?>;
+</script>
+<!-- jQuery & Select2 CDN -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
 <style>
+    /* ============================================================ */
+    /* SELECT2 CUSTOM STYLING (DARK THEME) */
+    /* ============================================================ */
+    .select2-container {
+        width: 100% !important;
+    }
+    .select2-container--default .select2-selection--single {
+        background-color: rgba(255, 255, 255, 0.05) !important;
+        border: 1px solid var(--border, rgba(255, 255, 255, 0.1)) !important;
+        border-radius: 12px !important;
+        height: 42px !important;
+        display: flex !important;
+        align-items: center !important;
+        transition: border-color 0.2s, box-shadow 0.2s !important;
+    }
+    .select2-container--default .select2-selection--single:focus,
+    .select2-container--default.select2-container--open .select2-selection--single {
+        border-color: var(--purple, #8b5cf6) !important;
+        box-shadow: 0 0 12px rgba(139, 92, 246, 0.3) !important;
+    }
+    .select2-container--default .select2-selection--single .select2-selection__rendered {
+        color: var(--text-primary, #f1f5f9) !important;
+        font-size: 13px !important;
+        line-height: 40px !important;
+        padding-left: 12px !important;
+        padding-right: 30px !important;
+    }
+    .select2-container--default .select2-selection--single .select2-selection__placeholder {
+        color: var(--text-muted, #94a3b8) !important;
+    }
+    .select2-container--default .select2-selection--single .select2-selection__arrow {
+        height: 40px !important;
+        right: 10px !important;
+    }
+    .select2-container--default .select2-selection--single .select2-selection__arrow b {
+        border-color: var(--text-muted, #94a3b8) transparent transparent transparent !important;
+    }
+    .select2-container--default.select2-container--open .select2-selection--single .select2-selection__arrow b {
+        border-color: transparent transparent var(--text-muted, #94a3b8) transparent !important;
+    }
+    .select2-dropdown {
+        background-color: #0c1527 !important;
+        border: 1px solid var(--border, #2a2745) !important;
+        border-radius: 12px !important;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8) !important;
+        z-index: 99999 !important;
+        overflow: hidden !important;
+    }
+    .select2-search--dropdown {
+        padding: 8px !important;
+        background-color: #0c1527 !important;
+    }
+    .select2-search--dropdown .select2-search__field {
+        background-color: rgba(255, 255, 255, 0.08) !important;
+        border: 1px solid var(--border, rgba(255, 255, 255, 0.15)) !important;
+        border-radius: 8px !important;
+        color: var(--text-primary, #f1f5f9) !important;
+        font-size: 13px !important;
+        padding: 8px 10px !important;
+        outline: none !important;
+    }
+    .select2-results__options {
+        max-height: 220px !important;
+        overflow-y: auto !important;
+    }
+    .select2-results__option {
+        padding: 10px 14px !important;
+        font-size: 13px !important;
+        color: var(--text-secondary, #cbd5e1) !important;
+        background-color: transparent !important;
+    }
+    .select2-container--default .select2-results__option--highlighted[aria-selected] {
+        background-color: var(--purple, #8b5cf6) !important;
+        color: #ffffff !important;
+    }
+    .select2-container--default .select2-results__option[aria-selected=true] {
+        background-color: rgba(139, 92, 246, 0.25) !important;
+        color: #a78bfa !important;
+    }
+    .select2-container--default .select2-selection--single .select2-selection__clear {
+        color: #ef4444 !important;
+        font-size: 16px !important;
+        margin-right: 15px !important;
+    }
+
+    /* Select2 Multiple Styling */
+    .select2-container--default .select2-selection--multiple {
+        background-color: rgba(255, 255, 255, 0.05) !important;
+        border: 1px solid var(--border, rgba(255, 255, 255, 0.1)) !important;
+        border-radius: 12px !important;
+        min-height: 42px !important;
+        padding: 4px 8px !important;
+    }
+    .select2-container--default.select2-container--focus .select2-selection--multiple {
+        border-color: var(--purple, #8b5cf6) !important;
+        box-shadow: 0 0 12px rgba(139, 92, 246, 0.3) !important;
+    }
+    .select2-container--default .select2-selection--multiple .select2-selection__choice {
+        background-color: rgba(139, 92, 246, 0.25) !important;
+        border: 1px solid rgba(139, 92, 246, 0.4) !important;
+        color: #a78bfa !important;
+        border-radius: 8px !important;
+        font-size: 11px !important;
+        padding: 2px 8px !important;
+        margin-top: 4px !important;
+    }
+    .select2-container--default .select2-selection--multiple .select2-selection__choice__remove {
+        color: #ef4444 !important;
+        margin-right: 4px !important;
+        border-right: none !important;
+    }
+    .select2-container--default .select2-selection--multiple .select2-search__field {
+        color: var(--text-primary, #f1f5f9) !important;
+        font-size: 12px !important;
+        margin-top: 4px !important;
+    }
+
     /* ============================================================ */
     /* CSS DARI FILE LAMA (YANG HILANG) */
     /* ============================================================ */
@@ -1438,23 +1565,23 @@
         </div>
     </div>
     
-    <!-- Search input -->
-    <div style="flex-shrink: 0; padding: 8px 12px 4px 12px;">
-        <input type="text" id="searchScoutingDashboard" placeholder=" Cari creator..." 
-               onkeyup="filterTaskAjax('task1', this.value)"
-               style="width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; font-size: 12px; background: rgba(255,255,255,0.05); color: var(--text-primary); outline: none; transition: var(--transition);">
-    </div>
-    
     <!-- View Switcher (Creator vs Brand) -->
-    <div style="display: flex; gap: 6px; padding: 0 12px 8px 12px; flex-shrink: 0;">
+    <div style="display: flex; gap: 6px; padding: 8px 12px 4px 12px; flex-shrink: 0;">
         <button onclick="changeScoutingDisplayMode('creator')" id="btnScoutingModeCreator" 
                 style="flex: 1; padding: 6px 10px; font-size: 11px; font-weight: 600; border-radius: 8px; cursor: pointer; transition: 0.2s; outline: none; border: 1px solid var(--purple); background: rgba(139,92,246,0.15); color: #a78bfa;">
-            <i class="fas fa-user" style="margin-right: 4px;"></i> Berdasarkan Creator
+            <i class="fas fa-user" style="margin-right: 4px;"></i> Creator
         </button>
         <button onclick="changeScoutingDisplayMode('brand')" id="btnScoutingModeBrand" 
                 style="flex: 1; padding: 6px 10px; font-size: 11px; font-weight: 600; border-radius: 8px; cursor: pointer; transition: 0.2s; outline: none; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.02); color: var(--text-secondary);">
-            <i class="fas fa-store" style="margin-right: 4px;"></i> Berdasarkan Brand
+            <i class="fas fa-store" style="margin-right: 4px;"></i> Brand
         </button>
+    </div>
+    
+    <!-- Search input -->
+    <div style="flex-shrink: 0; padding: 0 12px 8px 12px;">
+        <input type="text" id="searchScoutingDashboard" placeholder=" Cari creator..." 
+               onkeyup="filterTaskAjax('task1', this.value)"
+               style="width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; font-size: 12px; background: rgba(255,255,255,0.05); color: var(--text-primary); outline: none; transition: var(--transition);">
     </div>
     
     <!-- Scrollable container -->
@@ -1582,6 +1709,30 @@
                     </span>
                 </div>
                 <?php endif; ?>
+
+                <!-- CA CONTACTED INFO (KHUSUS PIC / SUPER CA is@toopai.com) -->
+                <?php
+                $logged_user_id   = (string)$this->session->userdata('user_id');
+                $logged_username  = strtolower((string)$this->session->userdata('username'));
+                $logged_email     = strtolower((string)$this->session->userdata('email'));
+
+                $item_is_id       = !empty($item->is_id) ? (string)$item->is_id : '';
+                $item_is_username = !empty($item->is_username) ? strtolower($item->is_username) : '';
+
+                $is_pic      = ($item_is_id !== '' && $item_is_id === $logged_user_id) || 
+                               ($item_is_username !== '' && $item_is_username === $logged_username);
+                $is_super_ca = ($logged_email === 'is@toopai.com' || $logged_username === 'is@toopai.com');
+
+                if ($is_pic || $is_super_ca):
+                    $contacted_names = !empty($item->contacted_ca_names) ? $item->contacted_ca_names : (!empty($item->is_full_name) ? $item->is_full_name : '');
+                ?>
+                <div class="item-details-dashboard" style="margin-top:4px;">
+                    <span style="background: rgba(139, 92, 246, 0.12); color: #a78bfa; border: 1px solid rgba(139, 92, 246, 0.25); padding: 3px 8px; border-radius: 8px; font-size: 9.5px; display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap;" title="User CA yang telah menghubungi/berinteraksi dengan creator">
+                        <i class="fas fa-user-check" style="font-size: 8px;"></i>
+                        Dihubungi oleh: <strong style="color: #c4b5fd;"><?= htmlspecialchars($contacted_names ?: 'Belum dihubungi') ?></strong>
+                    </span>
+                </div>
+                <?php endif; ?>
                 
                 <!-- SUMBER DATA & TANGGAL INPUT -->
                 <div class="item-details-dashboard" style="font-size: 9px; margin-top: 6px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px; color: var(--is-muted);">
@@ -1663,11 +1814,22 @@
             <!-- TAP-Inspired Category Filter Bar -->
             <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; padding: 10px 14px; background: rgba(13,23,42,0.6); border: 1px solid rgba(139,92,246,0.2); border-radius: 12px; align-items: center;">
                 <span style="font-size: 11px; font-weight: 600; color: var(--text-secondary); margin-right: 4px;">
-                    <i class="fas fa-filter" style="color: var(--purple);"></i> Kategori TAP:
+                    <i class="fas fa-filter" style="color: var(--purple);"></i> Kategori Brand:
                 </span>
-                <button class="tap-filter-btn active" data-category="all" onclick="filterBrandCategory('all')" style="background: rgba(139,92,246,0.2); color: #a78bfa; border: 1px solid rgba(139,92,246,0.4); padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 5px;">
-                    <i class="fas fa-store" style="color: #a78bfa;"></i> Semua Brand
-                </button>
+                <select id="brandCategorySelectFilter" onchange="filterBrandCategory(this.value)" 
+                        style="padding: 6px 14px; background: rgba(139,92,246,0.2); color: #a78bfa; border: 1px solid rgba(139,92,246,0.4); border-radius: 20px; font-size: 11px; font-weight: 600; outline: none; cursor: pointer; transition: all 0.2s ease;">
+                    <option value="all" style="background: #0f172a; color: #fff;">Semua Kategori</option>
+                    <option value="Beauty" style="background: #0f172a; color: #fff;">Beauty</option>
+                    <option value="Fashion" style="background: #0f172a; color: #fff;">Fashion</option>
+                    <option value="Tech" style="background: #0f172a; color: #fff;">Tech</option>
+                    <option value="Lifestyle" style="background: #0f172a; color: #fff;">Lifestyle</option>
+                    <option value="Gaming" style="background: #0f172a; color: #fff;">Gaming</option>
+                    <option value="Food" style="background: #0f172a; color: #fff;">Food</option>
+                    <option value="Travel" style="background: #0f172a; color: #fff;">Travel</option>
+                    <option value="Sports" style="background: #0f172a; color: #fff;">Sports</option>
+                    <option value="Home & Living" style="background: #0f172a; color: #fff;">Home & Living</option>
+                    <option value="Health" style="background: #0f172a; color: #fff;">Health</option>
+                </select>
                 <button class="tap-filter-btn" data-category="bestseller" onclick="filterBrandCategory('bestseller')" style="background: rgba(30,41,59,0.7); color: var(--text-secondary); border: 1px solid rgba(255,255,255,0.08); padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 5px;">
                     <i class="fas fa-fire" style="color: #ef4444;"></i> Bestsellers
                 </button>
@@ -1682,6 +1844,7 @@
                     // shop_name sudah di-COALESCE di query (COALESCE(NULLIF(shop_name,''), name))
                     $brand_name = !empty($brand_item->shop_name) ? $brand_item->shop_name : (!empty($brand_item->brand_name) ? $brand_item->brand_name : 'Brand Aktif');
                     $brand_id = !empty($brand_item->brand_id) ? intval($brand_item->brand_id) : 0;
+                    $brand_category = !empty($brand_item->category) ? $brand_item->category : '';
                     $brand_total_gmv = floatval($brand_item->total_gmv ?? 0);
                     $brand_day7_gmv  = floatval($brand_item->day7_gmv ?? 0);
                     $is_bestseller   = !empty($brand_item->is_bestseller);
@@ -1690,10 +1853,12 @@
             ?>
                 <div class="brand-item-card" 
                      data-brand-name="<?= htmlspecialchars($brand_name) ?>"
+                     data-category="<?= htmlspecialchars($brand_category) ?>"
                      data-gmv-28d="<?= $brand_total_gmv ?>"
                      data-gmv-7d="<?= $brand_day7_gmv ?>"
                      data-is-bestseller="<?= $is_bestseller ? '1' : '0' ?>"
                      data-is-trending="<?= $is_trending ? '1' : '0' ?>">
+
                     <div style="display: flex; align-items: center; gap: 12px;">
                         <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(139,92,246,0.15); display: flex; align-items: center; justify-content: center; border: 1px solid rgba(139,92,246,0.25);">
                             <i class="fas fa-store" style="color: #a78bfa; font-size: 16px;"></i>
@@ -2032,9 +2197,13 @@
 <div id="brandCreatorsModal" class="modal-overlay-dashboard" style="display:none; z-index: 9998;">
     <div class="modal-glass-dashboard" style="max-width: 900px; width: 95%;">
         <div class="modal-header-dashboard">
-            <h3 id="brandCreatorsModalTitle"><i class="fas fa-store"></i> List Creator Brand</h3>
+            <div>
+                <h3 id="brandCreatorsModalTitle"><i class="fas fa-store" style="color: var(--purple);"></i> List Creator Brand</h3>
+                <div id="brandCreatorsModalSub" style="font-size: 12px; color: var(--text-secondary); margin-top: 4px; display: flex; align-items: center; gap: 6px;"></div>
+            </div>
             <span class="modal-close-dashboard" onclick="closeBrandCreatorsModal()">&times;</span>
         </div>
+
         <div class="modal-body" id="brandCreatorsModalBody" style="max-height: 70vh; overflow-y: auto; padding: 20px;">
             <div style="text-align:center; padding:40px;">
                 <i class="fas fa-spinner fa-pulse fa-2x" style="color: var(--purple);"></i>
@@ -2178,11 +2347,11 @@
                         <label style="color: var(--text-primary); font-weight:500; display:block; margin-bottom:4px; font-size:13px;">
                             <i class="fas fa-tag"></i> Kategori
                         </label>
-                        <select id="task3Category" style="width:100%; padding:10px 12px; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:12px; color:var(--text-primary); font-size:13px; outline:none;">
+                        <select id="task3Category" multiple="multiple" style="width:100%; padding:10px 12px; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:12px; color:var(--text-primary); font-size:13px; outline:none;">
                             <option value="Beauty">Beauty</option>
                             <option value="Fashion">Fashion</option>
                             <option value="Tech">Tech</option>
-                            <option value="Lifestyle" selected>Lifestyle</option>
+                            <option value="Lifestyle">Lifestyle</option>
                             <option value="Gaming">Gaming</option>
                             <option value="Food">Food</option>
                             <option value="Travel">Travel</option>
@@ -2279,11 +2448,11 @@
                         <label style="color: var(--text-primary); font-weight:500; display:block; margin-bottom:4px; font-size:13px;">
                             <i class="fas fa-tag"></i> Kategori
                         </label>
-                        <select id="creatorCategoryIS" style="width:100%; padding:10px 12px; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:12px; color:var(--text-primary); font-size:13px; outline:none;">
+                        <select id="creatorCategoryIS" multiple="multiple" style="width:100%; padding:10px 12px; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:12px; color:var(--text-primary); font-size:13px; outline:none;">
                             <option value="Beauty">Beauty</option>
                             <option value="Fashion">Fashion</option>
                             <option value="Tech">Tech</option>
-                            <option value="Lifestyle" selected>Lifestyle</option>
+                            <option value="Lifestyle">Lifestyle</option>
                             <option value="Gaming">Gaming</option>
                             <option value="Food">Food</option>
                             <option value="Travel">Travel</option>
@@ -2541,23 +2710,31 @@ window.toggleProductSelection = function(productId) {
 };
 
 window.selectAllProducts = function() {
-    document.querySelectorAll('.product-checkbox').forEach(function(cb) {
-        cb.checked = true;
-        const item = cb.closest('.product-link-item');
-        if (item) {
-            item.classList.add('selected');
-            item.style.borderColor = '#8b5cf6';
-            item.style.background = 'rgba(139,92,246,0.15)';
+    const activeContainer = document.querySelector('#sendLinkMainProductsView[style*="block"], #sendLinkRecProductsView[style*="block"]');
+    const targetScope = activeContainer || document;
+
+    targetScope.querySelectorAll('.product-link-item').forEach(function(item) {
+        if (item.style.display !== 'none') {
+            const cb = item.querySelector('.product-checkbox');
+            if (cb) {
+                cb.checked = true;
+                item.classList.add('selected');
+                item.style.borderColor = '#8b5cf6';
+                item.style.background = 'rgba(139,92,246,0.15)';
+            }
         }
     });
     window.updateSelectedCount();
 };
 
 window.deselectAllProducts = function() {
-    document.querySelectorAll('.product-checkbox').forEach(function(cb) {
-        cb.checked = false;
-        const item = cb.closest('.product-link-item');
-        if (item) {
+    const activeContainer = document.querySelector('#sendLinkMainProductsView[style*="block"], #sendLinkRecProductsView[style*="block"]');
+    const targetScope = activeContainer || document;
+
+    targetScope.querySelectorAll('.product-link-item').forEach(function(item) {
+        const cb = item.querySelector('.product-checkbox');
+        if (cb) {
+            cb.checked = false;
             item.classList.remove('selected');
             item.style.borderColor = 'rgba(255,255,255,0.06)';
             item.style.background = 'rgba(255,255,255,0.03)';
@@ -2565,6 +2742,7 @@ window.deselectAllProducts = function() {
     });
     window.updateSelectedCount();
 };
+
 
 window.clearSelectedLinks = function() {
     document.querySelectorAll('.product-checkbox').forEach(function(cb) {
@@ -2913,150 +3091,161 @@ async function showTask1SendLinkModal(creatorId) {
                 </div>
             </div>
             
-            <div style="display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap;">
-                <button onclick="window.selectAllProducts()" style="background:rgba(139,92,246,0.15); color:#8b5cf6; border:1px solid rgba(139,92,246,0.3); padding:4px 14px; border-radius:16px; cursor:pointer; font-size:10px; font-weight:600;">
-                    <i class="fas fa-check-double"></i> Select All
-                </button>
-                <button onclick="window.deselectAllProducts()" style="background:rgba(239,68,68,0.1); color:#ef4444; border:1px solid rgba(239,68,68,0.2); padding:4px 14px; border-radius:16px; cursor:pointer; font-size:10px; font-weight:600;">
-                    <i class="fas fa-times"></i> Deselect All
-                </button>
-                <span style="font-size:10px; color:var(--text-muted); padding:4px 8px;">
-                    <i class="fas fa-info-circle"></i> Pilih satu atau lebih link untuk dikirim
-                </span>
-            </div>
-            
-            <div id="productLinkList" style="max-height: 280px; overflow-y: auto; padding-right: 4px; margin-bottom: 12px; border: 1px solid var(--border); border-radius: 12px; padding: 8px;">
-                ${(() => {
-                    function renderProductRow(p) {
-                        let sourceClass = '';
-                        let sourceBadge = '';
-                        let borderColor = 'rgba(255,255,255,0.06)';
-                        let bgColor = 'rgba(255,255,255,0.03)';
-                        let leftBorder = '';
-                        
-                        const isPalette = p.link_type === 'palette' || p.link_type === 'multi' || (p.product_id && p.product_id.startsWith('palette_'));
-                        
-                        if (isPalette) {
-                            sourceClass = 'palette';
-                            borderColor = 'rgba(236,72,153,0.4)';
-                            bgColor = 'rgba(236,72,153,0.1)';
-                            leftBorder = 'border-left: 3px solid #ec4899;';
-                            sourceBadge = `<span style="background:rgba(236,72,153,0.2); color:#ec4899; font-size:7px; padding:2px 10px; border-radius:12px; font-weight:700; white-space:nowrap; border:1px solid rgba(236,72,153,0.3);">
-                                <i class="fas fa-folder-open"></i> PALETTE LINK
-                            </span>`;
-                        } else if (p.is_assigned) {
-                            sourceClass = 'assigned';
-                            borderColor = 'rgba(16,185,129,0.4)';
-                            bgColor = 'rgba(16,185,129,0.12)';
-                            leftBorder = 'border-left: 3px solid #10b981;';
-                            sourceBadge = `<span style="background:rgba(16,185,129,0.2); color:#10b981; font-size:7px; padding:2px 10px; border-radius:12px; font-weight:700; white-space:nowrap; border:1px solid rgba(16,185,129,0.3);">
-                                <i class="fas fa-check-circle"></i> ASSIGNED
-                            </span>`;
-                        } else if (p.source === 'creator_product') {
-                            sourceClass = 'available';
-                            borderColor = 'rgba(74,222,128,0.3)';
-                            bgColor = 'rgba(74,222,128,0.08)';
-                            leftBorder = 'border-left: 3px solid #4ade80;';
-                            sourceBadge = `<span style="background:rgba(74,222,128,0.15); color:#4ade80; font-size:7px; padding:2px 10px; border-radius:12px; font-weight:600; white-space:nowrap; border:1px solid rgba(74,222,128,0.2);">
-                                <i class="fas fa-user"></i> FROM CREATOR
-                            </span>`;
-                        } else if (p.source === 'recommended') {
-                            sourceClass = 'recommended';
-                            borderColor = 'rgba(139,92,246,0.3)';
-                            bgColor = 'rgba(139,92,246,0.08)';
-                            leftBorder = 'border-left: 3px solid #8b5cf6;';
-                            sourceBadge = `<span style="background:rgba(139,92,246,0.15); color:#8b5cf6; font-size:7px; padding:2px 10px; border-radius:12px; font-weight:600; white-space:nowrap; border:1px solid rgba(139,92,246,0.2);">
-                                <i class="fas fa-star"></i> RECOMMENDED
-                            </span>`;
-                        } else {
-                            sourceClass = 'unmatched';
-                            borderColor = 'rgba(245,158,11,0.3)';
-                            bgColor = 'rgba(245,158,11,0.05)';
-                            leftBorder = 'border-left: 3px solid #f59e0b;';
-                            sourceBadge = `<span style="background:rgba(245,158,11,0.15); color:#f59e0b; font-size:7px; padding:2px 10px; border-radius:12px; font-weight:600; white-space:nowrap; border:1px solid rgba(245,158,11,0.2);">
-                                <i class="fas fa-clock"></i> UNMATCHED
-                            </span>`;
-                        }
-                        
-                        return `
-                        <div class="product-link-item ${sourceClass}" 
-                             data-product-id="${p.product_id}"
-                             data-link="${escapeHtml(p.affiliate_link || '')}"
-                             data-campaign="${escapeHtml(p.campaign_id || '')}"
-                             data-name="${escapeHtml(p.product_name || '').toLowerCase()}"
-                             data-shop="${escapeHtml(p.shop_name || '').toLowerCase()}"
-                             style="background: ${bgColor}; 
-                                    border: 1px solid ${borderColor};
-                                    border-radius: 10px; 
-                                    padding: 8px 10px; 
-                                    margin-bottom: 6px; 
-                                    transition: all 0.2s ease;
-                                    display: flex;
-                                    align-items: center;
-                                    gap: 10px;
-                                    cursor: pointer;
-                                    ${leftBorder}">
-                            
-                            <input type="checkbox" class="product-checkbox" 
-                                   data-product-id="${p.product_id}"
-                                   data-link="${escapeHtml(p.affiliate_link || '')}"
-                                   data-campaign="${escapeHtml(p.campaign_id || '')}"
-                                   ${p.is_assigned ? 'checked' : ''}
-                                   style="width:16px; height:16px; cursor:pointer; accent-color:#8b5cf6; flex-shrink:0; pointer-events:none;">
-                            
-                            ${isPalette ? `<div style="width:36px; height:36px; border-radius:6px; background:rgba(236,72,153,0.2); display:flex; align-items:center; justify-content:center; flex-shrink:0;"><i class="fas fa-folder-open" style="color:#ec4899;"></i></div>` : p.image_url ? `<img src="${escapeHtml(p.image_url)}" style="width:36px; height:36px; border-radius:6px; object-fit:cover; flex-shrink:0;" onerror="this.src=''; this.onerror=null; this.parentElement.innerHTML='<div style=\\'width:36px;height:36px;border-radius:6px;background:var(--bg-elevated);display:flex;align-items:center;justify-content:center;flex-shrink:0;\\'><i class=\\'fas fa-box\\' style=\\'color:var(--text-muted);\\'></i></div>'">` : '<div style="width:36px; height:36px; border-radius:6px; background:var(--bg-elevated); display:flex; align-items:center; justify-content:center; flex-shrink:0;"><i class="fas fa-box" style="color:var(--text-muted);"></i></div>'}
-                            
-                            <div style="flex:1; min-width:0;">
-                                <div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
-                                    <span style="font-weight:500; color:var(--text-primary); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:200px;">
-                                        ${escapeHtml(p.product_name.substring(0, 50))}
-                                    </span>
-                                    ${sourceBadge}
-                                    ${p.shop_name ? `<span style="color:var(--text-muted); font-size:9px; white-space:nowrap;"><i class="fas fa-store"></i> ${escapeHtml(p.shop_name)}</span>` : ''}
-                                </div>
-                                <div style="display:flex; gap:8px; margin-top:2px; font-size:9px; color:var(--text-muted); flex-wrap:wrap;">
-                                    <span><i class="fas fa-tag"></i> ${p.commission_rate || 0}%</span>
-                                    ${p.sales_count ? `<span><i class="fas fa-chart-line"></i> ${formatNumber(p.sales_count)} sold</span>` : ''}
-                                    ${p.gmv ? `<span><i class="fas fa-dollar-sign"></i> Rp ${formatNumber(p.gmv)}</span>` : ''}
-                                    ${p.bd_created_by ? `<span><i class="fas fa-user"></i> ${escapeHtml(p.bd_created_by)}</span>` : ''}
-                                    ${p.is_matched ? `<span style="color:#4ade80;"><i class="fas fa-check"></i> Match</span>` : ''}
-                                    ${p.is_assigned ? `<span style="color:#10b981;"><i class="fas fa-check-circle"></i> Assigned</span>` : ''}
-                                </div>
-                            </div>
-                            
-                            <div style="text-align:right; flex-shrink:0;">
-                                <div style="font-size:10px; color:${isPalette ? '#ec4899' : p.is_assigned ? '#10b981' : p.source === 'creator_product' ? '#4ade80' : p.source === 'recommended' ? '#8b5cf6' : '#f59e0b'}; font-weight:600;">
-                                    ${isPalette ? '<i class="fas fa-folder-open"></i>' : p.is_assigned ? '<i class="fas fa-check-circle"></i>' : p.source === 'creator_product' ? '<i class="fas fa-user"></i>' : p.source === 'recommended' ? '<i class="fas fa-star"></i>' : '<i class="fas fa-clock"></i>'}
-                                </div>
-                            </div>
-                        </div>`;
+            ${(() => {
+                function renderProductRow(p) {
+                    let sourceClass = '';
+                    let sourceBadge = '';
+                    let borderColor = 'rgba(255,255,255,0.06)';
+                    let bgColor = 'rgba(255,255,255,0.03)';
+                    let leftBorder = '';
+                    
+                    const isPalette = p.link_type === 'palette' || p.link_type === 'multi' || (p.product_id && p.product_id.startsWith('palette_'));
+                    
+                    if (isPalette) {
+                        sourceClass = 'palette';
+                        borderColor = 'rgba(236,72,153,0.4)';
+                        bgColor = 'rgba(236,72,153,0.1)';
+                        leftBorder = 'border-left: 3px solid #ec4899;';
+                        sourceBadge = `<span style="background:rgba(236,72,153,0.2); color:#ec4899; font-size:7px; padding:2px 10px; border-radius:12px; font-weight:700; white-space:nowrap; border:1px solid rgba(236,72,153,0.3);">
+                            <i class="fas fa-folder-open"></i> PALETTE LINK
+                        </span>`;
+                    } else if (p.is_assigned) {
+                        sourceClass = 'assigned';
+                        borderColor = 'rgba(16,185,129,0.4)';
+                        bgColor = 'rgba(16,185,129,0.12)';
+                        leftBorder = 'border-left: 3px solid #10b981;';
+                        sourceBadge = `<span style="background:rgba(16,185,129,0.2); color:#10b981; font-size:7px; padding:2px 10px; border-radius:12px; font-weight:700; white-space:nowrap; border:1px solid rgba(16,185,129,0.3);">
+                            <i class="fas fa-check-circle"></i> ASSIGNED
+                        </span>`;
+                    } else if (p.source === 'creator_product') {
+                        sourceClass = 'available';
+                        borderColor = 'rgba(74,222,128,0.3)';
+                        bgColor = 'rgba(74,222,128,0.08)';
+                        leftBorder = 'border-left: 3px solid #4ade80;';
+                        sourceBadge = `<span style="background:rgba(74,222,128,0.15); color:#4ade80; font-size:7px; padding:2px 10px; border-radius:12px; font-weight:600; white-space:nowrap; border:1px solid rgba(74,222,128,0.2);">
+                            <i class="fas fa-user"></i> FROM CREATOR
+                        </span>`;
+                    } else if (p.source === 'recommended') {
+                        sourceClass = 'recommended';
+                        borderColor = 'rgba(139,92,246,0.3)';
+                        bgColor = 'rgba(139,92,246,0.08)';
+                        leftBorder = 'border-left: 3px solid #8b5cf6;';
+                        sourceBadge = `<span style="background:rgba(139,92,246,0.15); color:#8b5cf6; font-size:7px; padding:2px 10px; border-radius:12px; font-weight:600; white-space:nowrap; border:1px solid rgba(139,92,246,0.2);">
+                            <i class="fas fa-star"></i> RECOMMENDED
+                        </span>`;
+                    } else {
+                        sourceClass = 'unmatched';
+                        borderColor = 'rgba(245,158,11,0.3)';
+                        bgColor = 'rgba(245,158,11,0.05)';
+                        leftBorder = 'border-left: 3px solid #f59e0b;';
+                        sourceBadge = `<span style="background:rgba(245,158,11,0.15); color:#f59e0b; font-size:7px; padding:2px 10px; border-radius:12px; font-weight:600; white-space:nowrap; border:1px solid rgba(245,158,11,0.2);">
+                            <i class="fas fa-clock"></i> UNMATCHED
+                        </span>`;
                     }
-
-                    const colProducts = allProducts.filter(p => p.source !== 'recommended');
-                    const nonColProducts = allProducts.filter(p => p.source === 'recommended');
-
+                    
                     return `
-                    <!-- Group 1: Brand Sudah Bekerja Sama (No Header) -->
-                    <div id="collaboratedProductsList" style="margin-bottom: 12px;">
-                        ${colProducts.length > 0 ? colProducts.map(p => renderProductRow(p)).join('') : `<div class="no-products-placeholder" style="padding:10px; text-align:center; color:var(--text-muted); font-size:10px; border:1px dashed rgba(255,255,255,0.06); border-radius:8px;">Tidak ada produk dari brand partner</div>`}
+                    <div class="product-link-item ${sourceClass}" 
+                         data-product-id="${p.product_id}"
+                         data-link="${escapeHtml(p.affiliate_link || '')}"
+                         data-campaign="${escapeHtml(p.campaign_id || '')}"
+                         data-name="${escapeHtml(p.product_name || '').toLowerCase()}"
+                         data-shop="${escapeHtml(p.shop_name || '').toLowerCase()}"
+                         style="background: ${bgColor}; 
+                                border: 1px solid ${borderColor};
+                                border-radius: 10px; 
+                                padding: 8px 10px; 
+                                margin-bottom: 6px; 
+                                transition: all 0.2s ease;
+                                display: flex;
+                                align-items: center;
+                                gap: 10px;
+                                cursor: pointer;
+                                ${leftBorder}">
+                        
+                        <input type="checkbox" class="product-checkbox" 
+                               data-product-id="${p.product_id}"
+                               data-link="${escapeHtml(p.affiliate_link || '')}"
+                               data-campaign="${escapeHtml(p.campaign_id || '')}"
+                               ${p.is_assigned ? 'checked' : ''}
+                               style="width:16px; height:16px; cursor:pointer; accent-color:#8b5cf6; flex-shrink:0; pointer-events:none;">
+                        
+                        ${isPalette ? `<div style="width:36px; height:36px; border-radius:6px; background:rgba(236,72,153,0.2); display:flex; align-items:center; justify-content:center; flex-shrink:0;"><i class="fas fa-folder-open" style="color:#ec4899;"></i></div>` : p.image_url ? `<img src="${escapeHtml(p.image_url)}" style="width:36px; height:36px; border-radius:6px; object-fit:cover; flex-shrink:0;" onerror="this.src=''; this.onerror=null; this.parentElement.innerHTML='<div style=\\'width:36px;height:36px;border-radius:6px;background:var(--bg-elevated);display:flex;align-items:center;justify-content:center;flex-shrink:0;\\'><i class=\\'fas fa-box\\' style=\\'color:var(--text-muted);\\'></i></div>'">` : '<div style="width:36px; height:36px; border-radius:6px; background:var(--bg-elevated); display:flex; align-items:center; justify-content:center; flex-shrink:0;"><i class="fas fa-box" style="color:var(--text-muted);"></i></div>'}
+                        
+                        <div style="flex:1; min-width:0;">
+                            <div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
+                                <span style="font-weight:500; color:var(--text-primary); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:200px;">
+                                    ${escapeHtml(p.product_name.substring(0, 50))}
+                                </span>
+                                ${sourceBadge}
+                                ${p.shop_name ? `<span style="color:var(--text-muted); font-size:9px; white-space:nowrap;"><i class="fas fa-store"></i> ${escapeHtml(p.shop_name)}</span>` : ''}
+                            </div>
+                            <div style="display:flex; gap:8px; margin-top:2px; font-size:9px; color:var(--text-muted); flex-wrap:wrap;">
+                                <span><i class="fas fa-tag"></i> ${p.commission_rate || 0}%</span>
+                                ${p.sales_count ? `<span><i class="fas fa-chart-line"></i> ${formatNumber(p.sales_count)} sold</span>` : ''}
+                                ${p.gmv ? `<span><i class="fas fa-dollar-sign"></i> Rp ${formatNumber(p.gmv)}</span>` : ''}
+                                ${p.bd_created_by ? `<span><i class="fas fa-user"></i> ${escapeHtml(p.bd_created_by)}</span>` : ''}
+                                ${p.is_matched ? `<span style="color:#4ade80;"><i class="fas fa-check"></i> Match</span>` : ''}
+                                ${p.is_assigned ? `<span style="color:#10b981;"><i class="fas fa-check-circle"></i> Assigned</span>` : ''}
+                            </div>
+                        </div>
+                        
+                        <div style="text-align:right; flex-shrink:0;">
+                            <div style="font-size:10px; color:${isPalette ? '#ec4899' : p.is_assigned ? '#10b981' : p.source === 'creator_product' ? '#4ade80' : p.source === 'recommended' ? '#8b5cf6' : '#f59e0b'}; font-weight:600;">
+                                ${isPalette ? '<i class="fas fa-folder-open"></i>' : p.is_assigned ? '<i class="fas fa-check-circle"></i>' : p.source === 'creator_product' ? '<i class="fas fa-user"></i>' : p.source === 'recommended' ? '<i class="fas fa-star"></i>' : '<i class="fas fa-clock"></i>'}
+                            </div>
+                        </div>
+                    </div>`;
+                }
+
+                const colProducts = allProducts.filter(p => p.source !== 'recommended');
+                const nonColProducts = allProducts.filter(p => p.source === 'recommended');
+
+                return `
+                <!-- Tab Switcher Bar untuk Send Link Products -->
+                <div style="display: flex; gap: 8px; background: rgba(13,23,42,0.8); padding: 4px; border-radius: 12px; border: 1px solid rgba(139,92,246,0.2); margin-bottom: 10px;">
+                    <button type="button" id="sendLinkTabMainBtn" onclick="window.switchSendLinkTab('main')" 
+                            style="flex: 1; padding: 7px 12px; border-radius: 9px; border: 1px solid rgba(139,92,246,0.5); background: rgba(139,92,246,0.25); color: #a78bfa; font-size: 11px; font-weight: 700; cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                        <i class="fas fa-box-open" style="color: #a78bfa;"></i> Produk Dipromosikan (${colProducts.length})
+                    </button>
+                    <button type="button" id="sendLinkTabRecBtn" onclick="window.switchSendLinkTab('rec')" 
+                            style="flex: 1; padding: 7px 12px; border-radius: 9px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); color: var(--text-secondary); font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                        <i class="fas fa-star" style="color: #f59e0b;"></i> Produk Rekomendasi (${nonColProducts.length})
+                    </button>
+                </div>
+
+                <!-- Action Buttons: Select All & Deselect All untuk Tab Aktif -->
+                <div style="display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; align-items:center;">
+                    <button onclick="window.selectAllProducts()" style="background:rgba(139,92,246,0.15); color:#8b5cf6; border:1px solid rgba(139,92,246,0.3); padding:4px 14px; border-radius:16px; cursor:pointer; font-size:10px; font-weight:600;">
+                        <i class="fas fa-check-double"></i> Select All
+                    </button>
+                    <button onclick="window.deselectAllProducts()" style="background:rgba(239,68,68,0.1); color:#ef4444; border:1px solid rgba(239,68,68,0.2); padding:4px 14px; border-radius:16px; cursor:pointer; font-size:10px; font-weight:600;">
+                        <i class="fas fa-times"></i> Deselect All
+                    </button>
+                    <span style="font-size:10px; color:var(--text-muted); padding:4px 8px;">
+                        <i class="fas fa-info-circle"></i> Pilih satu atau lebih link untuk dikirim
+                    </span>
+                </div>
+
+                <!-- Search Bar -->
+                <div style="margin-bottom: 10px;">
+                    <input type="text" id="searchProductLink" placeholder="🔍 Cari produk..." 
+                           style="width:100%; padding:8px 12px; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:10px; color:var(--text-primary); font-size:12px; outline:none;">
+                </div>
+
+                <div id="productLinkList">
+                    <!-- Tab 1: Main Products (Produk Dipromosikan) -->
+                    <div id="sendLinkMainProductsView" style="display: block; max-height: 280px; overflow-y: auto; padding-right: 4px; border: 1px solid var(--border); border-radius: 12px; padding: 8px; margin-bottom: 8px;">
+                        ${colProducts.length > 0 ? colProducts.map(p => renderProductRow(p)).join('') : `<div class="no-products-placeholder" style="padding:24px; text-align:center; color:var(--text-muted); font-size:11px; border:1px dashed rgba(255,255,255,0.06); border-radius:8px;"><i class="fas fa-box-open" style="font-size:24px; margin-bottom:8px; display:block; opacity:0.4; color:#a78bfa;"></i>Tidak ada produk yang sedang dipromosikan</div>`}
                     </div>
 
-                    <!-- Search bar in the middle -->
-                    <div id="searchBarMiddleWrapper" style="margin-top: 10px; margin-bottom: 10px;">
-                        <input type="text" id="searchProductLink" placeholder="🔍 Cari produk..." 
-                               style="width:100%; padding:8px 12px; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:10px; color:var(--text-primary); font-size:12px; outline:none;">
+                    <!-- Tab 2: Recommended Products -->
+                    <div id="sendLinkRecProductsView" style="display: none; max-height: 280px; overflow-y: auto; padding-right: 4px; border: 1px solid var(--border); border-radius: 12px; padding: 8px; margin-bottom: 8px;">
+                        ${nonColProducts.length > 0 ? nonColProducts.map(p => renderProductRow(p)).join('') : `<div class="no-products-placeholder" style="padding:24px; text-align:center; color:var(--text-muted); font-size:11px; border:1px dashed rgba(255,255,255,0.06); border-radius:8px;"><i class="fas fa-star" style="font-size:24px; margin-bottom:8px; display:block; opacity:0.4; color:#f59e0b;"></i>Tidak ada produk rekomendasi</div>`}
                     </div>
+                </div>
+                `;
+            })()}
 
-                    <!-- Group 2: Recommended Products -->
-                    <div class="product-group-header non-collaborated-header" style="font-size: 11px; font-weight: 700; color: #8b5cf6; margin-top: 8px; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
-                        <i class="fas fa-star"></i> Rekomendasi Produk (Recommended)
-                    </div>
-                    <div id="nonCollaboratedProductsList">
-                        ${nonColProducts.length > 0 ? nonColProducts.map(p => renderProductRow(p)).join('') : `<div class="no-products-placeholder" style="padding:10px; text-align:center; color:var(--text-muted); font-size:10px; border:1px dashed rgba(255,255,255,0.06); border-radius:8px;">Tidak ada rekomendasi produk baru</div>`}
-                    </div>
-                    `;
-                })()}
-            </div>
             
             <div id="selectedLinksSummary" style="background:rgba(139,92,246,0.08); border-radius:10px; padding:10px 12px; margin-bottom:12px; border-left:3px solid #8b5cf6; display:none;">
                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:4px;">
@@ -3073,7 +3262,7 @@ async function showTask1SendLinkModal(creatorId) {
                 <i class="fas fa-edit" style="color: #f59e0b;"></i> Pesan WhatsApp
             </label>
             <textarea id="sendLinkMessage" rows="3" style="width:100%; padding:10px 12px; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:12px; color:var(--text-primary); font-size:12px; outline: none; transition: var(--transition); resize: vertical; font-family: inherit;">
-Halo! �9�9
+Halo! 👋
 
 Terima kasih telah bergabung dengan Toopai. 
 
@@ -3081,7 +3270,7 @@ Berikut adalah link afiliasi yang dapat Anda gunakan untuk mempromosikan produk:
 
 [LINK]
 
-Selamat berpromosi! �0�4
+Selamat berpromosi! 🎉
 
 Tim Toopai
             </textarea>
@@ -3089,7 +3278,7 @@ Tim Toopai
             <div style="background:rgba(245,158,11,0.1); border-radius:10px; padding:10px 12px; margin-top:8px; border-left:3px solid #f59e0b;">
                 <span style="color:#f59e0b; font-size:10px; display:flex; align-items:center; gap:6px;">
                     <i class="fas fa-info-circle"></i> 
-                    ${hasPhone ? `Link akan dikirim via WhatsApp ke @${escapeHtml(c.username)}` : '�7�2�1�5 <strong>Nomor WhatsApp tidak tersedia!</strong> Silakan update nomor terlebih dahulu.'}
+                    ${hasPhone ? `Link akan dikirim via WhatsApp ke @${escapeHtml(c.username)}` : '⚠️ <strong>Nomor WhatsApp tidak tersedia!</strong> Silakan update nomor terlebih dahulu.'}
                 </span>
             </div>
             
@@ -3111,7 +3300,37 @@ Tim Toopai
         body.innerHTML = html;
         
         // ============================================================
-        // �9�7 EVENT LISTENER: SEARCH PRODUCT
+        // ⚡ EVENT LISTENER: SWITCH TAB
+        // ============================================================
+        window.switchSendLinkTab = (tab) => {
+            const mainView = document.getElementById('sendLinkMainProductsView');
+            const recView = document.getElementById('sendLinkRecProductsView');
+            const mainBtn = document.getElementById('sendLinkTabMainBtn');
+            const recBtn = document.getElementById('sendLinkTabRecBtn');
+            
+            if (tab === 'main') {
+                mainView.style.display = 'block';
+                recView.style.display = 'none';
+                mainBtn.style.background = 'rgba(139,92,246,0.25)';
+                mainBtn.style.border = '1px solid rgba(139,92,246,0.5)';
+                mainBtn.style.color = '#a78bfa';
+                recBtn.style.background = 'rgba(255,255,255,0.03)';
+                recBtn.style.border = '1px solid rgba(255,255,255,0.08)';
+                recBtn.style.color = 'var(--text-secondary)';
+            } else {
+                mainView.style.display = 'none';
+                recView.style.display = 'block';
+                mainBtn.style.background = 'rgba(255,255,255,0.03)';
+                mainBtn.style.border = '1px solid rgba(255,255,255,0.08)';
+                mainBtn.style.color = 'var(--text-secondary)';
+                recBtn.style.background = 'rgba(245,158,11,0.25)';
+                recBtn.style.border = '1px solid rgba(245,158,11,0.5)';
+                recBtn.style.color = '#f59e0b';
+            }
+        };
+
+        // ============================================================
+        // ⚡ EVENT LISTENER: SEARCH PRODUCT
         // ============================================================
         const searchInput = document.getElementById('searchProductLink');
         if (searchInput) {
@@ -3125,14 +3344,6 @@ Tim Toopai
                     const match = keyword === '' || name.includes(keyword) || shop.includes(keyword);
                     item.style.display = match ? 'flex' : 'none';
                 });
-
-                // Toggle group header visibility based on search results
-                const nonColList = document.getElementById('nonCollaboratedProductsList');
-                if (nonColList) {
-                    const visibleNonCol = Array.from(nonColList.querySelectorAll('.product-link-item')).some(el => el.style.display !== 'none');
-                    const nonColHeader = document.querySelector('.non-collaborated-header');
-                    if (nonColHeader) nonColHeader.style.display = visibleNonCol ? 'flex' : 'none';
-                }
             });
         }
         
@@ -3581,6 +3792,17 @@ async function showTask1DetailModal(creatorId) {
         const multiLinks = result.multi_links || [];
         const whatsappLogs = result.whatsapp_logs || [];
         
+        let totalProductsDisplay = result.total_products || 0;
+        if (brands.length > 0) {
+            let sumBrandProducts = 0;
+            brands.forEach(b => {
+                sumBrandProducts += parseInt(b.total_products || 0);
+            });
+            if (sumBrandProducts > totalProductsDisplay) {
+                totalProductsDisplay = sumBrandProducts;
+            }
+        }
+
         title.innerHTML = `<i class="fas fa-user" style="color: var(--purple);"></i> @${escapeHtml(c.username)} - Detail`;
         
         let html = `
@@ -3608,7 +3830,7 @@ async function showTask1DetailModal(creatorId) {
                         <span style="display:inline-flex; align-items:center; gap:4px;"><i class="fas fa-phone" style="color: #25D366;"></i> ${escapeHtml(c.phone || '-')}</span>
                         <span style="display:inline-flex; align-items:center; gap:4px;"><i class="fas fa-calendar" style="color: var(--text-muted);"></i> Since: ${new Date(c.created_at).toLocaleDateString('id-ID')}</span>
                         ${c.brand_name ? `<span style="display:inline-flex; align-items:center; gap:4px;"><i class="fas fa-store" style="color: #4ade80;"></i> ${escapeHtml(c.brand_name)}</span>` : ''}
-                        <span style="display:inline-flex; align-items:center; gap:4px;"><i class="fas fa-box" style="color: #fbbf24;"></i> ${result.total_products || 0} products</span>
+                        <span style="display:inline-flex; align-items:center; gap:4px;"><i class="fas fa-box" style="color: #fbbf24;"></i> ${totalProductsDisplay} products</span>
                         <span style="display:inline-flex; align-items:center; gap:4px;"><i class="fas fa-store" style="color: #8b5cf6;"></i> ${result.total_brands || 0} brands</span>
                     </div>
                 </div>
@@ -3633,6 +3855,17 @@ async function showTask1DetailModal(creatorId) {
                                    display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                            <i class="fas fa-store" style="color:${logoIcon};font-size:10px;"></i>
                        </div>`;
+                const brandName = b.brand_name || b.shop_name || b.name || '-';
+
+                // Tombol Remind BA khusus untuk brand yang BELUM bekerja sama
+                const remindBtn = !isPartner
+                    ? `<button onclick="remindBaForBrand('${escapeHtml(brandName)}', '${creatorId}', this)"
+                               title="Kirim notifikasi ke Tim BA untuk melakukan kerja sama dengan brand ini"
+                               style="background: rgba(245,158,11,0.15); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3); padding: 3px 8px; border-radius: 6px; cursor: pointer; font-size: 8.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; outline: none; margin-top: 4px; transition: 0.2s;">
+                           <i class="fas fa-bell"></i> Remind BA
+                       </button>`
+                    : '';
+
                 return `
                 <div style="background:var(--bg-elevated);border-radius:9px;padding:8px 10px;
                             border-left:3px solid ${accentColor};display:flex;align-items:center;gap:8px;
@@ -3641,9 +3874,10 @@ async function showTask1DetailModal(creatorId) {
                     <div style="flex:1;min-width:0;">
                         <div style="color:var(--text-primary);font-size:11px;font-weight:600;
                                     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-                            ${escapeHtml(b.brand_name || b.shop_name || b.name || '-')}
+                            ${escapeHtml(brandName)}
                         </div>
                         <div style="color:var(--text-muted);font-size:9px;">${b.total_products || 0} produk</div>
+                        ${remindBtn}
                     </div>
                     <div style="flex-shrink:0;text-align:right;display:flex;flex-direction:column;align-items:flex-end;justify-content:center;">
                         <span style="color:${accentColor};font-size:11px;font-weight:700;line-height:1.2;">
@@ -3849,6 +4083,49 @@ async function showTask1DetailModal(creatorId) {
                 <button onclick="closeTask1DetailModal()" style="margin-top:16px; padding: 8px 24px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); cursor: pointer;">Close</button>
             </div>
         `;
+    }
+}
+
+// ============================================================
+// REMIND BA FOR BRAND FUNCTION
+// ============================================================
+async function remindBaForBrand(brandName, creatorId, btnEl) {
+    if (!brandName || brandName === '-') {
+        showToastGlobal('Nama brand tidak valid', 'error');
+        return;
+    }
+    
+    const originalText = btnEl.innerHTML;
+    btnEl.disabled = true;
+    btnEl.innerHTML = '<i class="fas fa-spinner fa-pulse"></i> Sending...';
+    
+    try {
+        const formData = new FormData();
+        formData.append('brand_name', brandName);
+        formData.append('creator_id', creatorId || '');
+        
+        const response = await fetch(BASE_URL + 'is/remind_ba_brand', {
+            method: 'POST',
+            body: formData
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+            showToastGlobal(result.message || 'Notifikasi remind BA berhasil dikirim!', 'success');
+            btnEl.style.background = 'rgba(16,185,129,0.2)';
+            btnEl.style.color = '#34d399';
+            btnEl.style.borderColor = 'rgba(16,185,129,0.3)';
+            btnEl.innerHTML = '<i class="fas fa-check"></i> Reminded!';
+        } else {
+            showToastGlobal(result.message || 'Gagal mengirim notifikasi remind BA', 'error');
+            btnEl.disabled = false;
+            btnEl.innerHTML = originalText;
+        }
+    } catch (err) {
+        console.error('Error remind BA:', err);
+        showToastGlobal('Terjadi kesalahan saat mengirim notifikasi', 'error');
+        btnEl.disabled = false;
+        btnEl.innerHTML = originalText;
     }
 }
 
@@ -4549,6 +4826,7 @@ async function showBrandCreatorsModal(brandId, brandName) {
     const modal = document.getElementById('brandCreatorsModal');
     const body = document.getElementById('brandCreatorsModalBody');
     const title = document.getElementById('brandCreatorsModalTitle');
+    const subTitle = document.getElementById('brandCreatorsModalSub');
     
     if (!modal || !body || !title) {
         showToastGlobal('Modal tidak ditemukan', 'error');
@@ -4558,6 +4836,11 @@ async function showBrandCreatorsModal(brandId, brandName) {
     modal.style.display = 'flex';
     modal.classList.add('active');
     title.innerHTML = `<i class="fas fa-store" style="color: var(--purple);"></i> Brand: ${escapeHtml(brandName)}`;
+    if (subTitle) {
+        subTitle.innerHTML = `<i class="fas fa-user-tie" style="color: #a78bfa;"></i> PIC BA: <span style="color:#94a3b8; font-style:italic;">Memuat data...</span>`;
+        subTitle.style.display = 'flex';
+    }
+
     body.innerHTML = `
         <div style="text-align:center; padding:40px;">
             <i class="fas fa-spinner fa-pulse fa-2x" style="color: var(--purple);"></i>
@@ -4581,8 +4864,27 @@ async function showBrandCreatorsModal(brandId, brandName) {
         
         const result = await response.json();
         console.log('Brand Creators result:', result);
-        
+
+        // Render informasi PIC BA (User BA yang berhasil deal dengan brand ini)
+        if (subTitle) {
+            let picName = '';
+            if (result.brand_detail) {
+                if (result.brand_detail.pic_ba_full_name) {
+                    picName = result.brand_detail.pic_ba_full_name + (result.brand_detail.pic_ba_username ? ` (@${result.brand_detail.pic_ba_username})` : '');
+                } else if (result.brand_detail.pic_ba_username) {
+                    picName = `@${result.brand_detail.pic_ba_username}`;
+                }
+            }
+            if (picName) {
+                subTitle.innerHTML = `<i class="fas fa-user-check" style="color: #34d399;"></i> PIC BA: <strong style="color: #f7fbff; font-weight:700;">${escapeHtml(picName)}</strong>`;
+            } else {
+                subTitle.innerHTML = `<i class="fas fa-user-slash" style="color: #94a3b8;"></i> PIC BA: <span style="color: #94a3b8; font-style: italic;">Belum ada PIC (Belum di-claim BA)</span>`;
+            }
+            subTitle.style.display = 'flex';
+        }
+
         if (!result.success || !result.creators || result.creators.length === 0) {
+
             body.innerHTML = `
                 <div style="text-align:center; padding:40px;">
                     <i class="fas fa-user-slash fa-2x" style="color: var(--is-muted);"></i>
@@ -4672,6 +4974,12 @@ async function showBrandCreatorsModal(brandId, brandName) {
 }
 
 function filterBrandCategory(category) {
+    // Sync dropdown select if filtering by category option
+    const selectElem = document.getElementById('brandCategorySelectFilter');
+    if (selectElem && category !== 'bestseller' && category !== 'trending') {
+        selectElem.value = category;
+    }
+
     document.querySelectorAll('.tap-filter-btn').forEach(btn => {
         if (btn.getAttribute('data-category') === category) {
             btn.classList.add('active');
@@ -4683,10 +4991,6 @@ function filterBrandCategory(category) {
                 btn.style.background = 'linear-gradient(135deg, rgba(16,185,129,0.2), rgba(59,130,246,0.2))';
                 btn.style.color = '#34d399';
                 btn.style.border = '1px solid rgba(16,185,129,0.4)';
-            } else {
-                btn.style.background = 'rgba(139,92,246,0.2)';
-                btn.style.color = '#a78bfa';
-                btn.style.border = '1px solid rgba(139,92,246,0.4)';
             }
         } else {
             btn.classList.remove('active');
@@ -4708,12 +5012,16 @@ function filterBrandCategory(category) {
         const isBestseller = card.getAttribute('data-is-bestseller') === '1';
         const isTrending = card.getAttribute('data-is-trending') === '1';
         const brandName = (card.getAttribute('data-brand-name') || '').toLowerCase();
+        const brandCat = (card.getAttribute('data-category') || '').toLowerCase();
 
         let show = true;
         if (category === 'bestseller') {
             show = isBestseller;
         } else if (category === 'trending') {
             show = isTrending;
+        } else if (category && category !== 'all') {
+            // Pemfilteran berdasarkan kategori brand
+            show = brandCat ? brandCat.includes(category.toLowerCase()) : true;
         } else {
             show = true;
         }
@@ -4728,6 +5036,7 @@ function filterBrandCategory(category) {
             card.style.display = 'none';
         }
     });
+
 
     cards.sort((a, b) => {
         const gmvA = parseFloat(a.getAttribute('data-gmv-28d') || 0);
@@ -5025,6 +5334,24 @@ function renderSingleCreatorHtml(creator) {
                 </span>
             </div>
             ` : ''}
+
+            <!-- CA CONTACTED INFO (KHUSUS PIC / SUPER CA is@toopai.com) -->
+            ${(() => {
+                const isPic = (creator.is_id && String(creator.is_id) === String(LOGGED_USER_ID)) ||
+                              (creator.is_username && creator.is_username.toLowerCase() === LOGGED_USERNAME.toLowerCase());
+                const isSuperCa = (LOGGED_EMAIL.toLowerCase() === 'is@toopai.com' || LOGGED_USERNAME.toLowerCase() === 'is@toopai.com');
+                if (isPic || isSuperCa) {
+                    const contactedNames = creator.contacted_ca_names || creator.is_full_name || creator.contacted_by_name || '';
+                    return `
+                    <div class="item-details-dashboard" style="margin-top:4px;">
+                        <span style="background: rgba(139, 92, 246, 0.12); color: #a78bfa; border: 1px solid rgba(139, 92, 246, 0.25); padding: 3px 8px; border-radius: 8px; font-size: 9.5px; display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap;" title="User CA yang telah menghubungi/berinteraksi dengan creator">
+                            <i class="fas fa-user-check" style="font-size: 8px;"></i>
+                            Dihubungi oleh: <strong style="color: #c4b5fd;">${escapeHtml(contactedNames || 'Belum dihubungi')}</strong>
+                        </span>
+                    </div>`;
+                }
+                return '';
+            })()}
             
             <!-- SUMBER DATA & TANGGAL INPUT -->
             <div class="item-details-dashboard" style="font-size: 9px; margin-top: 6px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px; color: var(--is-muted);">
@@ -5211,6 +5538,15 @@ function openAddCreatorTask3() {
         modal.style.display = 'flex';
         modal.classList.add('active');
         document.getElementById('addCreatorTask3Form').reset();
+        if (typeof $ !== 'undefined' && $.fn.select2) {
+            $('#task3Brand').val('').trigger('change');
+            $('#task3Category').val([]).trigger('change');
+            $('#task3Category').select2({
+                placeholder: 'Pilih Kategori...',
+                allowClear: true,
+                dropdownParent: $('#addCreatorTask3Modal')
+            });
+        }
         loadBrandsForTask3();
     }
 }
@@ -5220,6 +5556,10 @@ function closeAddCreatorTask3() {
     if (modal) {
         modal.style.display = 'none';
         modal.classList.remove('active');
+        if (typeof $ !== 'undefined' && $.fn.select2) {
+            $('#task3Brand').select2('close');
+            $('#task3Category').select2('close');
+        }
     }
 }
 
@@ -5237,6 +5577,14 @@ async function loadBrandsForTask3() {
                 option.textContent = brand.name + (brand.shop_name ? ' (' + brand.shop_name + ')' : '');
                 select.appendChild(option);
             });
+
+            if (typeof $ !== 'undefined' && $.fn.select2) {
+                $('#task3Brand').select2({
+                    placeholder: '-- Pilih Brand --',
+                    allowClear: true,
+                    dropdownParent: $('#addCreatorTask3Modal')
+                });
+            }
         }
     } catch (error) {
         console.error('Error loading brands:', error);
@@ -5249,6 +5597,15 @@ function showAddCreatorModalIS() {
         modal.style.display = 'flex';
         modal.classList.add('active');
         document.getElementById('addCreatorTask1Form').reset();
+        if (typeof $ !== 'undefined' && $.fn.select2) {
+            $('#creatorBrandIS').val('').trigger('change');
+            $('#creatorCategoryIS').val([]).trigger('change');
+            $('#creatorCategoryIS').select2({
+                placeholder: 'Pilih Kategori...',
+                allowClear: true,
+                dropdownParent: $('#taskModalDashboard')
+            });
+        }
         loadBrandsForTask1();
     }
 }
@@ -5258,6 +5615,10 @@ function closeModalIS() {
     if (modal) {
         modal.style.display = 'none';
         modal.classList.remove('active');
+        if (typeof $ !== 'undefined' && $.fn.select2) {
+            $('#creatorBrandIS').select2('close');
+            $('#creatorCategoryIS').select2('close');
+        }
     }
 }
 
@@ -5275,6 +5636,14 @@ async function loadBrandsForTask1() {
                 option.textContent = brand.name + (brand.shop_name ? ' (' + brand.shop_name + ')' : '');
                 select.appendChild(option);
             });
+
+            if (typeof $ !== 'undefined' && $.fn.select2) {
+                $('#creatorBrandIS').select2({
+                    placeholder: '-- Pilih Brand --',
+                    allowClear: true,
+                    dropdownParent: $('#taskModalDashboard')
+                });
+            }
         }
     } catch (error) {
         console.error('Error loading brands:', error);
@@ -5694,11 +6063,24 @@ async function submitCreatorForm(taskType, forceSave = false) {
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-pulse"></i> Menambahkan...';
 
-    try {
+        let categoryVal = '';
+        if (typeof $ !== 'undefined' && $.fn.select2) {
+            const selectedArr = $(categoryEl).val();
+            if (Array.isArray(selectedArr)) {
+                categoryVal = selectedArr.join(', ');
+            } else {
+                categoryVal = selectedArr || '';
+            }
+        } else if (categoryEl.selectedOptions) {
+            categoryVal = Array.from(categoryEl.selectedOptions).map(opt => opt.value).join(', ');
+        } else {
+            categoryVal = categoryEl.value || '';
+        }
+
         const formData = new FormData();
         formData.append('username',       username.replace('@', ''));
         formData.append('full_name',      fullNameEl.value.trim());
-        formData.append('category',       categoryEl.value);
+        formData.append('category',       categoryVal);
         formData.append('phone',          phoneEl.value.trim());
         formData.append('email',          emailEl.value.trim());
         formData.append('follower_count', followersEl.value.trim() || 0);
@@ -5885,14 +6267,21 @@ document.getElementById('phoneDuplicateModal').addEventListener('click', functio
                            <i class="fas fa-bullhorn" style="font-size:8px;"></i> ${escapeHtml(item.campaign_name)}
                        </span>`
                     : ''}
-                ${item.status === 'contacted'
-                    ? `<span style="background:rgba(139,92,246,0.1);color:#a78bfa;
-                                   padding:2px 7px;border-radius:10px;font-size:9px;
-                                   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:240px;width:100%;display:inline-flex;align-items:center;gap:3px;" 
-                                   title="Dihubungi oleh ${escapeHtml(item.contacted_by_name || 'CA')}">
-                           <i class="fas fa-paper-plane" style="font-size:8px;"></i> Dihubungi: ${escapeHtml(item.contacted_by_name || 'CA')}
-                       </span>`
-                    : ''}
+                ${(() => {
+                    const isPic = (item.is_id && String(item.is_id) === String(LOGGED_USER_ID)) ||
+                                  (item.is_username && item.is_username.toLowerCase() === LOGGED_USERNAME.toLowerCase());
+                    const isSuperCa = (LOGGED_EMAIL.toLowerCase() === 'is@toopai.com' || LOGGED_USERNAME.toLowerCase() === 'is@toopai.com');
+                    if (isPic || isSuperCa) {
+                        const contactedNames = item.contacted_ca_names || item.is_full_name || item.contacted_by_name || '';
+                        return `<span style="background:rgba(139,92,246,0.12);color:#a78bfa;
+                                       padding:2px 7px;border-radius:10px;font-size:9px;
+                                       overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:240px;width:100%;display:inline-flex;align-items:center;gap:3px;" 
+                                       title="Dihubungi oleh ${escapeHtml(contactedNames || 'CA')}">
+                               <i class="fas fa-user-check" style="font-size:8px;"></i> Dihubungi: ${escapeHtml(contactedNames || 'Belum dihubungi')}
+                           </span>`;
+                    }
+                    return '';
+                })()}
             </div>
 
             <!-- Row 3: Produk -->

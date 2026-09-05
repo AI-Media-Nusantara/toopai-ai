@@ -69,8 +69,16 @@ public function dashboard() {
              FROM affiliate_orders o 
              WHERE o.creator_username = c.username 
                AND o.order_date_local >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-               AND o.order_status NOT IN ("CANCELLED", "REFUNDED")) as total_gmv_30d
-        ')
+               AND o.order_status NOT IN ("CANCELLED", "REFUNDED")) as total_gmv_30d,
+             (SELECT GROUP_CONCAT(DISTINCT u2.full_name SEPARATOR ", ")
+              FROM users u2
+              WHERE u2.role = "IS"
+                AND (
+                    u2.id = c.is_id
+                    OR u2.id IN (SELECT DISTINCT ul.user_id FROM user_logs ul WHERE ul.role = "IS" AND ul.action = "GENERATE_AFFILIATE_LINK" AND ul.description LIKE CONCAT("%creator @", c.username, ",%"))
+                )
+             ) as contacted_ca_names
+         ', false)
         ->from('creators c')
         ->join('brands b', 'c.brand_id = b.id', 'left')
         ->join('users u', 'c.is_id = u.id', 'left')
@@ -306,7 +314,13 @@ foreach ($task2_creators as $c) {
             b.id as brand_id,
             b.name as brand_name,
             COALESCE(NULLIF(b.shop_name, ''), b.name) as shop_name,
+            COALESCE(NULLIF(b.category, ''), (
+                SELECT GROUP_CONCAT(DISTINCT c2.category SEPARATOR ', ')
+                FROM creators c2
+                WHERE c2.brand_id = b.id AND c2.category IS NOT NULL AND c2.category != ''
+            ), '') as category,
             COALESCE((
+
                 SELECT SUM(o.gmv)
                 FROM affiliate_orders o
                 JOIN affiliate_products ap2 ON o.product_id = ap2.product_id AND o.campaign_id = ap2.campaign_id
@@ -1799,6 +1813,18 @@ public function get_creator_task1_detail() {
             }
         }
 
+        // Hitung total akumulasi produk keseluruhan dari seluruh brand kolaborasi & produk
+        $total_products_count = count($products);
+        if (!empty($brands)) {
+            $brand_products_sum = 0;
+            foreach ($brands as $b) {
+                $brand_products_sum += intval($b->total_products ?? 0);
+            }
+            if ($brand_products_sum > $total_products_count) {
+                $total_products_count = $brand_products_sum;
+            }
+        }
+
         // ============================================================
         // 9. KIRIM RESPONSE
         // ============================================================
@@ -1812,7 +1838,7 @@ public function get_creator_task1_detail() {
             'total_gmv'      => $total_gmv,
             'fastmoss_gmv'   => floatval($creator->fastmoss_gmv ?? 0),    // total GMV creator all-time dari baseInfo
             'fastmoss_gmv_28d' => floatval($creator->fastmoss_gmv_28d ?? 0), // GMV 28 hari dari baseInfo
-            'total_products' => count($products),
+            'total_products' => $total_products_count,
             'total_brands'   => count($brands),
             'phone_source'   => $phone_source
         ];
@@ -1830,6 +1856,93 @@ public function get_creator_task1_detail() {
         return $this->output->set_output(json_encode([
             'success' => false,
             'message' => 'Server error: ' . $e->getMessage()
+        ]));
+    }
+}
+
+/**
+ * AJAX — Kirim Notifikasi Remind BA terhadap brand yang belum bekerja sama
+ */
+public function remind_ba_brand() {
+    $this->output->set_content_type('application/json');
+
+    if (!$this->session->userdata('logged_in')) {
+        return $this->output->set_output(json_encode(['success' => false, 'message' => 'Session expired']));
+    }
+
+    $user_id    = $this->session->userdata('user_id');
+    $user_name  = $this->session->userdata('full_name') ?: $this->session->userdata('username');
+    $user_role  = $this->session->userdata('role');
+    $brand_name = trim($this->input->post('brand_name'));
+    $creator_id = $this->input->post('creator_id');
+
+    if (empty($brand_name)) {
+        return $this->output->set_output(json_encode(['success' => false, 'message' => 'Nama brand tidak valid']));
+    }
+
+    // Ambil data creator jika ada creator_id
+    $creator_username = '';
+    if (!empty($creator_id)) {
+        $creator = $this->db->select('username')->where('id', $creator_id)->get('creators')->row();
+        if ($creator) {
+            $creator_username = $creator->username;
+        }
+    }
+
+    try {
+        // Auto-create tabel ba_reminders jika belum ada
+        $this->db->query("
+            CREATE TABLE IF NOT EXISTS ba_reminders (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                sender_id INT NULL,
+                sender_name VARCHAR(255) NULL,
+                creator_id INT NULL,
+                creator_username VARCHAR(255) NULL,
+                brand_name VARCHAR(255) NOT NULL,
+                status VARCHAR(50) DEFAULT 'PENDING',
+                notes TEXT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                KEY idx_brand_name (brand_name),
+                KEY idx_creator_id (creator_id),
+                KEY idx_status (status)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+
+        // Simpan reminder ke ba_reminders
+        $data = [
+            'sender_id'        => $user_id,
+            'sender_name'      => $user_name,
+            'creator_id'       => $creator_id,
+            'creator_username' => $creator_username,
+            'brand_name'       => $brand_name,
+            'status'           => 'PENDING',
+            'notes'            => 'Tim CA (' . $user_name . ') mengingatkan tim BA untuk bekerja sama dengan brand ' . $brand_name . ($creator_username ? ' (Creator: @' . $creator_username . ')' : ''),
+            'created_at'       => date('Y-m-d H:i:s')
+        ];
+        $this->db->insert('ba_reminders', $data);
+
+        // Simpan log aktivitas
+        $this->load->model('User_log_model');
+        if (isset($this->User_log_model)) {
+            $this->User_log_model->log(
+                $user_id,
+                $user_name,
+                $user_role,
+                'REMIND_BA_BRAND',
+                'Mengirim notifikasi ke tim BA untuk brand: ' . $brand_name . ($creator_username ? ' (Creator: @' . $creator_username . ')' : '')
+            );
+        }
+
+        return $this->output->set_output(json_encode([
+            'success' => true,
+            'message' => 'Notifikasi ke tim BA untuk brand "' . $brand_name . '" berhasil dikirim!'
+        ]));
+    } catch (Exception $e) {
+        log_message('error', 'remind_ba_brand error: ' . $e->getMessage());
+        return $this->output->set_output(json_encode([
+            'success' => false,
+            'message' => 'Gagal mengirim notifikasi: ' . $e->getMessage()
         ]));
     }
 }
@@ -10014,8 +10127,16 @@ public function get_brand_creators() {
              FROM affiliate_orders o 
              WHERE o.creator_username = c.username 
                AND o.order_date_local >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-               AND o.order_status NOT IN ("CANCELLED", "REFUNDED")) as total_gmv_30d
-        ')
+               AND o.order_status NOT IN ("CANCELLED", "REFUNDED")) as total_gmv_30d,
+             (SELECT GROUP_CONCAT(DISTINCT u2.full_name SEPARATOR ", ")
+              FROM users u2
+              WHERE u2.role = "IS"
+                AND (
+                    u2.id = c.is_id
+                    OR u2.id IN (SELECT DISTINCT ul.user_id FROM user_logs ul WHERE ul.role = "IS" AND ul.action = "GENERATE_AFFILIATE_LINK" AND ul.description LIKE CONCAT("%creator @", c.username, ",%"))
+                )
+             ) as contacted_ca_names
+         ', false)
         ->from('creators c')
         ->join('users u', 'c.is_id = u.id', 'left')
         ->group_start()
@@ -10052,8 +10173,16 @@ public function get_brand_creators() {
              FROM affiliate_orders o 
              WHERE o.creator_username = c.username 
                AND o.order_date_local >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-               AND o.order_status NOT IN ("CANCELLED", "REFUNDED")) as total_gmv_30d
-        ')
+               AND o.order_status NOT IN ("CANCELLED", "REFUNDED")) as total_gmv_30d,
+             (SELECT GROUP_CONCAT(DISTINCT u2.full_name SEPARATOR ", ")
+              FROM users u2
+              WHERE u2.role = "IS"
+                AND (
+                    u2.id = c.is_id
+                    OR u2.id IN (SELECT DISTINCT ul.user_id FROM user_logs ul WHERE ul.role = "IS" AND ul.action = "GENERATE_AFFILIATE_LINK" AND ul.description LIKE CONCAT("%creator @", c.username, ",%"))
+                )
+             ) as contacted_ca_names
+         ', false)
         ->from('creators c')
         ->join('brands b', '1=1', 'inner')
         ->join('brand_creators bc', 'bc.brand_id = b.id AND bc.creator_username = c.username', 'left')
@@ -10079,11 +10208,34 @@ public function get_brand_creators() {
                          ->get()
                          ->result();
 
+    // Ambil detail brand (termasuk PIC BA / user BA yang deal)
+    $brand_detail = null;
+    if (!empty($brand_id)) {
+        $brand_detail = $this->db->select('b.id, b.name, b.shop_name, b.bd_id, u.full_name as pic_ba_full_name, u.username as pic_ba_username')
+                                 ->from('brands b')
+                                 ->join('users u', 'b.bd_id = u.id', 'left')
+                                 ->where('b.id', $brand_id)
+                                 ->get()
+                                 ->row();
+    } else if (!empty($brand_name) && $brand_name !== 'Belum ada brand') {
+        $brand_detail = $this->db->select('b.id, b.name, b.shop_name, b.bd_id, u.full_name as pic_ba_full_name, u.username as pic_ba_username')
+                                 ->from('brands b')
+                                 ->join('users u', 'b.bd_id = u.id', 'left')
+                                 ->group_start()
+                                     ->where('b.name', $brand_name)
+                                     ->or_where('b.shop_name', $brand_name)
+                                 ->group_end()
+                                 ->get()
+                                 ->row();
+    }
+
     return $this->output->set_output(json_encode([
-        'success' => true,
-        'creators' => $creators
+        'success'      => true,
+        'brand_detail' => $brand_detail,
+        'creators'     => $creators
     ]));
 }
+
 
 /**
  * AJAX — Ambil scouting list

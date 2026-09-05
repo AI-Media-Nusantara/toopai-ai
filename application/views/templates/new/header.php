@@ -22,6 +22,26 @@ if ($user_role !== 'bd' && $user_role !== 'BD' && $user_role !== 'IS'):
         *{box-sizing:border-box;margin:0;padding:0} html,body{min-height:100%} body{font-family:var(--font);color:var(--text);background:radial-gradient(circle at 18% -10%,rgba(124,60,255,.17),transparent 28%),radial-gradient(circle at 88% 8%,rgba(16,223,240,.08),transparent 24%),linear-gradient(145deg,#020711 0%,#040a17 42%,#061021 100%);overflow-x:hidden} body:before{content:"";position:fixed;inset:0;pointer-events:none;background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.02) 1px,transparent 1px);background-size:44px 44px;mask-image:radial-gradient(circle at 50% 8%,#000 0%,transparent 70%);opacity:.6}.navbar{position:sticky;top:0;z-index:1000;height:72px;background:rgba(3,9,20,.76);border-bottom:1px solid rgba(112,136,185,.16);backdrop-filter:blur(18px);padding:0 28px}.nav-container{height:100%;max-width:1920px;margin:auto;display:flex;align-items:center;justify-content:space-between;gap:20px}.logo{display:flex;align-items:center;gap:12px}
              .logo-img{height:150px;width:auto;display:block}.brand-text{font-size:24px;font-weight:900;letter-spacing:-.04em}.user-menu{display:flex;align-items:center;gap:12px}.user-name{height:42px;display:flex;align-items:center;gap:9px;padding:0 14px;color:var(--muted-2);border:1px solid var(--stroke);border-radius:999px;background:rgba(8,18,34,.65);font-size:13px;font-weight:700}.user-name i{color:var(--purple-2)}.user-actions{display:flex;align-items:center;gap:10px}.btn-icon,.logout-btn{width:42px;height:42px;display:inline-grid;place-items:center;border-radius:999px;border:1px solid var(--stroke);background:rgba(8,18,34,.65);color:#fff;text-decoration:none;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.04);transition:.2s}.logout-btn{width:auto;padding:0 16px;display:inline-flex;gap:8px}.btn-icon:hover,.logout-btn:hover{border-color:rgba(168,126,255,.45);box-shadow:var(--glow-purple);transform:translateY(-1px)}.container{max-width:1920px;margin:0 auto;padding:0}.fade-in{animation:fadeIn .3s ease}@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}.modal{display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.74);backdrop-filter:blur(10px);align-items:center;justify-content:center;padding:20px}.modal.show{display:flex}.modal-content{width:92%;max-width:520px;max-height:86vh;overflow:auto;border-radius:24px;border:1px solid var(--stroke);background:linear-gradient(160deg,rgba(19,33,59,.96),rgba(6,14,27,.96));box-shadow:var(--shadow)}.modal-header{display:flex;align-items:center;justify-content:space-between;padding:20px 22px;border-bottom:1px solid rgba(112,136,185,.14)}.modal-header h3{font-size:18px}.close{font-size:28px;color:var(--muted);cursor:pointer}.close:hover{color:#fff}.modal-body{padding:22px}.form-group{margin-bottom:16px}.form-group label{display:block;color:var(--muted-2);font-size:12px;font-weight:700;margin-bottom:7px}.form-control{width:100%;height:46px;border-radius:14px;border:1px solid var(--stroke);background:rgba(8,18,34,.72);color:#fff;padding:0 14px}.form-control:focus{outline:none;border-color:var(--purple);box-shadow:0 0 18px rgba(124,60,255,.18)}.flex-buttons{display:flex;gap:10px;margin-top:20px}.btn-primary,.btn-secondary{height:44px;padding:0 18px;border-radius:999px;font-weight:800;cursor:pointer}.btn-primary{border:0;background:linear-gradient(135deg,#5a25d8,#7f34ff);color:#fff}.btn-secondary{border:1px solid var(--stroke);background:rgba(8,18,34,.72);color:#fff}.log-item{padding:12px;border-bottom:1px solid rgba(112,136,185,.12)}.log-time{font-size:11px;color:var(--muted)}.log-action{margin-top:4px;color:var(--purple-2);font-weight:800}.log-description{margin-top:4px;color:var(--muted-2);font-size:12px}.loading,.empty-state{padding:28px;text-align:center;color:var(--muted)}@media(max-width:768px){.navbar{height:62px;padding:0 14px}.logo-img{height:150px}.brand-text{font-size:20px}.user-name span,.logout-btn span{display:none}.user-name{width:40px;padding:0;justify-content:center}.btn-icon,.logout-btn{width:40px;height:40px}.container{padding:0}}
 .user-dropdown{position:relative;display:inline-block}.user-name{height:42px;display:flex;align-items:center;gap:9px;padding:0 14px;color:var(--muted-2);border:1px solid var(--stroke);border-radius:999px;background:rgba(8,18,34,.65);font-size:13px;font-weight:700;cursor:pointer;transition:.2s}.user-name:hover{border-color:rgba(168,126,255,.45);color:#fff}.dropdown-menu{display:none;position:absolute;right:0;top:100%;margin-top:8px;min-width:180px;background:var(--panel-strong);border:1px solid var(--stroke);border-radius:var(--radius-sm);box-shadow:var(--shadow);z-index:1010;overflow:hidden}.dropdown-menu.show{display:block}.dropdown-item{display:flex;align-items:center;gap:10px;padding:12px 16px;color:var(--muted-2);text-decoration:none;font-size:13px;font-weight:600;transition:.2s}.dropdown-item:hover{background:rgba(124,60,255,.15);color:#fff}.dropdown-item i{color:var(--purple-2)}
+
+/* BA Notification Styling */
+.ba-notification-wrapper{position:relative;display:inline-block}
+.ba-notification-badge{position:absolute;top:-4px;right:-4px;background:linear-gradient(135deg,#ff4f65,#ef4444);color:#fff;font-size:10px;font-weight:800;min-width:18px;height:18px;border-radius:999px;display:flex;align-items:center;justify-content:center;padding:0 4px;box-shadow:0 0 10px rgba(239,68,68,.6);border:2px solid #061021;line-height:1}
+.ba-notification-dropdown{display:none;position:absolute;right:0;top:100%;margin-top:10px;width:360px;max-width:90vw;background:rgba(13,24,45,.96);backdrop-filter:blur(16px);border:1px solid rgba(112,136,185,.25);border-radius:16px;box-shadow:0 20px 50px rgba(0,0,0,.6);z-index:2000;overflow:hidden}
+.ba-notification-dropdown.show{display:block;animation:fadeIn .2s ease}
+.ba-notification-header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid rgba(112,136,185,.15);background:rgba(8,18,34,.6)}
+.ba-notification-header h4{font-size:13px;font-weight:700;color:#f7fbff;display:flex;align-items:center;gap:8px;margin:0}
+.ba-notification-header h4 i{color:#c02cff}
+.ba-mark-all-btn{font-size:11px;color:#10dff0;background:transparent;border:none;cursor:pointer;font-weight:600}
+.ba-mark-all-btn:hover{text-decoration:underline}
+.ba-notification-body{max-height:380px;overflow-y:auto;padding:10px}
+.ba-notification-item{padding:12px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid rgba(112,136,185,.1);margin-bottom:8px;transition:all .2s ease;cursor:pointer}
+.ba-notification-item:hover{background:rgba(124,60,255,.1);border-color:rgba(156,107,255,.3)}
+.ba-notification-item.unread{background:rgba(124,60,255,.15);border-left:3px solid #7c3cff}
+.ba-notification-item-title{font-size:13px;font-weight:700;color:#fff;display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+.ba-notification-item-sub{font-size:12px;color:#b7c1d6;margin-bottom:6px;line-height:1.4}
+.ba-notification-item-meta{font-size:10px;color:#8e9bb6;display:flex;align-items:center;justify-content:space-between}
+.ba-notification-empty{padding:30px 16px;text-align:center;color:#8e9bb6;font-size:13px}
+.ba-notification-empty i{font-size:32px;color:rgba(142,155,182,.3);margin-bottom:10px;display:block}
     </style>
 </head>
 <body data-role="<?= $this->session->userdata('role') ?? 'guest' ?>" 
@@ -41,10 +61,34 @@ if ($user_role !== 'bd' && $user_role !== 'BD' && $user_role !== 'IS'):
                 </div>
             </div>
             <div class="user-actions">
+                <?php 
+                $nav_user_role = strtolower($this->session->userdata('role') ?? '');
+                if (in_array($nav_user_role, ['bd', 'admin'])): 
+                ?>
+                <div class="ba-notification-wrapper">
+                    <button onclick="toggleBaNotificationDropdown(event)" class="btn-icon" title="Notifikasi Remind BA" style="position:relative;">
+                        <i class="fas fa-bell"></i>
+                        <span id="baNotificationBadge" class="ba-notification-badge" style="display:none;">0</span>
+                    </button>
+                    <div id="baNotificationDropdownMenu" class="ba-notification-dropdown">
+                        <div class="ba-notification-header">
+                            <h4><i class="fas fa-bell"></i> Notifikasi Remind BA</h4>
+                            <button onclick="markBaReminderRead('all', event)" class="ba-mark-all-btn">Tandai semua dibaca</button>
+                        </div>
+                        <div id="baNotificationList" class="ba-notification-body">
+                            <div class="ba-notification-empty">
+                                <i class="fas fa-bell-slash"></i>
+                                <p>Memuat notifikasi...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>
                 <button onclick="showChangePasswordModal()" class="btn-icon" title="Ganti Password"><i class="fas fa-key"></i></button>
                 <button onclick="showAddUserModal()" class="btn-icon" title="Tambah User"><i class="fas fa-user-plus"></i></button>
                 <button onclick="showActivityLogModal()" class="btn-icon" title="Log Aktivitas"><i class="fas fa-history"></i></button>
             </div>
+
             <a href="<?= base_url('auth/logout') ?>" class="logout-btn"><i class="fas fa-sign-out-alt"></i><span>Logout</span></a>
         </div>
     </div>
@@ -57,10 +101,121 @@ if ($user_role !== 'bd' && $user_role !== 'BD' && $user_role !== 'IS'):
 <script>
 function toggleUserDropdown(e) {
     e.stopPropagation();
-    document.getElementById('userDropdownMenu').classList.toggle('show');
-}
-document.addEventListener('click', function() {
     var menu = document.getElementById('userDropdownMenu');
-    if (menu) menu.classList.remove('show');
+    if (menu) menu.classList.toggle('show');
+    var baMenu = document.getElementById('baNotificationDropdownMenu');
+    if (baMenu) baMenu.classList.remove('show');
+}
+
+function toggleBaNotificationDropdown(e) {
+    e.stopPropagation();
+    var menu = document.getElementById('baNotificationDropdownMenu');
+    if (!menu) return;
+    var userMenu = document.getElementById('userDropdownMenu');
+    if (userMenu) userMenu.classList.remove('show');
+
+    var isShow = menu.classList.contains('show');
+    if (!isShow) {
+        menu.classList.add('show');
+        fetchBaReminders();
+    } else {
+        menu.classList.remove('show');
+    }
+}
+
+function fetchBaReminders() {
+    fetch('<?= base_url("bd/get_ba_reminders") ?>')
+        .then(res => res.json())
+        .then(data => {
+            if (!data.success) return;
+            
+            var badge = document.getElementById('baNotificationBadge');
+            if (badge) {
+                if (data.unread_count > 0) {
+                    badge.innerText = data.unread_count > 99 ? '99+' : data.unread_count;
+                    badge.style.display = 'flex';
+                } else {
+                    badge.style.display = 'none';
+                }
+            }
+
+            var list = document.getElementById('baNotificationList');
+            if (!list) return;
+
+            if (!data.reminders || data.reminders.length === 0) {
+                list.innerHTML = `
+                    <div class="ba-notification-empty">
+                        <i class="fas fa-bell-slash"></i>
+                        <p>Belum ada notifikasi dari Tim CA</p>
+                    </div>
+                `;
+                return;
+            }
+
+            var html = '';
+            data.reminders.forEach(item => {
+                var isUnread = item.status === 'PENDING';
+                html += `
+                    <div class="ba-notification-item ${isUnread ? 'unread' : ''}" onclick="markBaReminderRead(${item.id}, event)">
+                        <div class="ba-notification-item-title">
+                            <span><i class="fas fa-tag" style="color:#10dff0; margin-right:4px;"></i> ${escapeHtmlNav(item.brand_name)}</span>
+                            ${isUnread ? '<span style="background:#7c3cff; color:#fff; font-size:9px; font-weight:800; padding:2px 6px; border-radius:999px;">BARU</span>' : ''}
+                        </div>
+                        <div class="ba-notification-item-sub">
+                            ${escapeHtmlNav(item.notes || ('Permintaan remind untuk brand ' + item.brand_name))}
+                        </div>
+                        <div class="ba-notification-item-meta">
+                            <span><i class="fas fa-user" style="font-size:9px; margin-right:3px;"></i> CA: ${escapeHtmlNav(item.sender_name || 'Tim CA')}</span>
+                            <span>${escapeHtmlNav(item.created_at || '')}</span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            list.innerHTML = html;
+        })
+        .catch(err => console.error("Error fetching BA reminders:", err));
+}
+
+function markBaReminderRead(id, e) {
+    if (e) e.stopPropagation();
+    var formData = new FormData();
+    formData.append('id', id);
+
+    fetch('<?= base_url("bd/mark_ba_reminder_read") ?>', {
+        method: 'POST',
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            fetchBaReminders();
+        }
+    })
+    .catch(err => console.error("Error marking reminder read:", err));
+}
+
+function escapeHtmlNav(text) {
+    if (!text) return '';
+    return text.toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+}
+
+document.addEventListener('click', function(e) {
+    var userMenu = document.getElementById('userDropdownMenu');
+    if (userMenu) userMenu.classList.remove('show');
+    var baMenu = document.getElementById('baNotificationDropdownMenu');
+    if (baMenu && !baMenu.contains(e.target)) {
+        baMenu.classList.remove('show');
+    }
 });
+
+document.addEventListener('DOMContentLoaded', function() {
+    var userRole = '<?= strtolower($this->session->userdata("role") ?? "") ?>';
+    if (['bd', 'admin'].includes(userRole)) {
+        fetchBaReminders();
+        setInterval(fetchBaReminders, 30000);
+    }
+});
+
 </script>
+
