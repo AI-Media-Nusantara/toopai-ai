@@ -2937,11 +2937,18 @@ public function get_pending_products_with_recommendations() {
         }
         
         // Ambil brand name dan category dari database
-        if ($brand_id && !$brand_name) {
+        // PENTING: Selalu prioritaskan brand_id (bukan brand_name) karena:
+        // - Jika 2 BA menginput brand yang sama, WHERE name=brand_name bisa mengembalikan
+        //   entry milik BA lain (original), bukan entry duplikat milik current user.
+        // - Ini adalah root cause bug di mana status/owner dari entry yang salah dibaca
+        //   sehingga has_duplicates/needs_claim_resolution dihitung keliru.
+        if ($brand_id) {
+            // Selalu gunakan brand_id jika tersedia (original ATAU duplikat milik current user)
             $brand = $this->db->select('name, category, status, owner_id, is_duplicate, duplicate_of')->where('id', $brand_id)->get('brands')->row();
-            $brand_name = $brand->name ?? '';
+            $brand_name = $brand->name ?? $brand_name;
             $brand_category = $brand->category ?? '';
         } else {
+            // Fallback ke brand_name hanya jika brand_id tidak tersedia
             $brand = $this->db->select('category, status, owner_id, is_duplicate, duplicate_of')->where('name', $brand_name)->get('brands')->row();
             $brand_category = $brand->category ?? '';
         }
@@ -3093,15 +3100,34 @@ public function get_pending_products_with_recommendations() {
         $user_id = $this->session->userdata('user_id');
         $can_claim = false;
 
-        // can_claim aktif jika:
+        // === CEK STATUS CLAIM AKTUAL ===
+        // is_owner: current user adalah owner brand ini
+        $is_owner = (isset($brand) && !empty($brand->owner_id) && (int)$brand->owner_id === (int)$user_id);
+        // is_claimed_by_other: brand sudah punya owner tapi bukan current user
+        $is_claimed_by_other = (isset($brand) && !empty($brand->owner_id) && (int)$brand->owner_id !== (int)$user_id);
+
+        // Ambil nama owner jika brand sudah di-claim oleh user lain
+        $owner_name = null;
+        if ($is_claimed_by_other) {
+            $owner_user = $this->db->select('full_name, username')
+                ->where('id', $brand->owner_id)
+                ->get('users')
+                ->row();
+            $owner_name = $owner_user ? ($owner_user->full_name . ' (@' . $owner_user->username . ')') : 'BA lain';
+        }
+
+        // needs_claim_resolution aktif jika:
         // (a) status NEED_CLAIM, ATAU
-        // (b) status CAMPAIGN_READY tapi ada duplikat dan owner belum di-set
+        // (b) status CAMPAIGN_READY tapi ada duplikat dan owner belum di-set, ATAU
+        // (c) brand sudah ter-claim tapi bukan oleh current user
+        //     (kondisi (c) adalah ROOT CAUSE bug yang diperbaiki)
         $needs_claim_resolution = (
             (isset($brand) && $brand->status == 'NEED_CLAIM') ||
-            (isset($brand) && $has_duplicates && empty($brand->owner_id))
+            (isset($brand) && $has_duplicates && empty($brand->owner_id)) ||
+            $is_claimed_by_other
         );
 
-        if ($needs_claim_resolution) {
+        if ($needs_claim_resolution && !$is_claimed_by_other) {
             $original_id = isset($original_id) ? $original_id : ($brand_id ?: (isset($brand) ? $brand->id : null));
             if ($original_id) {
                 $contacted = $this->db->where('bd_id', $user_id)
@@ -3115,20 +3141,23 @@ public function get_pending_products_with_recommendations() {
         }
 
         return $this->output->set_output(json_encode([
-            'success' => true,
-            'brand_status' => (isset($brand) && isset($brand->status)) ? $brand->status : '',
-            'owner_id' => (isset($brand) && isset($brand->owner_id)) ? $brand->owner_id : null,
-            'can_claim' => $can_claim,
-            'has_duplicates' => $has_duplicates,
-            'needs_claim_resolution' => $needs_claim_resolution,
-            'contacted_bas' => $contacted_bas,
-            'brand_name' => $brand_name,
-            'brand_category' => $brand_category,
-            'pending_products' => $formatted_products,
-            'recommendations' => $recommendations,
+            'success'                 => true,
+            'brand_status'            => (isset($brand) && isset($brand->status)) ? $brand->status : '',
+            'owner_id'                => (isset($brand) && isset($brand->owner_id)) ? $brand->owner_id : null,
+            'is_owner'                => $is_owner,
+            'is_claimed_by_other'     => $is_claimed_by_other,
+            'owner_name'              => $owner_name,
+            'can_claim'               => $can_claim,
+            'has_duplicates'          => $has_duplicates,
+            'needs_claim_resolution'  => $needs_claim_resolution,
+            'contacted_bas'           => $contacted_bas,
+            'brand_name'              => $brand_name,
+            'brand_category'          => $brand_category,
+            'pending_products'        => $formatted_products,
+            'recommendations'         => $recommendations,
             'default_affiliate_commission' => $default_commission,
-            'has_approved' => $has_approved,
-            'total_pending' => count($formatted_products)
+            'has_approved'            => $has_approved,
+            'total_pending'           => count($formatted_products)
         ]));
         
     } catch (Exception $e) {
@@ -7177,9 +7206,18 @@ public function get_active_brands_list() {
 
     /**
      * CLAIM BRAND FEATURE
+     *
+     * Memeriksa kepemilikan brand saat user BA membuka Step 3.
+     * Menentukan apakah brand perlu auto-assign (1 BD), NEED_CLAIM (>1 BD), atau sudah claimed.
+     *
+     * PENTING: Deteksi "lebih dari 1 BD" dilakukan melalui DUA mekanisme:
+     *   1. Link database: duplicate_of / is_duplicate (primary)
+     *   2. Nama brand yang sama (fallback) — menangani kasus di mana entry duplikat
+     *      belum terhubung via duplicate_of karena masing-masing baru masuk Step 3
+     *      secara tidak bersamaan.
      */
     private function _check_brand_ownership($brand_id) {
-        $brand = $this->db->select('id, name, is_duplicate, duplicate_of, owner_id, status')->where('id', $brand_id)->get('brands')->row();
+        $brand = $this->db->select('id, name, is_duplicate, duplicate_of, owner_id, status, bd_id')->where('id', $brand_id)->get('brands')->row();
         if (!$brand) return;
 
         if ($brand->owner_id) return; // Already claimed
@@ -7194,7 +7232,7 @@ public function get_active_brands_list() {
             $this->db->where('id', $brand_id)->update('brands', ['is_duplicate' => 1]);
         }
 
-        // Ambil semua unique bd_id yang pernah input brand ini (original + semua duplikat)
+        // ===== STEP 1: Deteksi via link duplicate_of (primary) =====
         $bds = $this->db->select('DISTINCT(bd_id) as bd_id')
                          ->group_start()
                              ->where('id', $original_id)
@@ -7206,6 +7244,75 @@ public function get_active_brands_list() {
         foreach ($bds as $b) {
             if ($b->bd_id && !in_array($b->bd_id, $unique_bds)) {
                 $unique_bds[] = $b->bd_id;
+            }
+        }
+
+        // ===== STEP 2: Fallback — deteksi via nama brand yang sama =====
+        // Diperlukan ketika entry duplikat belum ter-link via duplicate_of karena:
+        //   - User A masih di Step 1/2 (belum pernah masuk Step 3)
+        //   - User B baru saja pertama kali masuk Step 3
+        //   - duplicate_of sudah di-set saat input, TAPI query di Step 1 tidak menemukan
+        //     entry User A jika entry itu belum CAMPAIGN_READY
+        //
+        // Solusi: cari semua entry dengan nama brand yang sama dari BD BERBEDA,
+        // lalu gabungkan dengan unique_bds yang sudah ditemukan via link.
+        $brand_name_for_check = $brand->name;
+        // Gunakan satu argumen where() untuk kondisi IS NOT NULL (raw SQL, aman di CI3)
+        $bds_by_name_qr = $this->db->select('DISTINCT bd_id as bd_id, id')
+            ->where('name', $brand_name_for_check)
+            ->where('bd_id IS NOT NULL')
+            ->get('brands');
+        $bds_by_name = ($bds_by_name_qr !== false) ? $bds_by_name_qr->result() : [];
+
+        $all_brand_ids_by_name = []; // semua brand_id dengan nama yang sama (untuk linking)
+        foreach ($bds_by_name as $b) {
+            if ($b->bd_id && !in_array($b->bd_id, $unique_bds)) {
+                $unique_bds[] = $b->bd_id;
+            }
+            $all_brand_ids_by_name[] = $b->id;
+        }
+
+
+        // Jika deteksi via nama menemukan BD baru yang belum ter-link,
+        // pastikan entry-entry tersebut memiliki duplicate_of yang benar
+        // agar link konsisten untuk cek berikutnya
+        if (count($unique_bds) > 1) {
+            // Tentukan entry "original" yang paling lama (ID terkecil, is_duplicate=0)
+            $true_original = $this->db->select('id')
+                ->where('name', $brand_name_for_check)
+                ->where('is_duplicate', 0)
+                ->order_by('id', 'ASC')
+                ->limit(1)
+                ->get('brands')
+                ->row();
+
+            if (!$true_original) {
+                // Semua entry adalah duplikat — ambil yang id-nya paling kecil
+                $true_original = $this->db->select('id')
+                    ->where('name', $brand_name_for_check)
+                    ->order_by('id', 'ASC')
+                    ->limit(1)
+                    ->get('brands')
+                    ->row();
+            }
+
+            if ($true_original) {
+                $true_original_id = $true_original->id;
+                // Update original_id ke root yang sebenarnya
+                $original_id = $true_original_id;
+
+                // Pastikan semua entry selain original memiliki duplicate_of yang benar
+                foreach ($all_brand_ids_by_name as $bid) {
+                    if ($bid != $true_original_id) {
+                        $entry = $this->db->select('is_duplicate, duplicate_of')->where('id', $bid)->get('brands')->row();
+                        if ($entry && (empty($entry->duplicate_of) || !$entry->is_duplicate)) {
+                            $this->db->where('id', $bid)->update('brands', [
+                                'is_duplicate' => 1,
+                                'duplicate_of' => $true_original_id
+                            ]);
+                        }
+                    }
+                }
             }
         }
 
@@ -7230,6 +7337,7 @@ public function get_active_brands_list() {
 
         return null;
     }
+
 
     public function claim_brand() {
         $this->output->set_content_type('application/json');
@@ -7266,8 +7374,29 @@ public function get_active_brands_list() {
             return $this->output->set_output(json_encode(['success' => false, 'message' => 'Anda tidak memiliki riwayat kontak dengan Brand ini sehingga tidak berhak melakukan claim.']));
         }
         
-        // Lock Ownership — set owner_id ke semua entry (original + semua duplikat)
+        // Lock Ownership — Atomic check + set owner_id ke semua entry (original + semua duplikat)
         $this->db->trans_start();
+
+        // ===== ATOMIC RE-CHECK: baca ulang di dalam transaksi untuk cegah race condition =====
+        // Jika 2 user menekan Claim Brand bersamaan, hanya 1 yang bisa berhasil.
+        $fresh_brand = $this->db
+            ->select('owner_id, status')
+            ->where('id', $original_id)
+            ->get('brands')
+            ->row();
+
+        if ($fresh_brand && !empty($fresh_brand->owner_id) && (int)$fresh_brand->owner_id !== (int)$user_id) {
+            // User lain sudah berhasil claim lebih dulu — rollback
+            $this->db->trans_rollback();
+            // Ambil nama pemenang claim untuk pesan yang informatif
+            $winner = $this->db->select('full_name, username')->where('id', $fresh_brand->owner_id)->get('users')->row();
+            $winner_name = $winner ? ($winner->full_name . ' (@' . $winner->username . ')') : 'BA lain';
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Brand ini sudah di-claim oleh ' . $winner_name . '. Anda tidak dapat mengklaimnya lagi.'
+            ]));
+        }
+        // ===== END ATOMIC RE-CHECK =====
 
         $this->db->group_start()
                      ->where('id', $original_id)
@@ -7312,6 +7441,3 @@ public function get_active_brands_list() {
     }
 
 }
-
-
-

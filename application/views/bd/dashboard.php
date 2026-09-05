@@ -2981,19 +2981,45 @@ async function showTask3SetupModalWithRecommendations(brandId, brandName) {
         currentCampaignIdForSetup = pendingProducts[0].campaign_id;
         currentCampaignNameForSetup = pendingProducts[0].campaign_name || 'Campaign';
     }
-      // 🔥 CLAIM BRAND UI
+    // 🔥 CLAIM BRAND UI — 3-STATE RENDERING
+    // Menggunakan is_owner dan is_claimed_by_other sebagai sumber kebenaran (dari server, real-time)
+    // BUKAN hanya needs_claim_resolution yang bisa tidak konsisten di kasus race condition.
     let claimHtml = '';
     let disableApproval = false;
 
-    // Trigger claim UI jika:
-    // (a) status NEED_CLAIM, ATAU
-    // (b) backend melaporkan needs_claim_resolution (ada duplikat tapi owner belum di-set)
+    // ---- Ambil field dari response backend ----
+    const isOwner          = result.is_owner === true;          // Current user adalah owner brand
+    const isClaimedByOther = result.is_claimed_by_other === true; // Brand sudah di-claim user lain
+    const ownerName        = result.owner_name || 'BA lain';   // Nama owner yang berhasil claim
     const needsClaimResolution = result.needs_claim_resolution === true ||
                                   result.brand_status === 'NEED_CLAIM';
 
-    if (needsClaimResolution) {
+    // ---- STATE B: Brand sudah di-claim oleh user lain ----
+    // Ditampilkan terlebih dahulu karena ini adalah kondisi yang sebelumnya menyebabkan bug:
+    // (User B melihat Requirements Form padahal owner_id = User A)
+    if (isClaimedByOther) {
+        claimHtml = `
+            <div style="background:rgba(239,68,68,0.1); border-radius:12px; padding:16px; margin-bottom:16px; border:1px solid #ef4444;">
+                <div style="color:#ef4444; font-size:14px; font-weight:bold; margin-bottom:6px;">
+                    <i class="fas fa-lock"></i> Brand Ini Sudah Di-Claim
+                </div>
+                <div style="color:#9aaebe; font-size:12px; margin-bottom:8px;">
+                    Brand ini telah berhasil di-claim oleh BA lain. Anda tidak dapat mengisi Requirements untuk brand ini.
+                </div>
+                <div style="background:rgba(239,68,68,0.15); border-radius:8px; padding:10px 14px; display:inline-block;">
+                    <span style="font-size:11px; color:#9aaebe;">Owner saat ini:</span>
+                    <span style="font-size:13px; color:#ef4444; font-weight:bold; margin-left:6px;">
+                        <i class="fas fa-user-check"></i> ${escapeHtml(ownerName)}
+                    </span>
+                </div>
+            </div>
+        `;
+        disableApproval = true;
+
+    // ---- STATE A: Brand belum di-claim / perlu resolusi claim ----
+    } else if (needsClaimResolution) {
         if (result.can_claim) {
-            // BA yang pernah kontak, tapi belum claim
+            // BA yang pernah kontak brand ini — tampilkan tombol Claim Brand
             claimHtml = `
                 <div style="background:rgba(239,68,68,0.1); border-radius:12px; padding:16px; margin-bottom:16px; border:1px solid #ef4444; display:flex; justify-content:space-between; align-items:center;">
                     <div>
@@ -3035,7 +3061,7 @@ async function showTask3SetupModalWithRecommendations(brandId, brandName) {
             `;
             disableApproval = true;
         } else {
-            // BA lain yang tidak punya riwayat kontak — hanya lihat info
+            // BA tanpa riwayat kontak — hanya lihat info
             claimHtml = `
                 <div style="background:rgba(239,68,68,0.07); border-radius:12px; padding:16px; margin-bottom:16px; border:1px solid #ef4444;">
                     <div style="color:#ef4444; font-size:14px; font-weight:bold; margin-bottom:4px;">
@@ -3049,6 +3075,9 @@ async function showTask3SetupModalWithRecommendations(brandId, brandName) {
             disableApproval = true;
         }
     }
+    // ---- STATE C: isOwner == true dan tidak needsClaimResolution ----
+    // → claimHtml tetap '' dan disableApproval tetap false
+    // → Requirements Form akan ditampilkan seperti biasa (lihat bagian selanjutnya)
     
     // 🔥 BUILD CAMPAIGN INFO HTML
     let campaignInfoHtml = '';
