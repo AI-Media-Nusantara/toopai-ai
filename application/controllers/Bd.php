@@ -54,14 +54,10 @@ public function dashboard() {
     // Task 3: SETUP CAMPAIGN (status CAMPAIGN_READY + NEED_CLAIM + ACTIVE dengan produk pending)
     $this->db->where_in('status', ['CAMPAIGN_READY', 'NEED_CLAIM']);
     if (!$is_supervisor) {
-        // Hitung brand milik BD ini (termasuk is_duplicate=1) + NEED_CLAIM yang pernah dihubungi
+        $this->db->where('bd_id', $user_id);
         $this->db->group_start()
-            ->where('bd_id', $user_id)
-            ->or_group_start()
-                ->where('is_duplicate', 0)
-                ->where('status', 'NEED_CLAIM')
-                ->where("id IN (SELECT DISTINCT(duplicate_of) FROM brands WHERE bd_id = $user_id AND is_duplicate = 1)", NULL, FALSE)
-            ->group_end()
+            ->where('owner_id IS NULL', NULL, FALSE)
+            ->or_where('owner_id', $user_id)
         ->group_end();
     }
     $total_setup = $this->db->count_all_results('brands');
@@ -126,10 +122,12 @@ public function dashboard() {
     
     // ========== 🔥 AUTO-UPDATE: FOLLOW_UP -> CAMPAIGN_READY ==========
     // Brand yang sudah konfirmasi deal (deal_confirmed_at terisi) otomatis pindah ke Step 3
-    // Pengecekan produk TIDAK dilakukan di sini karena produk baru disubmit saat Step 3
+    // Hanya entry ORIGINAL (is_duplicate=0) yang boleh dipromosikan ke CAMPAIGN_READY.
+    // Entry duplikat (is_duplicate=1) tetap di FOLLOW_UP — mereka tidak ditampilkan di Step 3.
     $updated_brands = $this->db
         ->where('status', 'FOLLOW_UP')
         ->where('deal_confirmed_at IS NOT NULL')
+        ->where('is_duplicate', 0)
         ->update('brands', [
             'status'       => 'CAMPAIGN_READY',
             'current_task' => 3,
@@ -323,37 +321,29 @@ public function dashboard() {
     }
     
     // ========== 🔥 TASK 3: SETUP CAMPAIGN ==========
-    // Ambil brand CAMPAIGN_READY
+    // Tampilkan brand berdasarkan bd_id — setiap user hanya melihat brand miliknya sendiri
     if ($is_supervisor) {
-        // Supervisor: tampilkan hanya entry original (is_duplicate=0)
-        // Ini memastikan brand yang sama dari BD berbeda hanya muncul 1 kali
+        // Supervisor: tampilkan semua entry original (is_duplicate=0) dari semua BD
         $setup_items_campaign_ready = $this->db->select('b.*, u.username as bd_username, u.full_name as bd_name, b.input_by, b.input_by_name')
             ->from('brands b')
             ->join('users u', 'b.bd_id = u.id', 'left')
             ->where('b.is_duplicate', 0)
-            ->where('b.duplicate_of IS NULL', NULL, FALSE)
             ->where_in('b.status', ['CAMPAIGN_READY', 'NEED_CLAIM'])
             ->order_by('b.updated_at', 'DESC')
             ->limit(1000)
             ->get()
             ->result();
     } else {
-        // Ambil brand milik BD sendiri (is_duplicate 0 atau 1),
-        // ATAU brand NEED_CLAIM (is_duplicate=0) yang pernah dihubungi user via entry duplikatnya
+        // Non-supervisor: filter ketat berdasarkan bd_id milik user ini saja, dan hanya brand yang belum di-claim atau di-claim oleh user ini
         $setup_items_campaign_ready = $this->db->select('b.*, u.username as bd_username, u.full_name as bd_name, b.input_by, b.input_by_name')
             ->from('brands b')
             ->join('users u', 'b.bd_id = u.id', 'left')
-            ->group_start()
-                // Brand yang langsung milik BD ini (terlepas is_duplicate)
-                ->where('b.bd_id', $user_id)
-                ->or_group_start()
-                    // Brand NEED_CLAIM milik BD lain, tapi BD ini pernah input sebagai duplikat
-                    ->where('b.is_duplicate', 0)
-                    ->where('b.status', 'NEED_CLAIM')
-                    ->where("b.id IN (SELECT DISTINCT(duplicate_of) FROM brands WHERE bd_id = $user_id AND is_duplicate = 1)", NULL, FALSE)
-                ->group_end()
-            ->group_end()
+            ->where('b.bd_id', $user_id)
             ->where_in('b.status', ['CAMPAIGN_READY', 'NEED_CLAIM'])
+            ->group_start()
+                ->where('b.owner_id IS NULL', NULL, FALSE)
+                ->or_where('b.owner_id', $user_id)
+            ->group_end()
             ->order_by('b.updated_at', 'DESC')
             ->limit(1000)
             ->get()
@@ -3990,16 +3980,13 @@ public function search_setup_brands() {
 
         if ($is_supervisor) {
             // Supervisor: hanya tampilkan entry original, cegah double
-            $this->db->where('b.is_duplicate', 0)
-                     ->where('b.duplicate_of IS NULL', NULL, FALSE);
+            $this->db->where('b.is_duplicate', 0);
         } else {
+            // Non-supervisor: tampilkan hanya brand milik user ini (berdasarkan bd_id) dan yang belum di-claim / di-claim oleh user ini
+            $this->db->where('b.bd_id', $user_id);
             $this->db->group_start()
-                ->where('b.bd_id', $user_id)
-                ->or_group_start()
-                    ->where('b.is_duplicate', 0)
-                    ->where('b.status', 'NEED_CLAIM')
-                    ->where("b.id IN (SELECT DISTINCT(duplicate_of) FROM brands WHERE bd_id = $user_id AND is_duplicate = 1)", NULL, FALSE)
-                ->group_end()
+                ->where('b.owner_id IS NULL', NULL, FALSE)
+                ->or_where('b.owner_id', $user_id)
             ->group_end();
         }
         
@@ -7398,17 +7385,27 @@ public function get_active_brands_list() {
         }
         // ===== END ATOMIC RE-CHECK =====
 
+        // Ambil nama brand original agar semua entry yang bernama sama ikut ter-update owner_id
+        $orig_brand = $this->db->select('name')->where('id', $original_id)->get('brands')->row();
+        $brand_name = $orig_brand ? trim($orig_brand->name) : '';
+
         $this->db->group_start()
                      ->where('id', $original_id)
-                     ->or_where('duplicate_of', $original_id)
-                 ->group_end()
+                     ->or_where('duplicate_of', $original_id);
+        if (!empty($brand_name)) {
+            $this->db->or_where('LOWER(name)', strtolower($brand_name));
+        }
+        $this->db->group_end()
                  ->update('brands', ['owner_id' => $user_id]);
 
         // Set SEMUA entry brand yang NEED_CLAIM kembali ke CAMPAIGN_READY
         $this->db->group_start()
                      ->where('id', $original_id)
-                     ->or_where('duplicate_of', $original_id)
-                 ->group_end()
+                     ->or_where('duplicate_of', $original_id);
+        if (!empty($brand_name)) {
+            $this->db->or_where('LOWER(name)', strtolower($brand_name));
+        }
+        $this->db->group_end()
                  ->where('status', 'NEED_CLAIM')
                  ->update('brands', [
                      'status'       => 'CAMPAIGN_READY',
