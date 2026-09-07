@@ -1628,10 +1628,7 @@ public function get_creator_task1_detail() {
         }
         
         // ============================================================
-        // 8.5 TANDAI is_partner — brand yang sudah bekerja sama
-        // (ada di tabel brands dengan status ACTIVE)
-        // Matching via: brand_id sudah terisi, ATAU shop_name/brand_name
-        // cocok dengan brands.shop_name atau brands.name
+        // 8.5 TANDAI is_partner & is_in_toopai — status brand di sistem Toopai
         // ============================================================
         if (!empty($brands)) {
             // Kumpulkan semua nama/shop yang belum punya brand_id
@@ -1645,11 +1642,10 @@ public function get_creator_task1_detail() {
                 }
             }
 
-            // Satu query untuk ambil semua brand aktif yang namanya cocok
-            $partner_names = [];
+            // Ambil semua brand di tabel `brands` yang namanya cocok (semua status)
+            $all_toopai_brands_by_name = [];
             if (!empty($unmatched_names)) {
-                $q = $this->db->select('id, name, shop_name')
-                    ->where('status', 'ACTIVE')
+                $q = $this->db->select('id, name, shop_name, status')
                     ->group_start()
                         ->where_in('name', $unmatched_names)
                         ->or_where_in('shop_name', $unmatched_names)
@@ -1657,56 +1653,70 @@ public function get_creator_task1_detail() {
                     ->get('brands');
                 if ($q) {
                     foreach ($q->result() as $pb) {
-                        $partner_names[strtolower(trim($pb->name))]      = intval($pb->id);
-                        $partner_names[strtolower(trim($pb->shop_name))] = intval($pb->id);
+                        if (!empty($pb->name))      $all_toopai_brands_by_name[strtolower(trim($pb->name))]      = $pb;
+                        if (!empty($pb->shop_name)) $all_toopai_brands_by_name[strtolower(trim($pb->shop_name))] = $pb;
                     }
                 }
             }
 
-            // Kumpulkan semua brand_id yang sudah terisi untuk di-validasi status ACTIVE-nya
+            // Kumpulkan semua brand_id yang sudah terisi untuk di-validasi ke DB
             $existing_brand_ids = [];
             foreach ($brands as $b) {
                 if (!empty($b->brand_id)) {
                     $existing_brand_ids[] = intval($b->brand_id);
                 }
             }
-            // Ambil brand_id yang benar-benar ACTIVE dari DB
-            $active_brand_ids = [];
+            $all_toopai_brands_by_id = [];
             if (!empty($existing_brand_ids)) {
-                $qActive = $this->db->select('id')
-                    ->where('status', 'ACTIVE')
+                $qIds = $this->db->select('id, name, shop_name, status')
                     ->where_in('id', $existing_brand_ids)
                     ->get('brands');
-                if ($qActive) {
-                    foreach ($qActive->result() as $ab) {
-                        $active_brand_ids[intval($ab->id)] = true;
+                if ($qIds) {
+                    foreach ($qIds->result() as $ab) {
+                        $all_toopai_brands_by_id[intval($ab->id)] = $ab;
                     }
                 }
             }
 
             foreach ($brands as $b) {
-                if (!empty($b->brand_id) && isset($active_brand_ids[intval($b->brand_id)])) {
-                    // brand_id ada DAN statusnya ACTIVE di DB
-                    $b->is_partner = true;
+                $matched_db_brand = null;
+                if (!empty($b->brand_id) && isset($all_toopai_brands_by_id[intval($b->brand_id)])) {
+                    $matched_db_brand = $all_toopai_brands_by_id[intval($b->brand_id)];
                 } else {
                     $key_shop  = strtolower(trim($b->shop_name  ?? ''));
                     $key_brand = strtolower(trim($b->brand_name ?? ''));
-                    if (isset($partner_names[$key_shop]) || isset($partner_names[$key_brand])) {
+                    if (!empty($key_shop) && isset($all_toopai_brands_by_name[$key_shop])) {
+                        $matched_db_brand = $all_toopai_brands_by_name[$key_shop];
+                    } elseif (!empty($key_brand) && isset($all_toopai_brands_by_name[$key_brand])) {
+                        $matched_db_brand = $all_toopai_brands_by_name[$key_brand];
+                    }
+                }
+
+                if ($matched_db_brand) {
+                    $b->is_in_toopai = true;
+                    $b->brand_id     = intval($matched_db_brand->id);
+                    // Tandai partner jika status di DB brands ACTIVE atau merupakan brand utama creator
+                    if ($matched_db_brand->status === 'ACTIVE' || (!empty($creator->brand_id) && intval($creator->brand_id) === intval($matched_db_brand->id))) {
                         $b->is_partner = true;
-                        // Isi brand_id jika ketemu
-                        $b->brand_id = $partner_names[$key_shop] ?? $partner_names[$key_brand] ?? null;
                     } else {
                         $b->is_partner = false;
                     }
+                } else {
+                    $b->is_in_toopai = false;
+                    $b->is_partner   = false;
                 }
             }
 
-            // Re-sort: partner duluan, lalu prospect, masing-masing by GMV desc
-            $partners  = array_filter($brands, fn($b) => $b->is_partner);
-            $prospects = array_filter($brands, fn($b) => !$b->is_partner);
-            usort($partners,  fn($a, $b) => $b->total_gmv <=> $a->total_gmv);
-            usort($prospects, fn($a, $b) => $b->total_gmv <=> $a->total_gmv);
-            $brands = array_values(array_merge($partners, $prospects));
+            // Re-sort: partner duluan, lalu prospect (dalam sistem), lalu non-sistem, masing-masing by GMV desc
+            $partners   = array_values(array_filter($brands, fn($b) => !empty($b->is_in_toopai) && !empty($b->is_partner)));
+            $prospects  = array_values(array_filter($brands, fn($b) => !empty($b->is_in_toopai) && empty($b->is_partner)));
+            $non_system = array_values(array_filter($brands, fn($b) => empty($b->is_in_toopai)));
+
+            usort($partners,   fn($a, $b) => ($b->total_gmv ?? 0) <=> ($a->total_gmv ?? 0));
+            usort($prospects,  fn($a, $b) => ($b->total_gmv ?? 0) <=> ($a->total_gmv ?? 0));
+            usort($non_system, fn($a, $b) => ($b->total_gmv ?? 0) <=> ($a->total_gmv ?? 0));
+
+            $brands = array_values(array_merge($partners, $prospects, $non_system));
         }
 
         // ============================================================
@@ -1826,6 +1836,97 @@ public function get_creator_task1_detail() {
         }
 
         // ============================================================
+        // 8.9 FETCH GMV BREAKDOWN PER CHANNEL DARI TAP API
+        // Ambil video_gmv, live_gmv, content_gmv_distribution dari
+        // endpoint marketplace_creators jika tiktok_open_id tersedia.
+        // Silent — tidak memblokir response jika gagal.
+        // ============================================================
+        $gmv_breakdown = null;
+        $tap_open_id   = $creator->tiktok_open_id ?? null;
+
+        // Jika tiktok_open_id belum ada, coba cari dari TAP via username
+        if (empty($tap_open_id) && !empty($creator->username)) {
+            try {
+                $search_result = $this->jsm_api->search_creators_by_is($creator->username, null, 20);
+                if (!empty($search_result['success']) && !empty($search_result['data']['creators'])) {
+                    foreach ($search_result['data']['creators'] as $tc) {
+                        if (strtolower($tc['username'] ?? '') === strtolower($creator->username)) {
+                            if (!empty($tc['creator_open_id'])) {
+                                $tap_open_id = $tc['creator_open_id'];
+                                // Simpan ke DB untuk request berikutnya
+                                $this->db->where('id', $creator_id)->update('creators', [
+                                    'tiktok_open_id' => $tap_open_id,
+                                    'updated_at'     => date('Y-m-d H:i:s')
+                                ]);
+                                $creator->tiktok_open_id = $tap_open_id;
+                                break;
+                            }
+                        }
+                    }
+                }
+            } catch (Exception $e) {
+                log_message('error', '[task1_detail] gmv_breakdown search open_id error: ' . $e->getMessage());
+            }
+        }
+
+        if (!empty($tap_open_id)) {
+            try {
+                $perf = $this->jsm_api->get_marketplace_creator_performance($tap_open_id);
+
+                if (!empty($perf['success']) && !empty($perf['data'])) {
+                    $d         = $perf['data'];
+                    $total     = floatval($d['gmv'] ?? 0);
+                    $live_gmv  = floatval($d['live_gmv'] ?? 0);
+                    $video_gmv = floatval($d['video_gmv'] ?? 0);
+
+                    // content_gmv_distribution: array dari TAP API jika tersedia
+                    $raw_dist  = $d['content_gmv_distribution'] ?? [];
+
+                    if ($total > 0) {
+                        // Hitung product_card GMV sebagai sisa
+                        $product_card_gmv = max(0, $total - $live_gmv - $video_gmv);
+
+                        // Persentase
+                        $live_pct         = round(($live_gmv / $total) * 100, 2);
+                        $video_pct        = round(($video_gmv / $total) * 100, 2);
+                        $product_card_pct = round(max(0, 100 - $live_pct - $video_pct), 2);
+
+                        $gmv_breakdown = [
+                            'total_gmv'        => $total,
+                            'live_gmv'         => $live_gmv,
+                            'video_gmv'        => $video_gmv,
+                            'product_card_gmv' => $product_card_gmv,
+                            'live_pct'         => $live_pct,
+                            'video_pct'        => $video_pct,
+                            'product_card_pct' => $product_card_pct,
+                            'source'           => 'tap_api',
+                            'raw_distribution' => $raw_dist,
+                        ];
+
+                        log_message('debug', '[task1_detail] gmv_breakdown: '
+                            . "live={$live_pct}% video={$video_pct}% product_card={$product_card_pct}%"
+                            . " total={$total} open_id={$tap_open_id}");
+                    } elseif (!empty($raw_dist) && is_array($raw_dist)) {
+                        // Hanya raw_dist tersedia, tidak ada nilai absolut
+                        $gmv_breakdown = [
+                            'total_gmv'        => 0,
+                            'live_gmv'         => 0,
+                            'video_gmv'        => 0,
+                            'product_card_gmv' => 0,
+                            'live_pct'         => 0,
+                            'video_pct'        => 0,
+                            'product_card_pct' => 0,
+                            'source'           => 'tap_api_partial',
+                            'raw_distribution' => $raw_dist,
+                        ];
+                    }
+                }
+            } catch (Exception $e) {
+                log_message('error', '[task1_detail] gmv_breakdown TAP error: ' . $e->getMessage());
+            }
+        }
+
+        // ============================================================
         // 9. KIRIM RESPONSE
         // ============================================================
         $response = [
@@ -1836,11 +1937,12 @@ public function get_creator_task1_detail() {
             'whatsapp_logs'  => $whatsapp_logs,
             'multi_links'    => $multi_links,
             'total_gmv'      => $total_gmv,
-            'fastmoss_gmv'   => floatval($creator->fastmoss_gmv ?? 0),    // total GMV creator all-time dari baseInfo
-            'fastmoss_gmv_28d' => floatval($creator->fastmoss_gmv_28d ?? 0), // GMV 28 hari dari baseInfo
+            'fastmoss_gmv'   => floatval($creator->fastmoss_gmv ?? 0),
+            'fastmoss_gmv_28d' => floatval($creator->fastmoss_gmv_28d ?? 0),
             'total_products' => $total_products_count,
             'total_brands'   => count($brands),
-            'phone_source'   => $phone_source
+            'phone_source'   => $phone_source,
+            'gmv_breakdown'  => $gmv_breakdown,   // null jika tidak tersedia
         ];
         
         log_message('debug', '=== get_creator_task1_detail SUCCESS ===');

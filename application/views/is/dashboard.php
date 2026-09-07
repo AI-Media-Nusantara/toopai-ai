@@ -2217,7 +2217,7 @@
 <!-- MODAL DETAIL TASK 1 (SCOUTING) -->
 <!-- ============================================================ -->
 <div id="task1DetailModal" class="modal-overlay-dashboard" style="display:none;">
-    <div class="modal-glass-dashboard" style="max-width: 900px; width: 95%;">
+    <div class="modal-glass-dashboard" style="max-width: 1050px; width: 95%;">
         <div class="modal-header-dashboard">
             <h3 id="task1ModalTitle"><i class="fas fa-user"></i> Creator Detail</h3>
             <span class="modal-close-dashboard" onclick="closeTask1DetailModal()">&times;</span>
@@ -3823,6 +3823,25 @@ async function showTask1DetailModal(creatorId) {
                                 : `<div style="color:#10b981; font-size:16px; font-weight:700;">Rp ${formatNumber(result.total_gmv || 0)}</div>
                                    <div style="font-size:10px; color:var(--text-muted);">Total GMV Kolaborasi</div>`
                             }
+                            ${(() => {
+                                const bd = result.gmv_breakdown;
+                                if (!bd || (bd.live_pct === 0 && bd.video_pct === 0 && bd.product_card_pct === 0)) return '';
+                                const channels = [
+                                    { label: 'LIVE',          pct: bd.live_pct        || 0, color: '#10b981', dot: '🟢' },
+                                    { label: 'Video',         pct: bd.video_pct       || 0, color: '#a78bfa', dot: '🟣' },
+                                    { label: 'Product Cards', pct: bd.product_card_pct|| 0, color: '#f59e0b', dot: '🟡' },
+                                ];
+                                const rows = channels.map(ch => `
+                                    <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-top:4px;">
+                                        <span style="font-size:9px; color:var(--text-muted); white-space:nowrap;">${ch.dot} ${ch.label}</span>
+                                        <div style="flex:1; height:3px; background:rgba(255,255,255,0.07); border-radius:4px; overflow:hidden; min-width:40px;">
+                                            <div style="height:100%; width:${Math.min(100, ch.pct)}%; background:${ch.color}; border-radius:4px;"></div>
+                                        </div>
+                                        <span style="font-size:9px; font-weight:700; color:${ch.color}; white-space:nowrap;">${parseFloat(ch.pct).toFixed(1)}%</span>
+                                    </div>
+                                `).join('');
+                                return `<div style="margin-top:8px; padding-top:7px; border-top:1px solid rgba(255,255,255,0.08);">${rows}</div>`;
+                            })()}
                         </div>
                     </div>
                     <div style="display:flex; gap:12px; margin-top:8px; flex-wrap:wrap; font-size:11px; color:var(--text-secondary);">
@@ -3836,17 +3855,46 @@ async function showTask1DetailModal(creatorId) {
                 </div>
             </div>
         `;
-        
-        // BRANDS — 2 kolom: Partner (sudah kerja sama) | Prospect (belum)
+
+        // ── END GMV BREAKDOWN ──────────────────────────────────────────────
         if (brands.length > 0) {
-            const partners  = brands.filter(b => b.is_partner);
-            const prospects = brands.filter(b => !b.is_partner);
+            const partners   = brands.filter(b => b.is_in_toopai && b.is_partner);
+            const prospects  = brands.filter(b => b.is_in_toopai && !b.is_partner);
+            const nonSystem  = brands.filter(b => b.is_in_toopai === false || (!b.is_partner && b.is_in_toopai === undefined));
 
             // Helper: render satu baris brand
-            function _brandRow(b, isPartner) {
-                const accentColor = isPartner ? '#4ade80' : '#f59e0b';
-                const logoBg      = isPartner ? 'rgba(74,222,128,0.12)' : 'rgba(245,158,11,0.12)';
-                const logoIcon    = isPartner ? '#4ade80' : '#f59e0b';
+            function _brandRow(b, type) {
+                let accentColor = '#4ade80';
+                let logoBg      = 'rgba(74,222,128,0.12)';
+                let logoIcon    = '#4ade80';
+                let remindBtn   = '';
+
+                const brandName = b.brand_name || b.shop_name || b.name || '-';
+
+                if (type === 'partner') {
+                    accentColor = '#4ade80';
+                    logoBg      = 'rgba(74,222,128,0.12)';
+                    logoIcon    = '#4ade80';
+                } else if (type === 'prospect') {
+                    accentColor = '#f59e0b';
+                    logoBg      = 'rgba(245,158,11,0.12)';
+                    logoIcon    = '#f59e0b';
+                    remindBtn   = `<button onclick="remindBaForBrand('${escapeHtml(brandName)}', '${creatorId}', this)"
+                               title="Kirim notifikasi ke Tim BA untuk melakukan kerja sama dengan brand ini"
+                               style="background: rgba(245,158,11,0.15); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3); padding: 3px 8px; border-radius: 6px; cursor: pointer; font-size: 8.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; outline: none; margin-top: 4px; transition: 0.2s;">
+                           <i class="fas fa-bell"></i> Remind BA
+                       </button>`;
+                } else if (type === 'non_system') {
+                    accentColor = '#38bdf8';
+                    logoBg      = 'rgba(56,189,248,0.12)';
+                    logoIcon    = '#38bdf8';
+                    remindBtn   = `<button onclick="remindBaForBrand('${escapeHtml(brandName)}', '${creatorId}', this)"
+                               title="Kirim notifikasi ke Tim BA untuk memprospek brand ini ke dalam sistem Toopai"
+                               style="background: rgba(56,189,248,0.15); color: #38bdf8; border: 1px solid rgba(56,189,248,0.3); padding: 3px 8px; border-radius: 6px; cursor: pointer; font-size: 8.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; outline: none; margin-top: 4px; transition: 0.2s;">
+                           <i class="fas fa-bell"></i> Remind BA
+                       </button>`;
+                }
+
                 const logo = (b.shop_logo || b.img)
                     ? `<img src="${escapeHtml(b.shop_logo || b.img)}" alt=""
                              style="width:26px;height:26px;border-radius:6px;object-fit:cover;flex-shrink:0;"
@@ -3855,16 +3903,6 @@ async function showTask1DetailModal(creatorId) {
                                    display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                            <i class="fas fa-store" style="color:${logoIcon};font-size:10px;"></i>
                        </div>`;
-                const brandName = b.brand_name || b.shop_name || b.name || '-';
-
-                // Tombol Remind BA khusus untuk brand yang BELUM bekerja sama
-                const remindBtn = !isPartner
-                    ? `<button onclick="remindBaForBrand('${escapeHtml(brandName)}', '${creatorId}', this)"
-                               title="Kirim notifikasi ke Tim BA untuk melakukan kerja sama dengan brand ini"
-                               style="background: rgba(245,158,11,0.15); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3); padding: 3px 8px; border-radius: 6px; cursor: pointer; font-size: 8.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; outline: none; margin-top: 4px; transition: 0.2s;">
-                           <i class="fas fa-bell"></i> Remind BA
-                       </button>`
-                    : '';
 
                 return `
                 <div style="background:var(--bg-elevated);border-radius:9px;padding:8px 10px;
@@ -3873,7 +3911,7 @@ async function showTask1DetailModal(creatorId) {
                     ${logo}
                     <div style="flex:1;min-width:0;">
                         <div style="color:var(--text-primary);font-size:11px;font-weight:600;
-                                    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                                    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${escapeHtml(brandName)}">
                             ${escapeHtml(brandName)}
                         </div>
                         <div style="color:var(--text-muted);font-size:9px;">${b.total_products || 0} produk</div>
@@ -3901,10 +3939,10 @@ async function showTask1DetailModal(creatorId) {
                         </span>
                     </h4>
 
-                    <!-- 2-column grid -->
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start;">
+                    <!-- 3-column grid -->
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:12px;align-items:start;">
 
-                        <!-- Kolom KIRI: Partner -->
+                        <!-- Kolom 1: Partner (Sudah Bekerja Sama) -->
                         <div>
                             <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
                                 <i class="fas fa-handshake" style="color:#4ade80;font-size:10px;"></i>
@@ -3918,7 +3956,7 @@ async function showTask1DetailModal(creatorId) {
                                 </span>
                             </div>
                             ${partners.length > 0
-                                ? partners.map(b => _brandRow(b, true)).join('')
+                                ? partners.map(b => _brandRow(b, 'partner')).join('')
                                 : `<div style="text-align:center;padding:20px 8px;color:var(--text-muted);font-size:10px;
                                               border:1px dashed rgba(74,222,128,0.15);border-radius:8px;">
                                        Belum ada brand partner
@@ -3926,7 +3964,7 @@ async function showTask1DetailModal(creatorId) {
                             }
                         </div>
 
-                        <!-- Kolom KANAN: Prospect -->
+                        <!-- Kolom 2: Prospect (Belum Bekerja Sama di Toopai) -->
                         <div>
                             <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
                                 <i class="fas fa-bullseye" style="color:#f59e0b;font-size:10px;"></i>
@@ -3940,10 +3978,32 @@ async function showTask1DetailModal(creatorId) {
                                 </span>
                             </div>
                             ${prospects.length > 0
-                                ? prospects.map(b => _brandRow(b, false)).join('')
+                                ? prospects.map(b => _brandRow(b, 'prospect')).join('')
                                 : `<div style="text-align:center;padding:20px 8px;color:var(--text-muted);font-size:10px;
                                               border:1px dashed rgba(245,158,11,0.15);border-radius:8px;">
-                                       
+                                       Belum ada prospect brand
+                                   </div>`
+                            }
+                        </div>
+
+                        <!-- Kolom 3: Belum Masuk Sistem Toopai -->
+                        <div>
+                            <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+                                <i class="fas fa-building-circle-exclamation" style="color:#38bdf8;font-size:10px;"></i>
+                                <span style="font-size:10px;font-weight:700;color:#38bdf8;text-transform:uppercase;
+                                             letter-spacing:.5px;">
+                                    Belum Masuk Sistem Toopai
+                                </span>
+                                <span style="background:rgba(56,189,248,0.15);color:#38bdf8;
+                                             font-size:9px;padding:1px 6px;border-radius:8px;font-weight:600;">
+                                    ${nonSystem.length}
+                                </span>
+                            </div>
+                            ${nonSystem.length > 0
+                                ? nonSystem.map(b => _brandRow(b, 'non_system')).join('')
+                                : `<div style="text-align:center;padding:20px 8px;color:var(--text-muted);font-size:10px;
+                                              border:1px dashed rgba(56,189,248,0.15);border-radius:8px;">
+                                       Belum ada brand luar
                                    </div>`
                             }
                         </div>

@@ -272,7 +272,7 @@
                     </button>
                     <div id="baNotificationDropdownMenu" class="ba-notification-dropdown">
                         <div class="ba-notification-header">
-                            <h4><i class="fas fa-bell"></i> Notifikasi Remind BA</h4>
+                            <h4><i class="fas fa-bell"></i> Notifikasi</h4>
                             <button onclick="markBaReminderRead('all', event)" class="ba-mark-all-btn">Tandai semua dibaca</button>
                         </div>
                         <div id="baNotificationList" class="ba-notification-body">
