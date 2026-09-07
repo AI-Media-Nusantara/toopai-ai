@@ -1846,12 +1846,26 @@ public function get_creator_task1_detail() {
         $tap_open_id   = $creator->tiktok_open_id ?? null;
 
         // ── Ambil kolom cache dari DB (mungkin belum ada di $creator karena SELECT terbatas) ──
-        $creator_cache = $this->db->select(
-                'tap_live_pct, tap_video_pct, tap_product_card_pct, tap_gmv_total, tap_gmv_synced_at'
-            )
-            ->where('id', $creator_id)
-            ->get('creators')
-            ->row();
+        $creator_cache = null;
+        try {
+            $creator_cache = $this->db->select(
+                    'tap_live_pct, tap_video_pct, tap_product_card_pct, tap_gmv_total, tap_gmv_synced_at'
+                )
+                ->where('id', $creator_id)
+                ->get('creators')
+                ->row();
+        } catch (Exception $e) {
+            // Kolom belum ada — jalankan migrasi otomatis
+            $this->db->query("
+                ALTER TABLE creators
+                  ADD COLUMN IF NOT EXISTS tap_live_pct         DECIMAL(6,2)  DEFAULT NULL,
+                  ADD COLUMN IF NOT EXISTS tap_video_pct        DECIMAL(6,2)  DEFAULT NULL,
+                  ADD COLUMN IF NOT EXISTS tap_product_card_pct DECIMAL(6,2)  DEFAULT NULL,
+                  ADD COLUMN IF NOT EXISTS tap_gmv_total        DECIMAL(20,2) DEFAULT NULL,
+                  ADD COLUMN IF NOT EXISTS tap_gmv_synced_at    DATETIME      DEFAULT NULL
+            ");
+            $creator_cache = null;
+        }
 
         $cache_synced_at  = $creator_cache->tap_gmv_synced_at ?? null;
         $cache_live_pct   = $creator_cache->tap_live_pct       ?? null;
@@ -6238,9 +6252,32 @@ public function debug_gmv_breakdown() {
         'step'           => [],
     ];
 
-    // Cek status cache
-    $cache = $this->db->select('tap_live_pct, tap_video_pct, tap_product_card_pct, tap_gmv_total, tap_gmv_synced_at')
-        ->where('id', $creator->id)->get('creators')->row();
+    // Auto-migrate: pastikan kolom cache ada di server ini
+    $this->db->query("
+        ALTER TABLE creators
+          ADD COLUMN IF NOT EXISTS tap_live_pct         DECIMAL(6,2)  DEFAULT NULL,
+          ADD COLUMN IF NOT EXISTS tap_video_pct        DECIMAL(6,2)  DEFAULT NULL,
+          ADD COLUMN IF NOT EXISTS tap_product_card_pct DECIMAL(6,2)  DEFAULT NULL,
+          ADD COLUMN IF NOT EXISTS tap_gmv_total        DECIMAL(20,2) DEFAULT NULL,
+          ADD COLUMN IF NOT EXISTS tap_gmv_synced_at    DATETIME      DEFAULT NULL
+    ");
+
+    // Cek status cache — gunakan query aman kalau kolom belum ada di server
+    $cache_row = null;
+    try {
+        $cache_row = $this->db->select('tap_live_pct, tap_video_pct, tap_product_card_pct, tap_gmv_total, tap_gmv_synced_at')
+            ->where('id', $creator->id)->get('creators')->row();
+    } catch (Exception $e) {
+        // Kolom belum ada — abaikan, cache dianggap kosong
+        $cache_row = null;
+    }
+    $cache = $cache_row ?: (object)[
+        'tap_live_pct'         => null,
+        'tap_video_pct'        => null,
+        'tap_product_card_pct' => null,
+        'tap_gmv_total'        => null,
+        'tap_gmv_synced_at'    => null,
+    ];
     $out['cache'] = [
         'tap_live_pct'         => $cache->tap_live_pct         ?? null,
         'tap_video_pct'        => $cache->tap_video_pct        ?? null,
@@ -6257,14 +6294,18 @@ public function debug_gmv_breakdown() {
 
     // Jika ada ?force_refresh=1, hapus cache dulu
     if ($this->input->get('force_refresh')) {
-        $this->db->where('id', $creator->id)->update('creators', [
-            'tap_gmv_synced_at' => null,
-            'tap_live_pct'      => null,
-            'tap_video_pct'     => null,
-            'tap_product_card_pct' => null,
-            'tap_gmv_total'     => null,
-        ]);
-        $out['step'][] = 'Cache dihapus — akan fetch ulang dari TAP API';
+        try {
+            $this->db->where('id', $creator->id)->update('creators', [
+                'tap_gmv_synced_at'    => null,
+                'tap_live_pct'         => null,
+                'tap_video_pct'        => null,
+                'tap_product_card_pct' => null,
+                'tap_gmv_total'        => null,
+            ]);
+            $out['step'][] = 'Cache dihapus — akan fetch ulang dari TAP API';
+        } catch (Exception $e) {
+            $out['step'][] = 'Cache belum ada di DB (kolom baru belum di-migrate): ' . $e->getMessage();
+        }
     }
 
     // 2. Resolve tiktok_open_id jika kosong
