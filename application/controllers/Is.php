@@ -6145,6 +6145,124 @@ public function get_creator_performance_detail() {
         ]));
     }
 }
+
+/**
+ * DEBUG: Cek seluruh flow GMV breakdown untuk creator tertentu
+ * URL: GET /is/debug_gmv_breakdown?username=rilllllll06
+ * atau: GET /is/debug_gmv_breakdown?creator_id=123
+ */
+public function debug_gmv_breakdown() {
+    $this->output->set_content_type('application/json');
+
+    $username   = $this->input->get('username');
+    $creator_id = $this->input->get('creator_id');
+
+    // 1. Cari creator
+    if (!empty($creator_id)) {
+        $creator = $this->db->select('id, username, tiktok_open_id')
+            ->where('id', $creator_id)->get('creators')->row();
+    } elseif (!empty($username)) {
+        $creator = $this->db->select('id, username, tiktok_open_id')
+            ->where('username', $username)->get('creators')->row();
+    } else {
+        return $this->output->set_output(json_encode(['error' => 'Provide ?username= or ?creator_id=']));
+    }
+
+    if (!$creator) {
+        return $this->output->set_output(json_encode(['error' => 'Creator not found']));
+    }
+
+    $out = [
+        'creator_id'     => $creator->id,
+        'username'       => $creator->username,
+        'tiktok_open_id' => $creator->tiktok_open_id,
+        'step'           => [],
+    ];
+
+    // 2. Resolve tiktok_open_id jika kosong
+    $tap_open_id = $creator->tiktok_open_id ?? null;
+    if (empty($tap_open_id)) {
+        $out['step'][] = 'tiktok_open_id kosong — coba resolve via TAP search';
+        try {
+            $search = $this->jsm_api->search_creators_by_is($creator->username, null, 20);
+            $out['tap_search_success'] = $search['success'] ?? false;
+            $out['tap_search_total']   = count($search['data']['creators'] ?? []);
+            foreach ($search['data']['creators'] ?? [] as $tc) {
+                if (strtolower($tc['username'] ?? '') === strtolower($creator->username)) {
+                    $tap_open_id = $tc['creator_open_id'] ?? null;
+                    $out['step'][] = 'Resolved open_id: ' . $tap_open_id;
+                    break;
+                }
+            }
+            if (empty($tap_open_id)) {
+                $out['step'][] = 'Tidak ditemukan di TAP search';
+                $out['tap_search_sample'] = array_slice(
+                    array_map(fn($c) => ['username' => $c['username'], 'open_id' => $c['creator_open_id'] ?? null],
+                    $search['data']['creators'] ?? []), 0, 5);
+            }
+        } catch (Exception $e) {
+            $out['step'][] = 'TAP search error: ' . $e->getMessage();
+        }
+    } else {
+        $out['step'][] = 'tiktok_open_id sudah ada: ' . $tap_open_id;
+    }
+
+    $out['tap_open_id_used'] = $tap_open_id;
+
+    if (empty($tap_open_id)) {
+        $out['step'][] = 'STOP: tidak ada open_id untuk panggil TAP performance API';
+        return $this->output->set_output(json_encode($out, JSON_PRETTY_PRINT));
+    }
+
+    // 3. Panggil get_marketplace_creator_performance
+    $out['step'][] = 'Memanggil get_marketplace_creator_performance(' . $tap_open_id . ')';
+    try {
+        $perf = $this->jsm_api->get_marketplace_creator_performance($tap_open_id);
+
+        $out['tap_perf_success'] = $perf['success'] ?? false;
+        $out['tap_perf_message'] = $perf['message'] ?? null;
+
+        if (!empty($perf['success']) && !empty($perf['data'])) {
+            $d = $perf['data'];
+            $out['step'][] = 'TAP response success';
+            $out['gmv_fields'] = [
+                'gmv'                      => $d['gmv']       ?? 'NOT SET',
+                'video_gmv'                => $d['video_gmv'] ?? 'NOT SET',
+                'live_gmv'                 => $d['live_gmv']  ?? 'NOT SET',
+                'content_gmv_distribution' => $d['content_gmv_distribution'] ?? 'NOT SET',
+            ];
+
+            $total    = floatval($d['gmv']       ?? 0);
+            $live_gmv = floatval($d['live_gmv']  ?? 0);
+            $vid_gmv  = floatval($d['video_gmv'] ?? 0);
+
+            $out['computed'] = [
+                'total'            => $total,
+                'live_gmv'         => $live_gmv,
+                'video_gmv'        => $vid_gmv,
+                'product_card_gmv' => max(0, $total - $live_gmv - $vid_gmv),
+                'live_pct'         => $total > 0 ? round(($live_gmv / $total) * 100, 2) : 0,
+                'video_pct'        => $total > 0 ? round(($vid_gmv  / $total) * 100, 2) : 0,
+                'product_card_pct' => $total > 0 ? round(max(0, 100 - ($live_gmv/$total)*100 - ($vid_gmv/$total)*100), 2) : 0,
+            ];
+
+            if ($total === 0.0) {
+                $out['step'][] = 'MASALAH: gmv = 0 — TAP mengembalikan data tapi nilai GMV nol. Breakdown tidak akan tampil.';
+            } else {
+                $out['step'][] = 'OK: gmv breakdown berhasil dihitung, breakdown SEHARUSNYA tampil';
+            }
+        } else {
+            $out['step'][] = 'TAP response gagal atau data kosong';
+            $out['tap_raw'] = $perf;
+        }
+    } catch (Exception $e) {
+        $out['step'][] = 'Exception: ' . $e->getMessage();
+        $out['exception'] = $e->getMessage();
+    }
+
+    return $this->output->set_output(json_encode($out, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+}
+
 /**
  * Format number to short (e.g., 1.2K, 2.3M)
  */
