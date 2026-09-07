@@ -6,14 +6,15 @@ $query_builder = TRUE;
 
 $db['default'] = array(
     'dsn'   => '',
-    'hostname' => 'localhost',
-    'username' => 'holasync_toopai',
-    'password' => ',)IZ$~~TqraTi{H-',
+    'hostname' => '127.0.0.1',
+    'username' => 'root',
+    'password' => 'root',
     'database' => 'holasync_toopai',
     'dbdriver' => 'mysqli',
     'dbprefix' => '',
     'pconnect' => FALSE,
-    'db_debug' => (ENVIRONMENT !== 'production'),
+    // 'db_debug' => (ENVIRONMENT !== 'production'),
+    'db_debug' => (ENVIRONMENT !== 'development'),
     'cache_on' => FALSE,
     'cachedir' => '',
     'char_set' => 'utf8mb4',
@@ -24,9 +25,10 @@ $db['default'] = array(
     'stricton' => FALSE,
     'failover' => array(),
     'save_queries' => TRUE,
-    'connect_timeout' => 120,  // Timeout 2 menit
-    'options' => array(
-        MYSQLI_OPT_CONNECT_TIMEOUT => 300,
-        MYSQLI_READ_DEFAULT_FILE => "1",
-    ),
+    // 'connect_timeout' => 120,  // Timeout 2 menit
+    // 'options' => array(
+    //     MYSQLI_OPT_CONNECT_TIMEOUT => 300,
+    //     MYSQLI_READ_DEFAULT_FILE => "1",
+    // ),
+    'port' => 3306,
 );

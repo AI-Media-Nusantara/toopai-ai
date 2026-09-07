@@ -156,9 +156,19 @@ class Import_monitoring extends CI_Controller {
             }
             
             // 🔥 CEK APAKAH CREATOR SUDAH ADA
-            $existing = $this->db->where('username', $username)->get('creators')->row();
+            $existing = $this->db->where('username', $username)
+                                 ->where('brand_id', $brand_id)
+                                 ->get('creators')
+                                 ->row();
             
             if ($existing) {
+                // Skip jika sudah ada CA owner lain untuk brand yang sama
+                if (!empty($existing->is_id) && $existing->is_id != $is_id) {
+                    $errors++;
+                    $error_rows[] = "Row {$row_num}: Skip @{$username} untuk brand '{$brand_name}': sudah dikelola oleh CA dengan ID {$existing->is_id}";
+                    continue;
+                }
+
                 // UPDATE menjadi ACTIVE (Task 3)
                 $update_data = [
                     'status' => 'ACTIVE',
@@ -167,9 +177,6 @@ class Import_monitoring extends CI_Controller {
                 
                 if (!empty($phone)) {
                     $update_data['phone'] = $phone;
-                }
-                if (!empty($brand_id)) {
-                    $update_data['brand_id'] = $brand_id;
                 }
                 if (!empty($is_id)) {
                     $update_data['is_id'] = $is_id;

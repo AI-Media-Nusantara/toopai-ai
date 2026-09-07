@@ -38,6 +38,13 @@ $route['is'] = 'is/index';
 $route['is/dashboard'] = 'is/dashboard';
 $route['is/creators'] = 'is/creators';
 $route['is/add_creator'] = 'is/add_creator';
+$route['is/check_phone_exists'] = 'is/check_phone_exists';
+
+// IS — Auto Creator Scouting
+$route['is/get_scouting_list']              = 'is/get_scouting_list';
+$route['is/onboard_creator_from_scouting']  = 'is/onboard_creator_from_scouting';
+$route['is/ignore_scouting_creator']        = 'is/ignore_scouting_creator';
+$route['is/refresh_scouting_list']          = 'is/refresh_scouting_list';
 $route['is/get_creator_detail'] = 'is/get_creator_detail';
 $route['is/approve_creator'] = 'is/approve_creator';
 $route['is/generate_affiliate_links'] = 'is/generate_affiliate_links';
@@ -54,6 +61,9 @@ $route['bd/send_whatsapp'] = 'bd/send_whatsapp';
 $route['bd/complete_task'] = 'bd/complete_task';
 
 // TTS Authorization Routes
+// Cron Discovery — Auto Scouting
+$route['cron_discovery/populate_scouting_list'] = 'cron_discovery/populate_scouting_list';
+
 $route['tts/authorize_affiliate']  = 'tts/authorize_affiliate';
 $route['tts/callback_affiliate']   = 'tts/callback_affiliate';
 $route['tts/authorize_seller']     = 'tts/authorize_seller';
@@ -67,6 +77,10 @@ $route['tts/refresh']              = 'tts/refresh';
 
 $route['link_management'] = 'link_management/dashboard';
 $route['link_management/(:any)'] = 'link_management/$1';
+
+// Redirect Tracker Route
+$route['r/(:any)'] = 'r/index/$1';
+
 
 
 // Di config/routes.php
@@ -124,5 +138,24 @@ $route['is/get_creator_shipping_address'] = 'is/get_creator_shipping_address';
 $route['is/confirm_sample_with_details'] = 'is/confirm_sample_with_details';
 $route['is/generate_sample_printout'] = 'is/generate_sample_printout';
 $route['is/view_sample_printout'] = 'is/view_sample_printout';
-
 $route['is/get_sample_products'] = 'is/get_sample_products';
+
+// IS - Fitur F: Sample Otomatis & Monitoring
+$route['is/monitoring']                      = 'is/monitoring';
+$route['is/confirm_sample_willingness']      = 'is/confirm_sample_willingness';
+$route['is/get_sample_recommendations']      = 'is/get_sample_recommendations';
+$route['is/save_sample_delivery']            = 'is/save_sample_delivery';
+$route['is/get_monitoring_creator_detail']   = 'is/get_monitoring_creator_detail';
+$route['is/get_creator_gmv_breakdown']       = 'is/get_creator_gmv_breakdown';
+$route['is/debug_fastmoss_base_info/(:any)'] = 'is/debug_fastmoss_base_info/$1';
+$route['is/add_creator_video']               = 'is/add_creator_video';
+$route['is/update_sample_video_link']        = 'is/update_sample_video_link';
+$route['is/get_sample_keranjang_trigger']    = 'is/get_sample_keranjang_trigger';
+
+// Profile & Management User Dashboard
+$route['profile'] = 'profile';
+$route['profile/save'] = 'profile/save';
+$route['profile/add_managed_user'] = 'profile/add_managed_user';
+$route['profile/toggle_status'] = 'profile/toggle_status';
+
+

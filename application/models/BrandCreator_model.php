@@ -41,15 +41,27 @@ class BrandCreator_model extends CI_Model {
             // Format produk
             $formatted_products = [];
             foreach ($products as $product) {
+                $price = $product['price'] ?? $product['sales_price'] ?? 0;
+                if (empty($price) && !empty($product['real_price'])) {
+                    $real_price = $product['real_price'];
+                    if (strpos($real_price, '-') !== false) {
+                        $parts = explode('-', $real_price);
+                        $real_price = trim($parts[0]);
+                    }
+                    $price = floatval(preg_replace('/[^0-9]/', '', $real_price));
+                }
+                if ($price > 99999999.99) {
+                    $price = 99999999.99;
+                }
                 $formatted_products[] = [
                     'product_id' => $product['goods_id'] ?? $product['product_id'] ?? null,
                     'product_name' => $product['goods_name'] ?? $product['product_name'] ?? $product['title'] ?? null,
-                    'price' => $product['price'] ?? $product['sales_price'] ?? 0,
+                    'price' => $price,
                     'sales_count' => $product['sold_count'] ?? $product['sales'] ?? 0,
                     'gmv' => $product['gmv'] ?? $product['sale_amount'] ?? 0,
-                    'commission_rate' => $product['commission_rate'] ?? $product['open_collaboration_commission_rate'] ?? null,
-                    'image_url' => $product['image_url'] ?? $product['main_image_url'] ?? '',
-                    'shop_name' => $product['shop_name'] ?? $product['shop']['name'] ?? '',
+                    'commission_rate' => $product['commission_rate'] ?? $product['open_collaboration_commission_rate'] ?? $product['commission_rate_show'] ?? null,
+                    'image_url' => $product['image_url'] ?? $product['main_image_url'] ?? $product['cover'] ?? '',
+                    'shop_name' => $product['shop_name'] ?? $product['shop_title'] ?? ($product['shop']['name'] ?? ''),
                     'category' => $product['category'] ?? $product['category_name'] ?? '',
                     'inventory' => $product['inventory'] ?? 0,
                     'product_url' => $product['detail_link'] ?? $product['url'] ?? null,
@@ -257,9 +269,30 @@ public function save_creators_from_fastmoss($brand_id, $creators_data, $is_id = 
         $category = $data['category'] ?? [];
         $price = floatval($data['price'] ?? 0);
         $inventory = intval($data['inventory'] ?? 0);
+
+        // 🔥 AMBIL TOTAL GMV DARI FASTMOSS baseInfo
+        // Dilakukan sekali per creator menggunakan UID yang diperoleh dari response
+        $fastmoss_gmv     = null;
+        $fastmoss_gmv_28d = null;
+        if (!empty($uid)) {
+            try {
+                $base_info = $this->Fastmoss_model->get_creator_base_info($uid);
+                if (!empty($base_info)) {
+                    $fastmoss_gmv     = $base_info['total_gmv'] > 0 ? $base_info['total_gmv'] : null;
+                    $fastmoss_gmv_28d = $base_info['gmv_28d']   > 0 ? $base_info['gmv_28d']   : null;
+                    // Perbarui follower dari baseInfo jika lebih akurat
+                    if (!empty($base_info['follower_count'])) {
+                        $follower_count = max($follower_count, intval($base_info['follower_count']));
+                    }
+                }
+            } catch (Exception $e) {
+                log_message('error', '[save_creators_from_fastmoss] baseInfo error for uid=' . $uid . ': ' . $e->getMessage());
+            }
+        }
         
         // CEK APAKAH SUDAH ADA DI creators
         $existing_creator = $this->db->where('username', $username)
+            ->where('brand_id', $brand_id)
             ->get('creators')
             ->row();
         
@@ -267,20 +300,33 @@ public function save_creators_from_fastmoss($brand_id, $creators_data, $is_id = 
         
         if ($existing_creator) {
             // UPDATE creator yang sudah ada
-            $new_gmv = floatval($existing_creator->imported_gmv ?? 0) + $gmv_from_this_product;
+            // imported_gmv: akumulasi GMV per produk (tetap dipertahankan untuk kompatibilitas)
+            $new_gmv   = floatval($existing_creator->imported_gmv ?? 0) + $gmv_from_this_product;
             $new_sales = intval($existing_creator->imported_sales_count ?? 0) + $sales_from_this_product;
             $new_followers = max(
                 intval($existing_creator->imported_followers ?? 0),
                 $follower_count
             );
+
+            $update_data = [
+                'imported_gmv'          => $new_gmv,
+                'imported_sales_count'  => $new_sales,
+                'imported_followers'    => $new_followers,
+                'updated_at'            => date('Y-m-d H:i:s'),
+            ];
+
+            // Simpan fastmoss_gmv jika berhasil diambil dari baseInfo
+            if ($fastmoss_gmv !== null) {
+                $update_data['fastmoss_gmv']       = $fastmoss_gmv;
+                $update_data['fastmoss_gmv_28d']   = $fastmoss_gmv_28d;
+                $update_data['fastmoss_synced_at'] = date('Y-m-d H:i:s');
+            }
+            // Simpan UID jika belum ada
+            if (!empty($uid) && empty($existing_creator->tiktok_open_id)) {
+                $update_data['tiktok_open_id'] = $uid;
+            }
             
-            $this->db->where('id', $existing_creator->id)
-                ->update('creators', [
-                    'imported_gmv' => $new_gmv,
-                    'imported_sales_count' => $new_sales,
-                    'imported_followers' => $new_followers,
-                    'updated_at' => date('Y-m-d H:i:s')
-                ]);
+            $this->db->where('id', $existing_creator->id)->update('creators', $update_data);
             
             $creator_id = $existing_creator->id;
             $result['updated_creators']++;
@@ -289,23 +335,26 @@ public function save_creators_from_fastmoss($brand_id, $creators_data, $is_id = 
         } else {
             // INSERT creator baru
             $insert_creator = [
-                'username' => $username,
-                'full_name' => $nickname,
-                'phone' => null,
-                'email' => null,
-                'category' => $this->_detect_category_from_creator($data),
-                'is_id' => $is_id,
-                'brand_id' => $brand_id,
-                'shop_name' => $this->_get_brand_shop_name($brand_id),
-                'source' => 'imported',
-                'status' => 'PENDING',
-                'avatar_url' => $avatar_url,
-                'imported_followers' => $follower_count,
-                'imported_gmv' => $gmv_from_this_product,
+                'username'             => $username,
+                'full_name'            => $nickname,
+                'phone'                => null,
+                'email'                => null,
+                'category'             => $this->_detect_category_from_creator($data),
+                'is_id'                => $is_id,
+                'brand_id'             => $brand_id,
+                'shop_name'            => $this->_get_brand_shop_name($brand_id),
+                'source'               => 'imported',
+                'status'               => 'PENDING',
+                'avatar_url'           => $avatar_url,
+                'imported_followers'   => $follower_count,
+                'imported_gmv'         => $gmv_from_this_product,
                 'imported_sales_count' => $sales_from_this_product,
-                'tiktok_open_id' => $uid,
-                'created_at' => date('Y-m-d H:i:s'),
-                'updated_at' => date('Y-m-d H:i:s')
+                'tiktok_open_id'       => $uid,
+                'fastmoss_gmv'         => $fastmoss_gmv,
+                'fastmoss_gmv_28d'     => $fastmoss_gmv_28d,
+                'fastmoss_synced_at'   => $fastmoss_gmv !== null ? date('Y-m-d H:i:s') : null,
+                'created_at'           => date('Y-m-d H:i:s'),
+                'updated_at'           => date('Y-m-d H:i:s'),
             ];
             
             $insert_creator = array_filter($insert_creator, function($value) {
@@ -627,15 +676,27 @@ public function get_creator_all_products($fastmoss_uid, $maxPages = 3) {
             }
 
             foreach ($products as $product) {
+                $price = $product['price'] ?? $product['sales_price'] ?? 0;
+                if (empty($price) && !empty($product['real_price'])) {
+                    $real_price = $product['real_price'];
+                    if (strpos($real_price, '-') !== false) {
+                        $parts = explode('-', $real_price);
+                        $real_price = trim($parts[0]);
+                    }
+                    $price = floatval(preg_replace('/[^0-9]/', '', $real_price));
+                }
+                if ($price > 99999999.99) {
+                    $price = 99999999.99;
+                }
                 $allProducts[] = [
                     'product_id' => $product['goods_id'] ?? $product['product_id'] ?? null,
                     'product_name' => $product['goods_name'] ?? $product['product_name'] ?? $product['title'] ?? null,
-                    'price' => $product['price'] ?? $product['sales_price'] ?? 0,
+                    'price' => $price,
                     'sales_count' => $product['sold_count'] ?? $product['sales'] ?? 0,
                     'gmv' => $product['gmv'] ?? $product['sale_amount'] ?? 0,
-                    'commission_rate' => $product['commission_rate'] ?? $product['open_collaboration_commission_rate'] ?? 0,
-                    'image_url' => $product['image_url'] ?? $product['main_image_url'] ?? '',
-                    'shop_name' => $product['shop_name'] ?? $product['shop']['name'] ?? '',
+                    'commission_rate' => $product['commission_rate'] ?? $product['open_collaboration_commission_rate'] ?? $product['commission_rate_show'] ?? 0,
+                    'image_url' => $product['image_url'] ?? $product['main_image_url'] ?? $product['cover'] ?? '',
+                    'shop_name' => $product['shop_name'] ?? $product['shop_title'] ?? ($product['shop']['name'] ?? ''),
                     'category' => $product['category'] ?? $product['category_name'] ?? '',
                     'inventory' => $product['inventory'] ?? 0,
                 ];
@@ -789,15 +850,27 @@ public function get_creator_all_products($fastmoss_uid, $maxPages = 3) {
 
             $formatted_products = [];
             foreach ($products as $product) {
+                $price = $product['price'] ?? $product['sales_price'] ?? 0;
+                if (empty($price) && !empty($product['real_price'])) {
+                    $real_price = $product['real_price'];
+                    if (strpos($real_price, '-') !== false) {
+                        $parts = explode('-', $real_price);
+                        $real_price = trim($parts[0]);
+                    }
+                    $price = floatval(preg_replace('/[^0-9]/', '', $real_price));
+                }
+                if ($price > 99999999.99) {
+                    $price = 99999999.99;
+                }
                 $formatted_products[] = [
                     'product_id' => $product['goods_id'] ?? $product['product_id'] ?? null,
                     'product_name' => $product['goods_name'] ?? $product['product_name'] ?? $product['title'] ?? null,
-                    'price' => $product['price'] ?? $product['sales_price'] ?? 0,
+                    'price' => $price,
                     'sales_count' => $product['sold_count'] ?? $product['sales'] ?? 0,
                     'gmv' => $product['gmv'] ?? $product['sale_amount'] ?? 0,
-                    'commission_rate' => $product['commission_rate'] ?? $product['open_collaboration_commission_rate'] ?? 0,
-                    'image_url' => $product['image_url'] ?? $product['main_image_url'] ?? '',
-                    'shop_name' => $product['shop_name'] ?? $product['shop']['name'] ?? '',
+                    'commission_rate' => $product['commission_rate'] ?? $product['open_collaboration_commission_rate'] ?? $product['commission_rate_show'] ?? 0,
+                    'image_url' => $product['image_url'] ?? $product['main_image_url'] ?? $product['cover'] ?? '',
+                    'shop_name' => $product['shop_name'] ?? $product['shop_title'] ?? ($product['shop']['name'] ?? ''),
                     'category' => $product['category'] ?? $product['category_name'] ?? '',
                     'inventory' => $product['inventory'] ?? 0,
                     'created_at' => $product['create_time'] ?? $product['created_at'] ?? null,

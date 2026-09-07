@@ -6,16 +6,18 @@ class Is extends CI_Controller {
     public function __construct() {
         parent::__construct();
         
-        if (!$this->session->userdata('logged_in')) {
-            redirect('auth/login');
-        }
-        
-        if ($this->session->userdata('role') != 'IS') {
-            show_error('Access denied. IS only area.', 403);
+        if (!is_cli()) {
+            if (!$this->session->userdata('logged_in')) {
+                redirect('auth/login');
+            }
+            
+            if ($this->session->userdata('role') != 'IS') {
+                show_error('Access denied. IS only area.', 403);
+            }
         }
         $this->load->helper('excel');
         $this->load->library('Jsm_api');
-        $this->load->model(['Campaign_model', 'Brand_model', 'Product_model', 'User_model', 'Jsm_token_model', 'Creator_model', 'Task_progress_model']);
+        $this->load->model(['Campaign_model', 'Brand_model', 'Product_model', 'User_model', 'Jsm_token_model', 'Creator_model', 'Task_progress_model', 'Fastmoss_model']);
         $this->load->helper('number');
         $this->load->database();
     }
@@ -28,9 +30,12 @@ class Is extends CI_Controller {
 // DASHBOARD UTAMA - IS (3 TASK) - TANPA KOMENTAR DI QUERY
 // ========================================================================
 public function dashboard() {
-    $user_id = $this->session->userdata('user_id');
+    $user_id = intval($this->session->userdata('user_id') ?: 0);
     $is_supervisor = ($user_id == 2);
     
+    // Auto-sync performa brand Bestseller & Trending secara otomatis di background
+    $this->sync_brand_tap_performance();
+
     // ====================================================================
     // 🔥 TASK 1: SCOUTING - AUTO GENERATE LINK
     // ====================================================================
@@ -38,6 +43,18 @@ public function dashboard() {
             c.*,
             b.name as brand_name,
             b.shop_name,
+            b.is_bestseller as brand_is_bestseller,
+            b.is_trending as brand_is_trending,
+            (SELECT COALESCE(SUM(bc.total_gmv), 0) 
+             FROM brand_creators bc 
+             JOIN creators c2 ON bc.creator_username = c2.username
+             WHERE bc.brand_id = b.id 
+               AND c2.status IN ("PENDING", "LINK_SWAPPING")) as brand_total_gmv,
+            (SELECT COALESCE(SUM(bc.day7_gmv), 0) 
+             FROM brand_creators bc 
+             JOIN creators c2 ON bc.creator_username = c2.username
+             WHERE bc.brand_id = b.id 
+               AND c2.status IN ("PENDING", "LINK_SWAPPING")) as brand_day7_gmv,
             u.username as is_username,
             u.full_name as is_full_name,
             (SELECT COUNT(DISTINCT acl.id) 
@@ -52,13 +69,22 @@ public function dashboard() {
              FROM affiliate_orders o 
              WHERE o.creator_username = c.username 
                AND o.order_date_local >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-               AND o.order_status NOT IN ("CANCELLED", "REFUNDED")) as total_gmv_30d
-        ')
+               AND o.order_status NOT IN ("CANCELLED", "REFUNDED")) as total_gmv_30d,
+             (SELECT GROUP_CONCAT(DISTINCT u2.full_name SEPARATOR ", ")
+              FROM users u2
+              WHERE u2.role = "IS"
+                AND (
+                    u2.id = c.is_id
+                    OR u2.id IN (SELECT DISTINCT ul.user_id FROM user_logs ul WHERE ul.role = "IS" AND ul.action = "GENERATE_AFFILIATE_LINK" AND ul.description LIKE CONCAT("%creator @", c.username, ",%"))
+                )
+             ) as contacted_ca_names
+         ', false)
         ->from('creators c')
         ->join('brands b', 'c.brand_id = b.id', 'left')
         ->join('users u', 'c.is_id = u.id', 'left')
         ->where_in('c.status', ['PENDING', 'LINK_SWAPPING'])
-        ->order_by('c.created_at', 'DESC')
+        ->order_by('(CASE WHEN c.phone IS NOT NULL AND c.phone != "" AND c.phone != "no_phone" THEN 1 ELSE 0 END)', 'DESC', false)
+        ->order_by('COALESCE(c.fastmoss_gmv_28d, c.imported_gmv, 0)', 'DESC', false)
         ->limit(100)
         ->get()
         ->result();
@@ -67,7 +93,6 @@ public function dashboard() {
     // 🔥 TASK 2: WAITING HANDLER - DEAL READY (LAMPU HIJAU)
     // ====================================================================
  $task2_sql = "
-    (
         -- PART 1: Creator yang sudah ada di tabel creators tapi is_id NULL
         SELECT 
             c.id,
@@ -86,48 +111,47 @@ public function dashboard() {
             b.shop_name,
             (SELECT COUNT(DISTINCT acl.id) 
              FROM affiliate_creator_links acl 
-             WHERE acl.creator_id = c.id 
-               AND acl.status = 'ACTIVE') as total_active_links,
+             LEFT JOIN affiliate_products ap ON acl.product_id = ap.product_id AND acl.campaign_id = ap.campaign_id
+             WHERE (acl.creator_id = c.id OR LOWER(TRIM(acl.creator_username)) = LOWER(TRIM(c.username)))
+               AND acl.status = 'ACTIVE'
+               AND (TRIM(ap.shop_name) = TRIM(b.shop_name) OR TRIM(ap.shop_name) = TRIM(b.name))) as total_active_links,
             (SELECT COALESCE(SUM(o.gmv), 0) 
              FROM affiliate_orders o 
              WHERE LOWER(TRIM(o.creator_username)) = LOWER(TRIM(c.username))
                AND o.order_date_local >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
                AND o.order_status NOT IN ('CANCELLED', 'REFUNDED')) as total_gmv_30d,
-            (SELECT product_name 
-             FROM affiliate_orders o2 
-             WHERE LOWER(TRIM(o2.creator_username)) = LOWER(TRIM(c.username))
-               AND o2.order_status NOT IN ('CANCELLED', 'REFUNDED')
-             GROUP BY o2.product_name 
-             ORDER BY SUM(o2.gmv) DESC 
-             LIMIT 1) as top_product,
-            (SELECT ap.image_url 
-             FROM affiliate_products ap 
-             JOIN affiliate_orders o3 ON ap.product_id = o3.product_id AND ap.campaign_id = o3.campaign_id
-             WHERE LOWER(TRIM(o3.creator_username)) = LOWER(TRIM(c.username))
-               AND o3.order_status NOT IN ('CANCELLED', 'REFUNDED')
-             GROUP BY ap.product_id 
-             ORDER BY SUM(o3.gmv) DESC 
-             LIMIT 1) as top_product_image,
+            (SELECT GROUP_CONCAT(acl3.product_name SEPARATOR ', ')
+              FROM affiliate_creator_links acl3
+              LEFT JOIN affiliate_products ap3 ON acl3.product_id = ap3.product_id AND acl3.campaign_id = ap3.campaign_id
+              WHERE (acl3.creator_id = c.id OR LOWER(TRIM(acl3.creator_username)) = LOWER(TRIM(c.username)))
+                AND acl3.status = 'ACTIVE'
+                AND (TRIM(ap3.shop_name) = TRIM(b.shop_name) OR TRIM(ap3.shop_name) = TRIM(b.name))) as top_product,
+            (SELECT ap4.image_url 
+              FROM affiliate_creator_links acl4
+              LEFT JOIN affiliate_products ap4 ON acl4.product_id = ap4.product_id AND acl4.campaign_id = ap4.campaign_id
+              WHERE (acl4.creator_id = c.id OR LOWER(TRIM(acl4.creator_username)) = LOWER(TRIM(c.username)))
+                AND acl4.status = 'ACTIVE'
+                AND (TRIM(ap4.shop_name) = TRIM(b.shop_name) OR TRIM(ap4.shop_name) = TRIM(b.name))
+              ORDER BY acl4.updated_at DESC
+              LIMIT 1) as top_product_image,
             CASE 
-                WHEN c.is_id IS NOT NULL AND c.is_id > 0 THEN 'claimed'
-                WHEN c.is_id IS NULL AND EXISTS (
+                WHEN c.is_id IS NOT NULL AND c.is_id != {$user_id} THEN 'claimed'
+                WHEN (c.is_id IS NULL OR c.is_id = {$user_id}) AND EXISTS (
                     SELECT 1 FROM affiliate_creator_links acl2
-                    WHERE acl2.creator_id = c.id
+                    LEFT JOIN affiliate_products ap2 ON acl2.product_id = ap2.product_id AND acl2.campaign_id = ap2.campaign_id
+                    WHERE (acl2.creator_id = c.id OR LOWER(TRIM(acl2.creator_username)) = LOWER(TRIM(c.username)))
                       AND acl2.status = 'ACTIVE'
+                      AND (TRIM(ap2.shop_name) = TRIM(b.shop_name) OR TRIM(ap2.shop_name) = TRIM(b.name))
+                      AND acl2.showcase_status = 'added'
                 ) THEN 'ready'
-                WHEN c.is_id IS NULL THEN 'no_handler'
+                WHEN c.is_id IS NULL OR c.is_id = {$user_id} THEN 'no_handler'
                 ELSE 'no_link'
             END AS deal_status,
             'registered' as source_type
         FROM creators c
         LEFT JOIN brands b ON c.brand_id = b.id
         LEFT JOIN users u ON c.is_id = u.id
-        WHERE c.is_id IS NULL
-          AND EXISTS (
-              SELECT 1 FROM affiliate_orders o 
-              WHERE LOWER(TRIM(o.creator_username)) = LOWER(TRIM(c.username))
-                AND o.order_status NOT IN ('CANCELLED', 'REFUNDED')
-          )
+        WHERE c.status = 'LINK_SENT'
         
         UNION ALL
         
@@ -165,7 +189,7 @@ public function dashboard() {
           )
         GROUP BY o.creator_username
         HAVING SUM(o.gmv) > 0
-    ) 
+        
     ORDER BY 
         CASE WHEN source_type = 'unregistered' THEN 0 ELSE 1 END,
         total_gmv_30d DESC
@@ -198,40 +222,33 @@ $task2_creators = $this->db->query($task2_sql)->result();
              WHERE acl.creator_id = c.id 
                AND acl.status = "ACTIVE") as total_links,
             (SELECT COALESCE(SUM(o.gmv), 0) 
-             FROM affiliate_orders o 
-             WHERE o.creator_username = c.username 
-               AND o.order_date_local >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-               AND o.order_status NOT IN ("CANCELLED", "REFUNDED")) as total_gmv_30d,
+              FROM affiliate_orders o 
+              WHERE o.creator_username = c.username 
+                AND o.order_status NOT IN ("CANCELLED", "REFUNDED")) as total_gmv_30d,
             (SELECT COUNT(DISTINCT o.order_id) 
-             FROM affiliate_orders o 
-             WHERE o.creator_username = c.username 
-               AND o.order_date_local >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-               AND o.order_status NOT IN ("CANCELLED", "REFUNDED")) as total_orders_30d,
+              FROM affiliate_orders o 
+              WHERE o.creator_username = c.username 
+                AND o.order_status NOT IN ("CANCELLED", "REFUNDED")) as total_orders_30d,
             (SELECT COALESCE(SUM(o.estimated_commission), 0) 
-             FROM affiliate_orders o 
-             WHERE o.creator_username = c.username 
-               AND o.order_date_local >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-               AND o.order_status NOT IN ("CANCELLED", "REFUNDED")) as total_commission_30d,
-            (SELECT product_name 
-             FROM affiliate_orders o2 
-             WHERE o2.creator_username = c.username 
-               AND o2.order_status NOT IN ("CANCELLED", "REFUNDED")
-             GROUP BY o2.product_name 
-             ORDER BY SUM(o2.gmv) DESC 
-             LIMIT 1) as top_product,
+              FROM affiliate_orders o 
+              WHERE o.creator_username = c.username 
+                AND o.order_status NOT IN ("CANCELLED", "REFUNDED")) as total_commission_30d,
+            (SELECT GROUP_CONCAT(product_name SEPARATOR ", ")
+              FROM affiliate_creator_links acl3
+              WHERE (acl3.creator_id = c.id OR LOWER(TRIM(acl3.creator_username)) = LOWER(TRIM(c.username)))
+                AND acl3.status = "ACTIVE") as top_product,
             (SELECT ap.image_url 
-             FROM affiliate_products ap 
-             JOIN affiliate_orders o3 ON ap.product_id = o3.product_id AND ap.campaign_id = o3.campaign_id
-             WHERE o3.creator_username = c.username 
-               AND o3.order_status NOT IN ("CANCELLED", "REFUNDED")
-             GROUP BY ap.product_id 
-             ORDER BY SUM(o3.gmv) DESC 
-             LIMIT 1) as top_product_image
+              FROM affiliate_creator_links acl4
+              LEFT JOIN affiliate_products ap ON acl4.product_id = ap.product_id AND acl4.campaign_id = ap.campaign_id
+              WHERE (acl4.creator_id = c.id OR LOWER(TRIM(acl4.creator_username)) = LOWER(TRIM(c.username)))
+                AND acl4.status = "ACTIVE"
+              ORDER BY acl4.updated_at DESC
+              LIMIT 1) as top_product_image
         ')
         ->from('creators c')
         ->join('brands b', 'c.brand_id = b.id', 'left')
         ->join('users u', 'c.is_id = u.id', 'left')
-        ->where('c.status', 'ACTIVE')
+        ->where_in('c.status', ['ACTIVE', 'SAMPLE_SENT'])
         ->order_by('total_gmv_30d', 'DESC')
         ->limit(100)
         ->get()
@@ -251,7 +268,7 @@ foreach ($task2_creators as $c) {
 }
 
     
-    $task3_count = $this->db->where('status', 'ACTIVE')->count_all_results('creators');
+    $task3_count = $this->db->where_in('status', ['ACTIVE', 'SAMPLE_SENT'])->count_all_results('creators');
     
     $today = date('Y-m-d');
     $today_gmv = $this->db->select('COALESCE(SUM(gmv), 0) as total')
@@ -277,9 +294,79 @@ foreach ($task2_creators as $c) {
     
     $gmv_growth = $yesterday_gmv > 0 ? (($today_gmv - $yesterday_gmv) / $yesterday_gmv * 100) : ($today_gmv > 0 ? 100 : 0);
     
+    // Get total creator count per brand
+    $brand_counts_raw = $this->db->select('brand_id, COUNT(*) as cnt')
+                                  ->from('creators')
+                                  ->where('brand_id >', 0)
+                                  ->group_by('brand_id')
+                                  ->get()
+                                  ->result();
+    $brand_creator_counts = [];
+    foreach ($brand_counts_raw as $row) {
+        $brand_creator_counts[$row->brand_id] = intval($row->cnt);
+    }
+    
+    // Query all active brands from Step 4 Monitoring di user BA for Step 1 user CA
+    // Logika identik dengan Task 4 di Bd.php: status=ACTIVE dan tidak punya produk PENDING
+    // GMV dihitung LANGSUNG dari affiliate_orders (bukan dari cached brands.total_gmv)
+    $task1_brands_q = $this->db->query("
+        SELECT 
+            b.id as brand_id,
+            b.name as brand_name,
+            COALESCE(NULLIF(b.shop_name, ''), b.name) as shop_name,
+            COALESCE(NULLIF(b.category, ''), (
+                SELECT GROUP_CONCAT(DISTINCT c2.category SEPARATOR ', ')
+                FROM creators c2
+                WHERE c2.brand_id = b.id AND c2.category IS NOT NULL AND c2.category != ''
+            ), '') as category,
+            COALESCE((
+
+                SELECT SUM(o.gmv)
+                FROM affiliate_orders o
+                JOIN affiliate_products ap2 ON o.product_id = ap2.product_id AND o.campaign_id = ap2.campaign_id
+                WHERE ap2.shop_name = b.name
+                  AND ap2.review_status = 'APPROVED'
+                  AND o.order_status NOT IN ('CANCELLED', 'REFUNDED')
+                  AND o.order_date_local >= DATE_SUB(CURDATE(), INTERVAL 28 DAY)
+            ), COALESCE(b.total_gmv, 0)) as total_gmv,
+            COALESCE((
+                SELECT SUM(o.gmv)
+                FROM affiliate_orders o
+                JOIN affiliate_products ap3 ON o.product_id = ap3.product_id AND o.campaign_id = ap3.campaign_id
+                WHERE ap3.shop_name = b.name
+                  AND ap3.review_status = 'APPROVED'
+                  AND o.order_status NOT IN ('CANCELLED', 'REFUNDED')
+                  AND o.order_date_local >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+            ), COALESCE(b.day7_gmv, 0)) as day7_gmv,
+            COALESCE(b.is_bestseller, 0) as is_bestseller,
+            COALESCE(b.is_trending, 0) as is_trending,
+            (
+                SELECT COUNT(DISTINCT c2.username)
+                FROM creators c2
+                WHERE c2.brand_id = b.id
+                  AND c2.status NOT IN ('REJECTED', 'BLACKLISTED')
+            ) as creators_count
+        FROM brands b
+        LEFT JOIN affiliate_products ap ON TRIM(b.name) = TRIM(ap.shop_name) AND ap.review_status = 'PENDING'
+        WHERE b.status = 'ACTIVE'
+          AND ap.id IS NULL
+        GROUP BY b.id
+        ORDER BY total_gmv DESC, day7_gmv DESC, b.name ASC
+    ");
+    $task1_brands = ($task1_brands_q && is_object($task1_brands_q)) ? $task1_brands_q->result() : [];
+
+    // Update is_bestseller & is_trending di memory berdasarkan GMV real-time
+    // (tanpa query tambahan ke DB, langsung dari data yang sudah diambil)
+    foreach ($task1_brands as &$tb) {
+        $tb->is_bestseller = ($tb->total_gmv > 0) ? 1 : 0;
+        $tb->is_trending   = ($tb->day7_gmv  > 0) ? 1 : 0;
+    }
+    unset($tb);
+
     $data = [
         'title' => 'IS Dashboard - Toopai',
         'task1_creators' => $task1_creators,
+        'task1_brands' => $task1_brands,
         'task2_creators' => $task2_creators,
         'task3_creators' => $task3_creators,
         'task1_count' => $task1_count,
@@ -289,6 +376,7 @@ foreach ($task2_creators as $c) {
         'today_orders' => $today_orders,
         'gmv_growth' => round($gmv_growth, 1),
         'total_creators' => $this->db->count_all_results('creators'),
+        'brand_creator_counts' => $brand_creator_counts,
         'is_supervisor' => $is_supervisor,
     ];
     
@@ -320,38 +408,46 @@ public function get_task2_creators() {
             b.shop_name,
             (SELECT COUNT(DISTINCT acl.id) 
              FROM affiliate_creator_links acl 
-             WHERE acl.creator_id = c.id 
-               AND acl.status = "ACTIVE") as total_active_links,
+             LEFT JOIN affiliate_products ap ON acl.product_id = ap.product_id AND acl.campaign_id = ap.campaign_id
+             WHERE (acl.creator_id = c.id OR LOWER(TRIM(acl.creator_username)) = LOWER(TRIM(c.username)))
+               AND acl.status = "ACTIVE"
+               AND (TRIM(ap.shop_name) = TRIM(b.shop_name) OR TRIM(ap.shop_name) = TRIM(b.name))) as total_active_links,
             (SELECT COALESCE(SUM(o.gmv), 0) 
              FROM affiliate_orders o 
              WHERE o.creator_username = c.username 
                AND o.order_date_local >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
                AND o.order_status NOT IN ("CANCELLED", "REFUNDED")) as total_gmv_30d,
-            (SELECT product_name 
-             FROM affiliate_orders o2 
-             WHERE o2.creator_username = c.username 
-               AND o2.order_status NOT IN ("CANCELLED", "REFUNDED")
-             GROUP BY o2.product_name 
-             ORDER BY SUM(o2.gmv) DESC 
-             LIMIT 1) as top_product,
-            (SELECT ap.image_url 
-             FROM affiliate_products ap 
-             JOIN affiliate_orders o3 ON ap.product_id = o3.product_id AND ap.campaign_id = o3.campaign_id
-             WHERE o3.creator_username = c.username 
-               AND o3.order_status NOT IN ("CANCELLED", "REFUNDED")
-             GROUP BY ap.product_id 
-             ORDER BY SUM(o3.gmv) DESC 
-             LIMIT 1) as top_product_image,
+            (SELECT GROUP_CONCAT(acl3.product_name SEPARATOR ", ")
+              FROM affiliate_creator_links acl3
+              LEFT JOIN affiliate_products ap3 ON acl3.product_id = ap3.product_id AND acl3.campaign_id = ap3.campaign_id
+              WHERE (acl3.creator_id = c.id OR LOWER(TRIM(acl3.creator_username)) = LOWER(TRIM(c.username)))
+                AND acl3.status = "ACTIVE"
+                AND (TRIM(ap3.shop_name) = TRIM(b.shop_name) OR TRIM(ap3.shop_name) = TRIM(b.name))) as top_product,
+            (SELECT ap4.image_url 
+              FROM affiliate_creator_links acl4
+              LEFT JOIN affiliate_products ap4 ON acl4.product_id = ap4.product_id AND acl4.campaign_id = ap4.campaign_id
+              WHERE (acl4.creator_id = c.id OR LOWER(TRIM(acl4.creator_username)) = LOWER(TRIM(c.username)))
+                AND acl4.status = "ACTIVE"
+                AND (TRIM(ap4.shop_name) = TRIM(b.shop_name) OR TRIM(ap4.shop_name) = TRIM(b.name))
+              ORDER BY acl4.updated_at DESC
+              LIMIT 1) as top_product_image,
             CASE 
                 WHEN EXISTS (
                     SELECT 1 FROM affiliate_creator_links acl2
-                    WHERE acl2.creator_id = c.id
+                    LEFT JOIN affiliate_products ap2 ON acl2.product_id = ap2.product_id AND acl2.campaign_id = ap2.campaign_id
+                    WHERE (acl2.creator_id = c.id OR LOWER(TRIM(acl2.creator_username)) = LOWER(TRIM(c.username)))
                       AND acl2.status = "ACTIVE"
+                      AND (TRIM(ap2.shop_name) = TRIM(b.shop_name) OR TRIM(ap2.shop_name) = TRIM(b.name))
+                      AND acl2.showcase_status = "added"
                       AND (acl2.created_by_user_id IS NULL OR acl2.created_by_user_id = 0)
                 ) THEN "ready"
                 WHEN EXISTS (
                     SELECT 1 FROM affiliate_creator_links acl2
-                    WHERE acl2.creator_id = c.id
+                    LEFT JOIN affiliate_products ap2 ON acl2.product_id = ap2.product_id AND acl2.campaign_id = ap2.campaign_id
+                    WHERE (acl2.creator_id = c.id OR LOWER(TRIM(acl2.creator_username)) = LOWER(TRIM(c.username)))
+                      AND acl2.status = "ACTIVE"
+                      AND (TRIM(ap2.shop_name) = TRIM(b.shop_name) OR TRIM(ap2.shop_name) = TRIM(b.name))
+                      AND acl2.showcase_status = "added"
                       AND acl2.created_by_user_id IS NOT NULL
                       AND acl2.created_by_user_id > 0
                 ) THEN "claimed"
@@ -404,39 +500,35 @@ public function get_task3_creators() {
             (SELECT COALESCE(SUM(o.gmv), 0) 
              FROM affiliate_orders o 
              WHERE o.creator_username = c.username 
-               AND o.order_date_local >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
                AND o.order_status NOT IN ("CANCELLED", "REFUNDED")) as total_gmv_30d,
             (SELECT COUNT(DISTINCT o.order_id) 
              FROM affiliate_orders o 
              WHERE o.creator_username = c.username 
-               AND o.order_date_local >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
                AND o.order_status NOT IN ("CANCELLED", "REFUNDED")) as total_orders_30d,
             (SELECT COALESCE(SUM(o.estimated_commission), 0) 
              FROM affiliate_orders o 
              WHERE o.creator_username = c.username 
-               AND o.order_date_local >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
                AND o.order_status NOT IN ("CANCELLED", "REFUNDED")) as total_commission_30d,
-            (SELECT product_name 
-             FROM affiliate_orders o2 
-             WHERE o2.creator_username = c.username 
-               AND o2.order_status NOT IN ("CANCELLED", "REFUNDED")
-             GROUP BY o2.product_name 
-             ORDER BY SUM(o2.gmv) DESC 
-             LIMIT 1) as top_product,
+            (SELECT GROUP_CONCAT(product_name SEPARATOR ", ")
+              FROM affiliate_creator_links acl3
+              WHERE (acl3.creator_id = c.id OR LOWER(TRIM(acl3.creator_username)) = LOWER(TRIM(c.username)))
+                AND acl3.showcase_status = "added") as top_product,
             (SELECT ap.image_url 
-             FROM affiliate_products ap 
-             JOIN affiliate_orders o3 ON ap.product_id = o3.product_id AND ap.campaign_id = o3.campaign_id
-             WHERE o3.creator_username = c.username 
-               AND o3.order_status NOT IN ("CANCELLED", "REFUNDED")
-             GROUP BY ap.product_id 
-             ORDER BY SUM(o3.gmv) DESC 
-             LIMIT 1) as top_product_image
+              FROM affiliate_creator_links acl4
+              LEFT JOIN affiliate_products ap ON acl4.product_id = ap.product_id AND acl4.campaign_id = ap.campaign_id
+              WHERE (acl4.creator_id = c.id OR LOWER(TRIM(acl4.creator_username)) = LOWER(TRIM(c.username)))
+                AND acl4.showcase_status = "added"
+              ORDER BY acl4.updated_at DESC
+              LIMIT 1) as top_product_image
         ')
         ->from('creators c')
         ->join('brands b', 'c.brand_id = b.id', 'left')
         ->join('users u', 'c.is_id = u.id', 'left')
-        ->where('c.status', 'ACTIVE')
+        ->where_in('c.status', ['ACTIVE', 'SAMPLE_SENT'])
+        ->order_by('total_orders_30d', 'DESC')
         ->order_by('total_gmv_30d', 'DESC')
+        ->order_by('COALESCE(c.fastmoss_gmv_28d, c.imported_gmv, 0)', 'DESC')
+        ->order_by('c.id', 'DESC')
         ->limit(100)
         ->get()
         ->result();
@@ -449,66 +541,85 @@ public function get_task3_creators() {
 }
 
 // ========================================================================
-// CLAIM DEAL - TANPA KOMENTAR
+// CLAIM DEAL
 // ========================================================================
 public function claim_deal() {
     $this->output->set_content_type('application/json');
-    
-    $creator_id = $this->input->post('creator_id');
+
+    // 🔒 Validasi session
+    if (!$this->session->userdata('logged_in')) {
+        return $this->output->set_output(json_encode([
+            'success' => false,
+            'message' => 'Session expired. Silakan login ulang.'
+        ]));
+    }
+
+    $creator_id       = $this->input->post('creator_id');
     $creator_username = $this->input->post('creator_username');
-    $user_id = $this->session->userdata('user_id');
-    $full_name = $this->session->userdata('full_name');
-    $username = $this->session->userdata('username');
-    
+    $user_id          = $this->session->userdata('user_id');
+    $full_name        = $this->session->userdata('full_name');
+    $username         = $this->session->userdata('username');
+
     // 🔥 Jika creator_id kosong dan ada username, coba auto-register
     if (empty($creator_id) && !empty($creator_username)) {
         $existing = $this->db->where('username', $creator_username)->get('creators')->row();
-        
+
         if (!$existing) {
-            // Auto-register creator
+            // 🚫 Blokir auto-register untuk creator tanpa link aktif maupun order
+            // (creator "no_handler" murni yang tidak pernah diberi link oleh CA)
+            $has_order = $this->db
+                ->where('creator_username', $creator_username)
+                ->where('order_status NOT IN (\'CANCELLED\', \'REFUNDED\')')
+                ->count_all_results('affiliate_orders') > 0;
+
+            if (!$has_order) {
+                return $this->output->set_output(json_encode([
+                    'success' => false,
+                    'message' => 'Creator belum menggunakan link dari CA. DEAL hanya bisa dilakukan setelah creator menggunakan link yang diberikan.'
+                ]));
+            }
+
+            // Auto-register creator yang sudah ada order
             $insert_data = [
-                'username' => $creator_username,
-                'full_name' => $creator_username,
-                'is_id' => $user_id,
-                'status' => 'ACTIVE',
-                'source' => 'auto_register',
+                'username'   => $creator_username,
+                'full_name'  => $creator_username,
+                'is_id'      => $user_id,
+                'status'     => 'ACTIVE',
+                'source'     => 'auto_register',
                 'created_at' => date('Y-m-d H:i:s'),
                 'updated_at' => date('Y-m-d H:i:s')
             ];
-            
+
             $this->db->insert('creators', $insert_data);
             $new_id = $this->db->insert_id();
-            
-            // Log aktivitas
+
             $this->load->model('User_log_model');
             $this->User_log_model->log(
-                $user_id,
-                $username,
-                'IS',
+                $user_id, $username, 'IS',
                 'AUTO_REGISTER_CLAIM',
                 "Auto-register and claim creator @{$creator_username} (ID: {$new_id})"
             );
-            
+
             return $this->output->set_output(json_encode([
-                'success' => true,
-                'message' => "✅ Berhasil register dan claim @{$creator_username}! Creator pindah ke Monitoring (Task 3).",
-                'creator_id' => $new_id,
+                'success'          => true,
+                'message'          => "✅ Berhasil register dan claim @{$creator_username}! Creator pindah ke Monitoring (Task 3).",
+                'creator_id'       => $new_id,
                 'creator_username' => $creator_username,
-                'claimed_by' => $full_name ?: $username,
-                'auto_registered' => true
+                'claimed_by'       => $full_name ?: $username,
+                'auto_registered'  => true
             ]));
         }
-        
+
         $creator_id = $existing->id;
     }
-    
+
     if (empty($creator_id)) {
         return $this->output->set_output(json_encode([
             'success' => false,
             'message' => 'Creator ID atau username required'
         ]));
     }
-    
+
     // 🔥 CEK APAKAH CREATOR VALID DAN BELUM DI-CLAIM
     $check = $this->db->select('c.id, c.username, c.is_id')
         ->from('creators c')
@@ -516,29 +627,51 @@ public function claim_deal() {
         ->where('c.is_id IS NULL')
         ->get()
         ->row();
-    
+
     if (!$check) {
         return $this->output->set_output(json_encode([
             'success' => false,
             'message' => 'Creator sudah di-claim oleh IS lain atau tidak valid'
         ]));
     }
-    
+
+    // 🔥 VALIDASI: Creator harus sudah menggunakan link dari CA
+    // (ditandai dengan affiliate_creator_links AKTIF atau ada order di affiliate_orders)
+    $has_active_link = $this->db
+        ->where('creator_id', $creator_id)
+        ->where('status', 'ACTIVE')
+        ->count_all_results('affiliate_creator_links') > 0;
+
+    $has_order = false;
+    if (!$has_active_link) {
+        $has_order = $this->db
+            ->where('LOWER(TRIM(creator_username))', 'LOWER(TRIM(\'' . $check->username . '\'))', false)
+            ->where('order_status NOT IN (\'CANCELLED\', \'REFUNDED\')')
+            ->count_all_results('affiliate_orders') > 0;
+    }
+
+    if (!$has_active_link && !$has_order) {
+        return $this->output->set_output(json_encode([
+            'success' => false,
+            'message' => '⚠️ DEAL tidak bisa dilakukan. Creator @' . $check->username . ' belum menggunakan link dari tim CA (belum ada link aktif atau order yang masuk).'
+        ]));
+    }
+
     // 🔥 LOCK TABLE untuk mencegah race condition
     $this->db->trans_start();
-    
+
     $this->db->where('id', $creator_id)
         ->where('is_id IS NULL')
         ->update('creators', [
-            'is_id' => $user_id,
-            'status' => 'ACTIVE',
+            'is_id'       => $user_id,
+            'status'      => 'ACTIVE',
             'approved_at' => date('Y-m-d H:i:s'),
             'approved_by' => $user_id,
-            'updated_at' => date('Y-m-d H:i:s')
+            'updated_at'  => date('Y-m-d H:i:s')
         ]);
-    
+
     $affected = $this->db->affected_rows();
-    
+
     if ($affected == 0) {
         $this->db->trans_rollback();
         return $this->output->set_output(json_encode([
@@ -546,25 +679,30 @@ public function claim_deal() {
             'message' => 'Maaf, creator sudah di-claim oleh IS lain! Silakan refresh halaman.'
         ]));
     }
-    
+
     $this->db->trans_complete();
-    
+
+    if ($this->db->trans_status() === FALSE) {
+        return $this->output->set_output(json_encode([
+            'success' => false,
+            'message' => 'Terjadi kesalahan sistem saat melakukan DEAL.'
+        ]));
+    }
+
     // Log aktivitas
     $this->load->model('User_log_model');
     $this->User_log_model->log(
-        $user_id,
-        $username,
-        'IS',
+        $user_id, $username, 'IS',
         'CLAIM_DEAL',
         "Claimed creator @{$check->username} (ID: {$creator_id})"
     );
-    
+
     return $this->output->set_output(json_encode([
-        'success' => true,
-        'message' => "✅ Berhasil claim @{$check->username}! Creator pindah ke Monitoring (Task 3).",
-        'creator_id' => $creator_id,
+        'success'          => true,
+        'message'          => "✅ Berhasil claim @{$check->username}! Creator pindah ke Monitoring (Task 3).",
+        'creator_id'       => $creator_id,
         'creator_username' => $check->username,
-        'claimed_by' => $full_name ?: $username
+        'claimed_by'       => $full_name ?: $username
     ]));
 }
 public function add_creator_task3() {
@@ -577,73 +715,157 @@ public function add_creator_task3() {
         ]));
     }
     
-    $user_id = $this->session->userdata('user_id');
-    $username = ltrim($this->input->post('username'), '@');
-    $full_name = $this->input->post('full_name');
-    $category = $this->input->post('category');
-    $phone = $this->input->post('phone');
-    $email = $this->input->post('email');
-    $brand_id = $this->input->post('brand_id');
-    $shop_name = $this->input->post('shop_name');
-    $avatar_url = $this->input->post('avatar_url');
+    $user_id      = $this->session->userdata('user_id');
+    $username     = strtolower(trim(ltrim($this->input->post('username'), '@')));
+    $full_name    = $this->input->post('full_name');
+    $category     = $this->input->post('category');
+    $phone        = $this->input->post('phone');
+    $email        = $this->input->post('email');
+    $brand_id     = $this->input->post('brand_id');
+    $shop_name    = $this->input->post('shop_name');
+    $avatar_url   = $this->input->post('avatar_url');
     $follower_count = $this->input->post('follower_count');
-    
+    $force_save   = $this->input->post('force_save') === '1'; // bypass phone duplicate
+
     if (empty($username)) {
         return $this->output->set_output(json_encode([
             'success' => false,
             'message' => 'Username TikTok wajib diisi'
         ]));
     }
-    
-    // Cek duplikat username
-    $existing = $this->db->where('username', $username)->get('creators')->row();
+
+    // Cek duplikat username pada brand yang sama
+    $existing = $this->db->select('c.*, u.full_name AS owner_name, b.name AS brand_name_label')
+                         ->from('creators c')
+                         ->join('brands b', 'c.brand_id = b.id', 'left')
+                         ->join('users u', 'c.is_id = u.id', 'left')
+                         ->where('LOWER(c.username)', $username)
+                         ->where('c.brand_id', $brand_id)
+                         ->get()
+                         ->row();
+
     if ($existing) {
-        return $this->output->set_output(json_encode([
-            'success' => false,
-            'message' => 'Creator dengan username @' . $username . ' sudah ada'
-        ]));
+        if (!empty($existing->is_id)) {
+            $owner_name = $existing->owner_name ?: 'CA lain';
+            $brand_label = $existing->brand_name_label ?: 'brand ini';
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => "Creator @{$username} untuk brand {$brand_label} sudah dikelola oleh {$owner_name}."
+            ]));
+        } else {
+            // Ada record tapi belum ada ownership (is_id NULL). Kita bisa update is_id
+            $update_data = [
+                'is_id'      => $user_id,
+                'status'     => 'ACTIVE',
+                'updated_at' => date('Y-m-d H:i:s'),
+                'approved_at' => date('Y-m-d H:i:s'),
+                'approved_by' => $user_id
+            ];
+            if (!empty($full_name)) $update_data['full_name'] = $full_name;
+            if (!empty($category)) $update_data['category'] = $category;
+            if (!empty($phone)) $update_data['phone'] = $phone;
+            if (!empty($email)) $update_data['email'] = $email;
+            if (!empty($avatar_url)) $update_data['avatar_url'] = $avatar_url;
+            if (!empty($follower_count)) $update_data['imported_followers'] = $follower_count;
+
+            $this->db->where('id', $existing->id)->update('creators', $update_data);
+
+            // Log aktivitas
+            $this->load->model('User_log_model');
+            $this->User_log_model->log(
+                $user_id,
+                $this->session->userdata('username'),
+                'IS',
+                'CLAIM_CREATOR_TASK3',
+                "Claimed ownership of creator @{$username} for brand ID {$brand_id}"
+            );
+
+            return $this->output->set_output(json_encode([
+                'success'    => true,
+                'message'    => '✅ @' . $username . ' berhasil ditambahkan ke Task 3 (Monitoring)!',
+                'creator_id' => $existing->id,
+                'username'   => $username
+            ]));
+        }
     }
-    
-    // 🔥 INSERT LANGSUNG KE TASK 3 (STATUS ACTIVE)
+
+    // Cek duplikat nomor HP (kecuali force_save)
+    if (!$force_save && !empty($phone)) {
+        $normalized_input = preg_replace('/[^0-9]/', '', $phone);
+        $input_tail = substr($normalized_input, -9);
+
+        if (strlen($input_tail) === 9) {
+            $all_creators = $this->db->select('id, username, full_name, phone, status')
+                ->where('phone IS NOT NULL')
+                ->where('phone !=', '')
+                ->get('creators')
+                ->result();
+
+            $phone_matches = [];
+            foreach ($all_creators as $c) {
+                $db_tail = substr(preg_replace('/[^0-9]/', '', $c->phone), -9);
+                if ($db_tail === $input_tail) {
+                    $phone_matches[] = [
+                        'id'        => $c->id,
+                        'username'  => $c->username,
+                        'full_name' => $c->full_name,
+                        'phone'     => $c->phone,
+                        'status'    => $c->status,
+                    ];
+                }
+            }
+
+            if (!empty($phone_matches)) {
+                return $this->output->set_output(json_encode([
+                    'success'       => false,
+                    'phone_duplicate' => true,
+                    'message'       => 'Nomor HP ini sudah terdaftar untuk creator lain.',
+                    'matches'       => $phone_matches
+                ]));
+            }
+        }
+    }
+
+    // INSERT LANGSUNG KE TASK 3 (STATUS ACTIVE)
     $insert_data = [
-        'username' => $username,
-        'full_name' => $full_name ?: $username,
-        'category' => $category ?: 'Lifestyle',
-        'phone' => $phone,
-        'email' => $email,
-        'is_id' => $user_id,
-        'brand_id' => $brand_id,
-        'shop_name' => $shop_name,
-        'source' => 'manual_task3',
-        'status' => 'ACTIVE',
-        'avatar_url' => $avatar_url,
+        'username'      => $username,
+        'full_name'     => $full_name ?: $username,
+        'category'      => $category ?: 'Lifestyle',
+        'phone'         => $phone,
+        'email'         => $email,
+        'is_id'         => $user_id,
+        'brand_id'      => $brand_id,
+        'shop_name'     => $shop_name,
+        'source'        => 'manual_task3',
+        'status'        => 'ACTIVE',
+        'avatar_url'    => $avatar_url,
         'imported_followers' => $follower_count,
-        'approved_at' => date('Y-m-d H:i:s'),
-        'approved_by' => $user_id,
-        'created_at' => date('Y-m-d H:i:s'),
-        'updated_at' => date('Y-m-d H:i:s')
+        'approved_at'   => date('Y-m-d H:i:s'),
+        'approved_by'   => $user_id,
+        'created_at'    => date('Y-m-d H:i:s'),
+        'updated_at'    => date('Y-m-d H:i:s')
     ];
-    
+
     if ($this->db->insert('creators', $insert_data)) {
         $new_id = $this->db->insert_id();
-        
+
         $this->load->model('User_log_model');
         $this->User_log_model->log(
             $user_id,
             $this->session->userdata('username'),
             'IS',
             'ADD_CREATOR_TASK3',
-            "Added creator @{$username} directly to Task 3 (Monitoring)"
+            "Added creator @{$username} directly to Task 3 (Monitoring)" . ($force_save ? ' [force - phone duplicate bypassed]' : '')
         );
-        
+
         return $this->output->set_output(json_encode([
-            'success' => true,
-            'message' => '✅ @' . $username . ' berhasil ditambahkan ke Task 3 (Monitoring)!',
+            'success'    => true,
+            'message'    => '✅ @' . $username . ' berhasil ditambahkan ke Task 3 (Monitoring)!',
             'creator_id' => $new_id,
-            'username' => $username
+            'username'   => $username
         ]));
     }
-    
+
     return $this->output->set_output(json_encode([
         'success' => false,
         'message' => 'Gagal menambahkan creator'
@@ -737,7 +959,7 @@ public function get_creator_detail_for_is() {
         ->where('creator_username', $creator->username)
         ->where('order_date_local >=', date('Y-m-d', strtotime('-30 days')))
         ->where('order_status NOT IN ("CANCELLED", "REFUNDED")')
-        ->group_by('product_id')
+        ->group_by('product_id, product_name')
         ->order_by('total_gmv', 'DESC')
         ->limit(5)
         ->get()
@@ -797,7 +1019,11 @@ public function get_creator_task1_detail() {
             c.follower_count,
             c.total_gmv,
             c.total_orders,
-            c.shop_name
+            c.shop_name,
+            c.tiktok_open_id,
+            c.fastmoss_gmv,
+            c.fastmoss_gmv_28d,
+            c.fastmoss_synced_at
         ')
         ->from('creators c')
         ->where('c.id', $creator_id)
@@ -812,6 +1038,35 @@ public function get_creator_task1_detail() {
         }
         
         log_message('debug', 'Creator found: ' . $creator->username);
+
+        // Auto-resolve tiktok_open_id and sync FastMoss products if empty
+        if (empty($creator->tiktok_open_id) && !empty($creator->username)) {
+            try {
+                $this->load->model('BrandCreator_model');
+                $fastmoss_uid = $this->BrandCreator_model->find_creator_in_fastmoss($creator->username);
+                if ($fastmoss_uid) {
+                    $this->db->where('id', $creator->id)->update('creators', [
+                        'tiktok_open_id' => $fastmoss_uid,
+                        'updated_at' => date('Y-m-d H:i:s')
+                    ]);
+                    $creator->tiktok_open_id = $fastmoss_uid;
+                }
+            } catch (Exception $e) {
+                log_message('error', 'Auto-resolve tiktok_open_id failed: ' . $e->getMessage());
+            }
+        }
+
+        if (!empty($creator->tiktok_open_id)) {
+            try {
+                $has_products = $this->db->where('creator_id', $creator_id)->count_all_results('creator_products');
+                if ($has_products < 5) {
+                    $this->load->model('BrandCreator_model');
+                    $this->BrandCreator_model->sync_creator_products_to_db($creator->id, $creator->username, $creator->tiktok_open_id);
+                }
+            } catch (Exception $e) {
+                log_message('error', 'Auto-sync FastMoss products failed: ' . $e->getMessage());
+            }
+        }
         
         // ============================================================
         // 2. AMBIL BRAND NAME
@@ -854,14 +1109,18 @@ public function get_creator_task1_detail() {
         // ============================================================
         $products = [];
         $total_gmv = floatval($creator->imported_gmv ?? 0);
+        $creator->total_gmv = $total_gmv;
         
         try {
-            // Cek apakah ada link afiliasi
-            $has_links = $this->db->where('creator_id', $creator_id)
+            $existing_pids = [];
+            // A. Ambil dari affiliate_creator_links
+            $has_links = $this->db
+                ->group_start()
+                    ->where('creator_id', $creator_id)
+                    ->or_where('creator_username', $creator->username)
+                ->group_end()
                 ->where('status', 'ACTIVE')
                 ->count_all_results('affiliate_creator_links');
-            
-            log_message('debug', 'Has affiliate_creator_links: ' . $has_links);
             
             if ($has_links > 0) {
                 $products_query = $this->db->select('
@@ -879,70 +1138,459 @@ public function get_creator_task1_detail() {
                 ')
                 ->from('affiliate_creator_links acl')
                 ->join('affiliate_products ap', 'acl.product_id = ap.product_id AND acl.campaign_id = ap.campaign_id', 'left')
-                ->where('acl.creator_id', $creator_id)
+                ->group_start()
+                    ->where('acl.creator_id', $creator_id)
+                    ->or_where('acl.creator_username', $creator->username)
+                ->group_end()
                 ->where('acl.status', 'ACTIVE')
                 ->order_by('acl.total_gmv', 'DESC')
-                ->limit(20)
+                ->limit(200)
                 ->get();
                 
-                $products = $products_query->result();
-                log_message('debug', 'Products found: ' . count($products));
-                
-                // Hitung total GMV dari products
-                if (!empty($products)) {
-                    $total_gmv = array_sum(array_column($products, 'product_gmv'));
+                if ($products_query) {
+                    $products = $products_query->result();
+                    foreach ($products as $p_item) {
+                        if (!empty($p_item->product_id)) {
+                            $existing_pids[] = $p_item->product_id;
+                        }
+                    }
                 }
             }
+
+            // B. Ambil dari creator_products (Data FastMoss/TikTok Shop yang disinkronkan)
+            if ($this->db->table_exists('creator_products')) {
+                $cp_query = $this->db->select('
+                    cp.product_id,
+                    cp.product_name,
+                    cp.commission_rate,
+                    cp.gmv as product_gmv,
+                    cp.sales_count as product_orders,
+                    cp.price,
+                    cp.image_url,
+                    cp.shop_name,
+                    cp.category,
+                    cp.sales_count
+                ')
+                ->from('creator_products cp')
+                ->where('cp.creator_id', $creator_id)
+                ->order_by('cp.gmv', 'DESC')
+                ->limit(300)
+                ->get();
+
+                if ($cp_query) {
+                    foreach ($cp_query->result() as $cp_row) {
+                        if (empty($cp_row->product_id) || !in_array($cp_row->product_id, $existing_pids)) {
+                            $products[] = $cp_row;
+                            if (!empty($cp_row->product_id)) {
+                                $existing_pids[] = $cp_row->product_id;
+                            }
+                        }
+                    }
+                }
+            }
+            log_message('debug', 'Total products found for creator_id ' . $creator_id . ': ' . count($products));
         } catch (Exception $e) {
             log_message('error', 'Error getting products: ' . $e->getMessage());
         }
         
         // ============================================================
-        // 5. BRANDS (dari products atau dari brand_id creator)
+        // 5. BRANDS (Kombinasi dari orders, affiliate links, dan brand creator)
         // ============================================================
-        $brands = [];
-        
-        // Jika ada products, ambil brand dari product_shop_name
-        if (!empty($products)) {
-            $brand_map = [];
-            foreach ($products as $p) {
-                $shop_name = $p->shop_name ?? '';
-                if (!empty($shop_name) && !isset($brand_map[$shop_name])) {
-                    $brand_map[$shop_name] = [
-                        'brand_name' => $shop_name,
-                        'shop_name' => $shop_name,
-                        'total_products' => 0,
-                        'total_gmv' => 0
-                    ];
+        $brands_map = [];
+
+        // A. Ambal brand dari affiliate_orders (berdasarkan sales/orders history)
+        if (!empty($creator->username)) {
+            try {
+                $order_cols = $this->db->list_fields('affiliate_orders');
+                $has_order_shop_name = in_array('shop_name', $order_cols);
+
+                if ($has_order_shop_name) {
+                    $this->db->select('
+                        o.shop_name,
+                        COUNT(DISTINCT o.product_id) as total_products,
+                        SUM(o.gmv) as total_gmv
+                    ')
+                    ->from('affiliate_orders o')
+                    ->where('o.creator_username', $creator->username)
+                    ->where_not_in('o.order_status', ['CANCELLED', 'REFUNDED'])
+                    ->where('o.order_date_local >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)')
+                    ->where('o.shop_name IS NOT NULL', NULL, FALSE)
+                    ->where('o.shop_name !=', '')
+                    ->group_by('o.shop_name');
+                } else {
+                    $this->db->select('
+                        ap.shop_name,
+                        COUNT(DISTINCT o.product_id) as total_products,
+                        SUM(o.gmv) as total_gmv
+                    ')
+                    ->from('affiliate_orders o')
+                    ->join('affiliate_products ap', 'o.product_id = ap.product_id', 'left')
+                    ->where('o.creator_username', $creator->username)
+                    ->where_not_in('o.order_status', ['CANCELLED', 'REFUNDED'])
+                    ->where('o.order_date_local >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)')
+                    ->where('ap.shop_name IS NOT NULL', NULL, FALSE)
+                    ->where('ap.shop_name !=', '')
+                    ->group_by('ap.shop_name');
                 }
-                if (!empty($shop_name)) {
-                    $brand_map[$shop_name]['total_products']++;
-                    $brand_map[$shop_name]['total_gmv'] += floatval($p->product_gmv ?? 0);
+
+                $q = $this->db->get();
+                if ($q) {
+                    $orders_brands = $q->result();
+                    foreach ($orders_brands as $ob) {
+                        $s_name = trim($ob->shop_name);
+                        $key = strtolower($s_name);
+                        if (!empty($s_name)) {
+                            $brands_map[$key] = [
+                                'brand_id' => null,
+                                'brand_name' => $s_name,
+                                'shop_name' => $s_name,
+                                'category' => '',
+                                'total_products' => intval($ob->total_products),
+                                'total_gmv' => floatval($ob->total_gmv)
+                            ];
+                        }
+                    }
+                } else {
+                    log_message('error', 'Orders brands query failed: ' . json_encode($this->db->error()));
                 }
+            } catch (Exception $e) {
+                log_message('error', 'Error getting brands from orders: ' . $e->getMessage());
             }
+        }
+
+        // B. Ambil brand dari affiliate_creator_links (baik yang ACTIVE maupun status lainnya)
+        // Gunakan creator_username sebagai fallback jika creator_id NULL di tabel (data lama/migrasi)
+        try {
+            $this->db->select('
+                ap.shop_name,
+                COUNT(DISTINCT acl.product_id) as total_products,
+                0 as total_gmv
+            ')
+            ->from('affiliate_creator_links acl')
+            ->join('affiliate_products ap', 'acl.product_id = ap.product_id AND acl.campaign_id = ap.campaign_id', 'inner')
+            ->group_start()
+                ->where('acl.creator_id', $creator_id)
+                ->or_where('acl.creator_username', $creator->username)
+            ->group_end()
+            ->where('ap.shop_name IS NOT NULL', NULL, FALSE)
+            ->where('ap.shop_name !=', '')
+            ->group_by('ap.shop_name');
+
+            $q = $this->db->get();
+            if ($q) {
+                $links_brands = $q->result();
+                foreach ($links_brands as $lb) {
+                    $s_name = trim($lb->shop_name);
+                    $key = strtolower($s_name);
+                    if (!empty($s_name)) {
+                        if (isset($brands_map[$key])) {
+                            $brands_map[$key]['total_gmv'] = max($brands_map[$key]['total_gmv'], floatval($lb->total_gmv));
+                            $brands_map[$key]['total_products'] = max($brands_map[$key]['total_products'], intval($lb->total_products));
+                        } else {
+                            $brands_map[$key] = [
+                                'brand_id' => null,
+                                'brand_name' => $s_name,
+                                'shop_name' => $s_name,
+                                'category' => '',
+                                'total_products' => intval($lb->total_products),
+                                'total_gmv' => floatval($lb->total_gmv)
+                            ];
+                        }
+                    }
+                }
+            } else {
+                log_message('error', 'Links brands query failed: ' . json_encode($this->db->error()));
+            }
+        } catch (Exception $e) {
+            log_message('error', 'Error getting brands from links: ' . $e->getMessage());
+        }
+
+        // C. Ambil brand dari creator_products (data FastMoss/Tiktok Shop yang disinkronkan)
+        if ($this->db->table_exists('creator_products')) {
+            try {
+                $this->db->select('
+                    cp.shop_name,
+                    COUNT(DISTINCT cp.product_id) as total_products,
+                    0 as total_gmv
+                ')
+                ->from('creator_products cp')
+                ->where('cp.creator_id', $creator_id)
+                ->where('cp.shop_name IS NOT NULL', NULL, FALSE)
+                ->where('cp.shop_name !=', '')
+                ->where('cp.gmv >', 0)
+                ->group_by('cp.shop_name');
+
+                $q = $this->db->get();
+                if ($q) {
+                    $fm_brands = $q->result();
+                    foreach ($fm_brands as $fb) {
+                        $s_name = trim($fb->shop_name);
+                        $key = strtolower($s_name);
+                        if (!empty($s_name)) {
+                            if (isset($brands_map[$key])) {
+                                $brands_map[$key]['total_gmv'] = max($brands_map[$key]['total_gmv'], floatval($fb->total_gmv));
+                                $brands_map[$key]['total_products'] = max($brands_map[$key]['total_products'], intval($fb->total_products));
+                            } else {
+                                $brands_map[$key] = [
+                                    'brand_id' => null,
+                                    'brand_name' => $s_name,
+                                    'shop_name' => $s_name,
+                                    'category' => '',
+                                    'total_products' => intval($fb->total_products),
+                                    'total_gmv' => floatval($fb->total_gmv)
+                                ];
+                            }
+                        }
+                    }
+                } else {
+                    log_message('error', 'Creator products brands query failed: ' . json_encode($this->db->error()));
+                }
+            } catch (Exception $e) {
+                log_message('error', 'Error getting brands from creator_products: ' . $e->getMessage());
+            }
+        }
+
+        // D. Ambil brand dari creator\'s brand_id (jika ada)
+        if (!empty($creator->brand_id) && !empty($brand_name)) {
+            $key = strtolower(trim($brand_name));
+            $key_shop = !empty($brand_shop_name) ? strtolower(trim($brand_shop_name)) : $key;
             
-            foreach ($brand_map as $key => $b) {
-                $brands[] = (object)[
-                    'brand_id' => null,
-                    'brand_name' => $b['brand_name'],
-                    'shop_name' => $b['shop_name'],
-                    'category' => '',
-                    'total_products' => $b['total_products'],
-                    'total_gmv' => $b['total_gmv']
+            $found_key = null;
+            if (isset($brands_map[$key_shop])) {
+                $found_key = $key_shop;
+            } elseif (isset($brands_map[$key])) {
+                $found_key = $key;
+            }
+
+            if ($found_key) {
+                $brands_map[$found_key]['brand_id'] = $creator->brand_id;
+                $brands_map[$found_key]['brand_name'] = $brand_name;
+                if (!empty($brand_shop_name)) {
+                    $brands_map[$found_key]['shop_name'] = $brand_shop_name;
+                }
+            } else {
+                $brands_map[$key_shop] = [
+                    'brand_id' => $creator->brand_id,
+                    'brand_name' => $brand_name,
+                    'shop_name' => !empty($brand_shop_name) ? $brand_shop_name : $brand_name,
+                    'category' => $creator->category ?? '',
+                    'total_products' => 0,
+                    'total_gmv' => 0
                 ];
             }
         }
+
+        // D. Untuk semua brand di map, coba cari id dan nama brand aslinya dari tabel `brands` jika brand_id masih null
+        $shop_names = array_column($brands_map, 'shop_name');
+        if (!empty($shop_names)) {
+            try {
+                $this->db->select('id, name, shop_name')
+                    ->where_in('shop_name', $shop_names)
+                    ->from('brands');
+                $q = $this->db->get();
+                if ($q) {
+                    $db_brands = $q->result();
+                    foreach ($db_brands as $db_b) {
+                        $key = strtolower(trim($db_b->shop_name));
+                        if (isset($brands_map[$key])) {
+                            $brands_map[$key]['brand_id'] = $db_b->id;
+                            $brands_map[$key]['brand_name'] = $db_b->name;
+                        }
+                    }
+                } else {
+                    log_message('error', 'Matching database brands query failed: ' . json_encode($this->db->error()));
+                }
+            } catch (Exception $e) {
+                log_message('error', 'Error matching brands to database: ' . $e->getMessage());
+            }
+        }
+
+        // Ubah ke array of objects
+        $brands = [];
+        foreach ($brands_map as $b) {
+            $brands[] = (object)$b;
+        }
+
+        // Urutkan berdasarkan total_gmv DESC agar brand dengan kontribusi tertinggi muncul pertama
+        usort($brands, function($a, $b) {
+            return $b->total_gmv <=> $a->total_gmv;
+        });
+
+        // Keep total_gmv as imported_gmv, do not overwrite with sum of brand GMVs
         
-        // Jika tidak ada brands dari products, gunakan brand dari creator
-        if (empty($brands) && !empty($brand_name)) {
-            $brands[] = (object)[
-                'brand_id' => $creator->brand_id,
-                'brand_name' => $brand_name,
-                'shop_name' => $brand_shop_name,
-                'category' => $creator->category ?? '',
-                'total_products' => 0,
-                'total_gmv' => floatval($creator->imported_gmv ?? 0)
-            ];
+        // ============================================================
+        // 5.5 ENRICH DARI FASTMOSS — baseInfo (GMV total) + shopList (GMV per brand)
+        // ============================================================
+        try {
+            $this->load->model('Fastmoss_model');
+
+            $fm_uid = $creator->tiktok_open_id ?? null;
+            $just_resolved = false;
+            if ((empty($fm_uid) || $fm_uid === $creator->username || !is_numeric($fm_uid)) && !empty($creator->username)) {
+                $resolved_uid = $this->Fastmoss_model->resolve_uid_by_username($creator->username);
+                if ($resolved_uid && is_numeric($resolved_uid)) {
+                    $fm_uid = $resolved_uid;
+                    $this->db->where('id', $creator_id)
+                             ->update('creators', [
+                                 'tiktok_open_id' => $fm_uid,
+                                 'updated_at'     => date('Y-m-d H:i:s')
+                             ]);
+                    $creator->tiktok_open_id = $fm_uid;
+                    $just_resolved = true;
+                }
+            }
+
+            if (!empty($fm_uid) && is_numeric($fm_uid)) {
+                // ── 5.5a: baseInfo → total GMV creator ────────────────
+                // Ambil jika belum pernah di-sync, baru saja di-resolve, atau sudah lebih dari 6 jam
+                $need_sync = $just_resolved
+                    || empty($creator->fastmoss_synced_at)
+                    || empty($creator->fastmoss_gmv_28d)
+                    || (time() - strtotime($creator->fastmoss_synced_at)) > 6 * 3600;
+
+                if ($need_sync) {
+                    $base_info = $this->Fastmoss_model->get_creator_base_info($fm_uid);
+                    if (!empty($base_info)) {
+                        // summary endpoint: gmv_28d = goods_max_sale_amount (GMV produk terlaris 28h)
+                        $new_fastmoss_gmv_28d = $base_info['gmv_28d'] > 0 ? floatval($base_info['gmv_28d']) : null;
+
+                        // Simpan ke DB — selalu update synced_at, kolom GMV hanya jika ada nilai
+                        $sync_data = [
+                            'fastmoss_synced_at' => date('Y-m-d H:i:s'),
+                            'updated_at'         => date('Y-m-d H:i:s'),
+                        ];
+                        if ($new_fastmoss_gmv_28d !== null) {
+                            $sync_data['fastmoss_gmv']     = $new_fastmoss_gmv_28d; // simpan juga ke fastmoss_gmv sebagai referensi
+                            $sync_data['fastmoss_gmv_28d'] = $new_fastmoss_gmv_28d;
+                        }
+                        $this->db->where('id', $creator_id)->update('creators', $sync_data);
+
+                        // Update object creator untuk response
+                        $creator->fastmoss_gmv       = $new_fastmoss_gmv_28d;
+                        $creator->fastmoss_gmv_28d   = $new_fastmoss_gmv_28d;
+                        $creator->fastmoss_synced_at = $sync_data['fastmoss_synced_at'];
+
+                        log_message('debug', '[task1_detail] summary gmv_28d=' . $new_fastmoss_gmv_28d . ' uid=' . $fm_uid);
+                    }
+                }
+
+                // ── 5.5b: shopList → GMV per brand kolaborasi ─────────
+                $fm_brands = $this->Fastmoss_model->get_all_creator_brand_collabs($fm_uid, 5);
+
+                log_message('debug', '[task1_detail] FastMoss returned ' . count($fm_brands) . ' brands for uid=' . $fm_uid);
+
+                foreach ($fm_brands as $fb) {
+                    $s_name = trim($fb['shop_name'] ?? '');
+                    if (empty($s_name)) continue;
+
+                    // --- SAVE TO brand_creators TABLE ---
+                    // 1. Cari brand_id yang cocok dari database brands
+                    $db_brand = $this->db->select('id')
+                        ->group_start()
+                            ->where('name', $s_name)
+                            ->or_where('shop_name', $s_name)
+                        ->group_end()
+                        ->get('brands')
+                        ->row();
+
+                    if ($db_brand) {
+                        $existing_bc = $this->db->where('brand_id', $db_brand->id)
+                            ->where('creator_username', $creator->username)
+                            ->get('brand_creators')
+                            ->row();
+
+                        $bc_data = [
+                            'brand_id'         => $db_brand->id,
+                            'creator_username' => $creator->username,
+                            'creator_nickname' => $creator->full_name ?: $creator->username,
+                            'follower_count'   => intval($creator->follower_count ?? 0),
+                            'total_gmv'        => floatval($fb['gmv']),
+                            'day7_gmv'         => floatval($fb['day7_gmv'] ?? 0),
+                            'rating'           => floatval($fb['shop_rating'] ?? 0),
+                            'total_orders'     => intval($fb['sales_count']),
+                            'creator_open_id'  => $fm_uid,
+                            'last_sync'        => date('Y-m-d H:i:s'),
+                            'updated_at'       => date('Y-m-d H:i:s')
+                        ];
+
+                        if (!empty($fb['shop_rating']) && floatval($fb['shop_rating']) > 0) {
+                            $this->db->where('id', $db_brand->id)->update('brands', ['rating' => floatval($fb['shop_rating'])]);
+                        }
+
+                        if ($existing_bc) {
+                            $this->db->where('id', $existing_bc->id)->update('brand_creators', $bc_data);
+                        } else {
+                            $bc_data['created_at'] = date('Y-m-d H:i:s');
+                            $this->db->insert('brand_creators', $bc_data);
+                        }
+                    }
+                    // ------------------------------------
+
+                    $key = strtolower($s_name);
+
+                    if (isset($brands_map[$key])) {
+                        // Prioritaskan GMV FastMoss (28 hari terakhir) jika nilainya valid (> 0)
+                        if (floatval($fb['gmv']) > 0) {
+                            $brands_map[$key]['total_gmv'] = floatval($fb['gmv']);
+                        } else {
+                            $brands_map[$key]['total_gmv'] = max(
+                                floatval($brands_map[$key]['total_gmv']),
+                                floatval($fb['gmv'])
+                            );
+                        }
+                        $brands_map[$key]['total_products'] = max(
+                            intval($brands_map[$key]['total_products']),
+                            intval($fb['product_count'])
+                        );
+                        $brands_map[$key]['_source'] = 'merged';
+                    } else {
+                        // Brand baru — hanya dari FastMoss
+                        $brands_map[$key] = [
+                            'brand_id'      => $db_brand ? $db_brand->id : null,
+                            'brand_name'    => $s_name,
+                            'shop_name'     => $s_name,
+                            'shop_logo'     => $fb['shop_logo'] ?? '',
+                            'category'      => '',
+                            'total_products'=> intval($fb['product_count']),
+                            'total_gmv'     => floatval($fb['gmv']),
+                            '_source'       => 'fastmoss',
+                        ];
+                    }
+                }
+
+                // Rebuild $brands array dari brands_map yang sudah di-enrich
+                $brands = [];
+                foreach ($brands_map as $b) {
+                    $brands[] = (object)$b;
+                }
+                usort($brands, function($a, $b) {
+                    return $b->total_gmv <=> $a->total_gmv;
+                });
+                log_message('debug', '[task1_detail] Final brands after merge: ' . count($brands));
+
+                // Hitung total GMV akumulasi dari brand kolaborasi dalam 28 hari terakhir
+                $fastmoss_brand_gmv_sum = 0;
+                foreach ($brands as $b) {
+                    if (isset($b->_source) && ($b->_source === 'fastmoss' || $b->_source === 'merged')) {
+                        $fastmoss_brand_gmv_sum += floatval($b->total_gmv);
+                    }
+                }
+                
+                // Gunakan jumlah akumulasi GMV per-brand
+                $final_gmv_28d = $fastmoss_brand_gmv_sum;
+                
+                // Simpan akumulasi GMV 28 hari ke object creator dan database
+                $creator->fastmoss_gmv_28d = $final_gmv_28d;
+                $this->db->where('id', $creator_id)->update('creators', [
+                    'fastmoss_gmv_28d' => $final_gmv_28d,
+                    'updated_at'       => date('Y-m-d H:i:s')
+                ]);
+
+                // Keep total_gmv as imported_gmv, do not overwrite with sum of brand GMVs
+            }
+        } catch (Exception $e) {
+            // Jangan gagalkan seluruh response jika FastMoss error
+            log_message('error', '[task1_detail] FastMoss enrich error: ' . $e->getMessage());
         }
         
         // ============================================================
@@ -1018,18 +1666,394 @@ public function get_creator_task1_detail() {
         }
         
         // ============================================================
+        // 8.5 TANDAI is_partner & is_in_toopai — status brand di sistem Toopai
+        // ============================================================
+        if (!empty($brands)) {
+            // Kumpulkan semua nama/shop yang belum punya brand_id
+            $unmatched_names = [];
+            foreach ($brands as $b) {
+                if (empty($b->brand_id)) {
+                    if (!empty($b->shop_name))  $unmatched_names[] = trim($b->shop_name);
+                    if (!empty($b->brand_name) && $b->brand_name !== $b->shop_name) {
+                        $unmatched_names[] = trim($b->brand_name);
+                    }
+                }
+            }
+
+            // Ambil semua brand di tabel `brands` yang namanya cocok (semua status)
+            $all_toopai_brands_by_name = [];
+            if (!empty($unmatched_names)) {
+                $q = $this->db->select('id, name, shop_name, status')
+                    ->group_start()
+                        ->where_in('name', $unmatched_names)
+                        ->or_where_in('shop_name', $unmatched_names)
+                    ->group_end()
+                    ->get('brands');
+                if ($q) {
+                    foreach ($q->result() as $pb) {
+                        if (!empty($pb->name))      $all_toopai_brands_by_name[strtolower(trim($pb->name))]      = $pb;
+                        if (!empty($pb->shop_name)) $all_toopai_brands_by_name[strtolower(trim($pb->shop_name))] = $pb;
+                    }
+                }
+            }
+
+            // Kumpulkan semua brand_id yang sudah terisi untuk di-validasi ke DB
+            $existing_brand_ids = [];
+            foreach ($brands as $b) {
+                if (!empty($b->brand_id)) {
+                    $existing_brand_ids[] = intval($b->brand_id);
+                }
+            }
+            $all_toopai_brands_by_id = [];
+            if (!empty($existing_brand_ids)) {
+                $qIds = $this->db->select('id, name, shop_name, status')
+                    ->where_in('id', $existing_brand_ids)
+                    ->get('brands');
+                if ($qIds) {
+                    foreach ($qIds->result() as $ab) {
+                        $all_toopai_brands_by_id[intval($ab->id)] = $ab;
+                    }
+                }
+            }
+
+            foreach ($brands as $b) {
+                $matched_db_brand = null;
+                if (!empty($b->brand_id) && isset($all_toopai_brands_by_id[intval($b->brand_id)])) {
+                    $matched_db_brand = $all_toopai_brands_by_id[intval($b->brand_id)];
+                } else {
+                    $key_shop  = strtolower(trim($b->shop_name  ?? ''));
+                    $key_brand = strtolower(trim($b->brand_name ?? ''));
+                    if (!empty($key_shop) && isset($all_toopai_brands_by_name[$key_shop])) {
+                        $matched_db_brand = $all_toopai_brands_by_name[$key_shop];
+                    } elseif (!empty($key_brand) && isset($all_toopai_brands_by_name[$key_brand])) {
+                        $matched_db_brand = $all_toopai_brands_by_name[$key_brand];
+                    }
+                }
+
+                if ($matched_db_brand) {
+                    $b->is_in_toopai = true;
+                    $b->brand_id     = intval($matched_db_brand->id);
+                    // Tandai partner jika status di DB brands ACTIVE atau merupakan brand utama creator
+                    if ($matched_db_brand->status === 'ACTIVE' || (!empty($creator->brand_id) && intval($creator->brand_id) === intval($matched_db_brand->id))) {
+                        $b->is_partner = true;
+                    } else {
+                        $b->is_partner = false;
+                    }
+                } else {
+                    $b->is_in_toopai = false;
+                    $b->is_partner   = false;
+                }
+            }
+
+            // Re-sort: partner duluan, lalu prospect (dalam sistem), lalu non-sistem, masing-masing by GMV desc
+            $partners   = array_values(array_filter($brands, fn($b) => !empty($b->is_in_toopai) && !empty($b->is_partner)));
+            $prospects  = array_values(array_filter($brands, fn($b) => !empty($b->is_in_toopai) && empty($b->is_partner)));
+            $non_system = array_values(array_filter($brands, fn($b) => empty($b->is_in_toopai)));
+
+            usort($partners,   fn($a, $b) => ($b->total_gmv ?? 0) <=> ($a->total_gmv ?? 0));
+            usort($prospects,  fn($a, $b) => ($b->total_gmv ?? 0) <=> ($a->total_gmv ?? 0));
+            usort($non_system, fn($a, $b) => ($b->total_gmv ?? 0) <=> ($a->total_gmv ?? 0));
+
+            $brands = array_values(array_merge($partners, $prospects, $non_system));
+        }
+
+        // ============================================================
+        // 8.7 AUTO-FETCH PHONE FROM TAP (jika phone masih kosong)
+        // Dilakukan secara silent di background — tidak memblokir response
+        // ============================================================
+        $phone_source = 'database';
+        if (empty($creator->phone)) {
+            $open_id_for_phone = $creator->tiktok_open_id ?? null;
+
+            // Pastikan tiktok_open_id tersedia
+            if (empty($open_id_for_phone) && !empty($creator->username)) {
+                try {
+                    $search_result = $this->jsm_api->search_creators_by_is($creator->username, null, 20);
+                    if ($search_result['success'] && !empty($search_result['data']['creators'])) {
+                        foreach ($search_result['data']['creators'] as $tc) {
+                            if (strtolower($tc['username'] ?? '') === strtolower($creator->username)) {
+                                if (!empty($tc['creator_open_id'])) {
+                                    $open_id_for_phone = $tc['creator_open_id'];
+                                    $this->db->where('id', $creator_id)->update('creators', [
+                                        'tiktok_open_id' => $open_id_for_phone,
+                                        'updated_at'     => date('Y-m-d H:i:s')
+                                    ]);
+                                    $creator->tiktok_open_id = $open_id_for_phone;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                } catch (Exception $e) {
+                    log_message('error', 'task1_detail auto-phone: search open_id failed: ' . $e->getMessage());
+                }
+            }
+
+            if (!empty($open_id_for_phone)) {
+                try {
+                    $tap_detail = $this->jsm_api->get_creator_detail_by_id($open_id_for_phone);
+                    if ($tap_detail['success']) {
+                        $tap_creator_raw = $tap_detail['data']['creator'] ?? $tap_detail['data'];
+                        // Prioritas 1: field phone langsung di response
+                        $phone_fields = [
+                            'phone_number', 'phone', 'mobile', 'whatsapp', 'wa_number',
+                            'contact_phone', 'contact_number', 'telephone'
+                        ];
+                        $fetched_phone = '';
+                        foreach ($phone_fields as $pf) {
+                            if (!empty($tap_creator_raw[$pf])) {
+                                $fetched_phone = $tap_creator_raw[$pf];
+                                log_message('debug', 'task1_detail auto-phone: found phone in field "' . $pf . '"');
+                                break;
+                            }
+                        }
+                        // Prioritas 2: sub-object contact_info
+                        if (empty($fetched_phone) && !empty($tap_creator_raw['contact_info'])) {
+                            foreach ($phone_fields as $pf) {
+                                if (!empty($tap_creator_raw['contact_info'][$pf])) {
+                                    $fetched_phone = $tap_creator_raw['contact_info'][$pf];
+                                    log_message('debug', 'task1_detail auto-phone: found phone in contact_info.' . $pf);
+                                    break;
+                                }
+                            }
+                        }
+                        // Prioritas 3: parse dari bio_description (Endorsement di TAP UI)
+                        if (empty($fetched_phone)) {
+                            $bio_text = $tap_creator_raw['bio_description']
+                                ?? $tap_creator_raw['bio']
+                                ?? $tap_creator_raw['description']
+                                ?? '';
+                            if (!empty($bio_text)) {
+                                $fetched_phone = $this->extractPhoneFromBio($bio_text);
+                                if (!empty($fetched_phone)) {
+                                    log_message('info', 'task1_detail auto-phone: found phone in bio_description: ' . $fetched_phone);
+                                }
+                            }
+                        }
+
+                        if (!empty($fetched_phone)) {
+                            // Format nomor ke standar 62xxx
+                            $fetched_phone = preg_replace('/[^0-9+]/', '', $fetched_phone);
+                            if (preg_match('/^0/', $fetched_phone)) {
+                                $fetched_phone = '62' . substr($fetched_phone, 1);
+                            } elseif (preg_match('/^\+/', $fetched_phone)) {
+                                $fetched_phone = substr($fetched_phone, 1);
+                            } elseif (!preg_match('/^62/', $fetched_phone) && strlen($fetched_phone) > 0) {
+                                $fetched_phone = '62' . $fetched_phone;
+                            }
+
+                            $creator->phone = $fetched_phone;
+                            $phone_source = 'tap_api';
+                            $this->db->where('id', $creator_id)->update('creators', [
+                                'phone'      => $fetched_phone,
+                                'updated_at' => date('Y-m-d H:i:s')
+                            ]);
+                            log_message('info', 'task1_detail auto-phone: saved phone=' . $fetched_phone . ' for creator_id=' . $creator_id);
+                        } else {
+                            log_message('debug', 'task1_detail auto-phone: no phone found. bio_desc="'
+                                . substr($tap_creator_raw['bio_description'] ?? '', 0, 100)
+                                . '" keys=' . implode(', ', array_keys($tap_creator_raw)));
+                        }
+                    }
+                } catch (Exception $e) {
+                    log_message('error', 'task1_detail auto-phone: TAP detail failed: ' . $e->getMessage());
+                }
+            }
+        }
+
+        // Hitung total akumulasi produk keseluruhan dari seluruh brand kolaborasi & produk
+        $total_products_count = count($products);
+        if (!empty($brands)) {
+            $brand_products_sum = 0;
+            foreach ($brands as $b) {
+                $brand_products_sum += intval($b->total_products ?? 0);
+            }
+            if ($brand_products_sum > $total_products_count) {
+                $total_products_count = $brand_products_sum;
+            }
+        }
+
+        // ============================================================
+        // 8.9 FETCH GMV BREAKDOWN PER CHANNEL — DENGAN CACHE DB
+        // Cache tersimpan di kolom tap_live_pct, tap_video_pct, tap_product_card_pct,
+        // tap_gmv_total, tap_gmv_synced_at pada tabel creators.
+        // TAP API hanya dipanggil jika cache kosong atau sudah > 24 jam.
+        // Ini mencegah rate limit dari TAP API.
+        // ============================================================
+        $gmv_breakdown = null;
+        $tap_open_id   = $creator->tiktok_open_id ?? null;
+
+        // ── Ambil kolom cache dari DB (mungkin belum ada di $creator karena SELECT terbatas) ──
+        $creator_cache = null;
+        try {
+            $creator_cache = $this->db->select(
+                    'tap_live_pct, tap_video_pct, tap_product_card_pct, tap_gmv_total, tap_gmv_synced_at'
+                )
+                ->where('id', $creator_id)
+                ->get('creators')
+                ->row();
+        } catch (Exception $e) {
+            // Kolom belum ada — jalankan migrasi otomatis
+            $this->db->query("
+                ALTER TABLE creators
+                  ADD COLUMN IF NOT EXISTS tap_live_pct         DECIMAL(6,2)  DEFAULT NULL,
+                  ADD COLUMN IF NOT EXISTS tap_video_pct        DECIMAL(6,2)  DEFAULT NULL,
+                  ADD COLUMN IF NOT EXISTS tap_product_card_pct DECIMAL(6,2)  DEFAULT NULL,
+                  ADD COLUMN IF NOT EXISTS tap_gmv_total        DECIMAL(20,2) DEFAULT NULL,
+                  ADD COLUMN IF NOT EXISTS tap_gmv_synced_at    DATETIME      DEFAULT NULL
+            ");
+            $creator_cache = null;
+        }
+
+        $cache_synced_at  = $creator_cache->tap_gmv_synced_at ?? null;
+        $cache_live_pct   = $creator_cache->tap_live_pct       ?? null;
+        $cache_video_pct  = $creator_cache->tap_video_pct      ?? null;
+        $cache_card_pct   = $creator_cache->tap_product_card_pct ?? null;
+        $cache_gmv_total  = $creator_cache->tap_gmv_total      ?? null;
+
+        // Cache valid jika ada data dan belum lebih dari 24 jam
+        $cache_is_valid = !empty($cache_synced_at)
+            && ($cache_live_pct !== null || $cache_video_pct !== null)
+            && (time() - strtotime($cache_synced_at)) < 24 * 3600;
+
+        if ($cache_is_valid) {
+            // ── Gunakan data cache dari DB ──────────────────────────
+            $live_pct         = floatval($cache_live_pct);
+            $video_pct        = floatval($cache_video_pct);
+            $product_card_pct = floatval($cache_card_pct);
+            $total_gmv_cache  = floatval($cache_gmv_total);
+
+            if ($live_pct > 0 || $video_pct > 0 || $product_card_pct > 0) {
+                $gmv_breakdown = [
+                    'total_gmv'        => $total_gmv_cache,
+                    'live_gmv'         => round($total_gmv_cache * $live_pct / 100, 2),
+                    'video_gmv'        => round($total_gmv_cache * $video_pct / 100, 2),
+                    'product_card_gmv' => round($total_gmv_cache * $product_card_pct / 100, 2),
+                    'live_pct'         => $live_pct,
+                    'video_pct'        => $video_pct,
+                    'product_card_pct' => $product_card_pct,
+                    'source'           => 'cache',
+                    'cached_at'        => $cache_synced_at,
+                ];
+                log_message('debug', '[task1_detail] gmv_breakdown dari cache DB: live=' . $live_pct . '% video=' . $video_pct . '%');
+            }
+        } else {
+            // ── Cache kosong/expired → panggil TAP API ──────────────
+
+            // Resolve tiktok_open_id jika belum ada
+            if (empty($tap_open_id) && !empty($creator->username)) {
+                try {
+                    $search_result = $this->jsm_api->search_creators_by_is($creator->username, null, 20);
+                    if (!empty($search_result['success']) && !empty($search_result['data']['creators'])) {
+                        foreach ($search_result['data']['creators'] as $tc) {
+                            if (strtolower($tc['username'] ?? '') === strtolower($creator->username)) {
+                                if (!empty($tc['creator_open_id'])) {
+                                    $tap_open_id = $tc['creator_open_id'];
+                                    $this->db->where('id', $creator_id)->update('creators', [
+                                        'tiktok_open_id' => $tap_open_id,
+                                        'updated_at'     => date('Y-m-d H:i:s')
+                                    ]);
+                                    $creator->tiktok_open_id = $tap_open_id;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                } catch (Exception $e) {
+                    log_message('error', '[task1_detail] gmv_breakdown search open_id error: ' . $e->getMessage());
+                }
+            }
+
+            if (!empty($tap_open_id)) {
+                try {
+                    $perf = $this->jsm_api->get_marketplace_creator_performance($tap_open_id);
+
+                    if (!empty($perf['success']) && !empty($perf['data'])) {
+                        $d         = $perf['data'];
+                        $total     = floatval($d['gmv']       ?? 0);
+                        $live_gmv  = floatval($d['live_gmv']  ?? 0);
+                        $video_gmv = floatval($d['video_gmv'] ?? 0);
+                        $raw_dist  = $d['content_gmv_distribution'] ?? [];
+
+                        if ($total > 0) {
+                            $live_pct         = round(($live_gmv  / $total) * 100, 2);
+                            $video_pct        = round(($video_gmv / $total) * 100, 2);
+                            $product_card_pct = round(max(0, 100 - $live_pct - $video_pct), 2);
+                            $product_card_gmv = max(0, $total - $live_gmv - $video_gmv);
+
+                            $gmv_breakdown = [
+                                'total_gmv'        => $total,
+                                'live_gmv'         => $live_gmv,
+                                'video_gmv'        => $video_gmv,
+                                'product_card_gmv' => $product_card_gmv,
+                                'live_pct'         => $live_pct,
+                                'video_pct'        => $video_pct,
+                                'product_card_pct' => $product_card_pct,
+                                'source'           => 'tap_api_fresh',
+                                'raw_distribution' => $raw_dist,
+                            ];
+
+                            // ── Simpan ke cache DB ──
+                            $this->db->where('id', $creator_id)->update('creators', [
+                                'tap_live_pct'         => $live_pct,
+                                'tap_video_pct'        => $video_pct,
+                                'tap_product_card_pct' => $product_card_pct,
+                                'tap_gmv_total'        => $total,
+                                'tap_gmv_synced_at'    => date('Y-m-d H:i:s'),
+                                'updated_at'           => date('Y-m-d H:i:s'),
+                            ]);
+
+                            log_message('debug', '[task1_detail] gmv_breakdown fresh dari TAP: '
+                                . "live={$live_pct}% video={$video_pct}% card={$product_card_pct}%"
+                                . " total={$total} open_id={$tap_open_id}");
+                        }
+                    } else {
+                        // TAP gagal (rate limit, dsb) — jika ada cache lama, tetap pakai
+                        if (!empty($cache_synced_at) && $cache_live_pct !== null) {
+                            $live_pct         = floatval($cache_live_pct);
+                            $video_pct        = floatval($cache_video_pct);
+                            $product_card_pct = floatval($cache_card_pct);
+                            $total_gmv_cache  = floatval($cache_gmv_total);
+                            if ($live_pct > 0 || $video_pct > 0 || $product_card_pct > 0) {
+                                $gmv_breakdown = [
+                                    'total_gmv'        => $total_gmv_cache,
+                                    'live_gmv'         => round($total_gmv_cache * $live_pct / 100, 2),
+                                    'video_gmv'        => round($total_gmv_cache * $video_pct / 100, 2),
+                                    'product_card_gmv' => round($total_gmv_cache * $product_card_pct / 100, 2),
+                                    'live_pct'         => $live_pct,
+                                    'video_pct'        => $video_pct,
+                                    'product_card_pct' => $product_card_pct,
+                                    'source'           => 'cache_stale',
+                                    'cached_at'        => $cache_synced_at,
+                                ];
+                                log_message('debug', '[task1_detail] gmv_breakdown fallback ke cache lama (TAP rate limit)');
+                            }
+                        }
+                        log_message('debug', '[task1_detail] TAP perf gagal: ' . ($perf['message'] ?? 'unknown'));
+                    }
+                } catch (Exception $e) {
+                    log_message('error', '[task1_detail] gmv_breakdown TAP error: ' . $e->getMessage());
+                }
+            }
+        }
+
+        // ============================================================
         // 9. KIRIM RESPONSE
         // ============================================================
         $response = [
-            'success' => true,
-            'creator' => $creator,
-            'brands' => $brands,
-            'products' => $products,
-            'whatsapp_logs' => $whatsapp_logs,
-            'multi_links' => $multi_links,
-            'total_gmv' => $total_gmv,
-            'total_products' => count($products),
-            'total_brands' => count($brands)
+            'success'        => true,
+            'creator'        => $creator,
+            'brands'         => $brands,
+            'products'       => $products,
+            'whatsapp_logs'  => $whatsapp_logs,
+            'multi_links'    => $multi_links,
+            'total_gmv'      => $total_gmv,
+            'fastmoss_gmv'   => floatval($creator->fastmoss_gmv ?? 0),
+            'fastmoss_gmv_28d' => floatval($creator->fastmoss_gmv_28d ?? 0),
+            'total_products' => $total_products_count,
+            'total_brands'   => count($brands),
+            'phone_source'   => $phone_source,
+            'gmv_breakdown'  => $gmv_breakdown,   // null jika tidak tersedia
         ];
         
         log_message('debug', '=== get_creator_task1_detail SUCCESS ===');
@@ -1045,6 +2069,93 @@ public function get_creator_task1_detail() {
         return $this->output->set_output(json_encode([
             'success' => false,
             'message' => 'Server error: ' . $e->getMessage()
+        ]));
+    }
+}
+
+/**
+ * AJAX — Kirim Notifikasi Remind BA terhadap brand yang belum bekerja sama
+ */
+public function remind_ba_brand() {
+    $this->output->set_content_type('application/json');
+
+    if (!$this->session->userdata('logged_in')) {
+        return $this->output->set_output(json_encode(['success' => false, 'message' => 'Session expired']));
+    }
+
+    $user_id    = $this->session->userdata('user_id');
+    $user_name  = $this->session->userdata('full_name') ?: $this->session->userdata('username');
+    $user_role  = $this->session->userdata('role');
+    $brand_name = trim($this->input->post('brand_name'));
+    $creator_id = $this->input->post('creator_id');
+
+    if (empty($brand_name)) {
+        return $this->output->set_output(json_encode(['success' => false, 'message' => 'Nama brand tidak valid']));
+    }
+
+    // Ambil data creator jika ada creator_id
+    $creator_username = '';
+    if (!empty($creator_id)) {
+        $creator = $this->db->select('username')->where('id', $creator_id)->get('creators')->row();
+        if ($creator) {
+            $creator_username = $creator->username;
+        }
+    }
+
+    try {
+        // Auto-create tabel ba_reminders jika belum ada
+        $this->db->query("
+            CREATE TABLE IF NOT EXISTS ba_reminders (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                sender_id INT NULL,
+                sender_name VARCHAR(255) NULL,
+                creator_id INT NULL,
+                creator_username VARCHAR(255) NULL,
+                brand_name VARCHAR(255) NOT NULL,
+                status VARCHAR(50) DEFAULT 'PENDING',
+                notes TEXT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                KEY idx_brand_name (brand_name),
+                KEY idx_creator_id (creator_id),
+                KEY idx_status (status)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+
+        // Simpan reminder ke ba_reminders
+        $data = [
+            'sender_id'        => $user_id,
+            'sender_name'      => $user_name,
+            'creator_id'       => $creator_id,
+            'creator_username' => $creator_username,
+            'brand_name'       => $brand_name,
+            'status'           => 'PENDING',
+            'notes'            => 'Tim CA (' . $user_name . ') mengingatkan tim BA untuk bekerja sama dengan brand ' . $brand_name . ($creator_username ? ' (Creator: @' . $creator_username . ')' : ''),
+            'created_at'       => date('Y-m-d H:i:s')
+        ];
+        $this->db->insert('ba_reminders', $data);
+
+        // Simpan log aktivitas
+        $this->load->model('User_log_model');
+        if (isset($this->User_log_model)) {
+            $this->User_log_model->log(
+                $user_id,
+                $user_name,
+                $user_role,
+                'REMIND_BA_BRAND',
+                'Mengirim notifikasi ke tim BA untuk brand: ' . $brand_name . ($creator_username ? ' (Creator: @' . $creator_username . ')' : '')
+            );
+        }
+
+        return $this->output->set_output(json_encode([
+            'success' => true,
+            'message' => 'Notifikasi ke tim BA untuk brand "' . $brand_name . '" berhasil dikirim!'
+        ]));
+    } catch (Exception $e) {
+        log_message('error', 'remind_ba_brand error: ' . $e->getMessage());
+        return $this->output->set_output(json_encode([
+            'success' => false,
+            'message' => 'Gagal mengirim notifikasi: ' . $e->getMessage()
         ]));
     }
 }
@@ -1705,18 +2816,19 @@ public function performance() {
         ]));
     }
     
-    $user_id = $this->session->userdata('user_id');
-    $username = ltrim($this->input->post('username'), '@');
-    $full_name = $this->input->post('full_name');
-    $category = $this->input->post('category');
-    $phone = $this->input->post('phone');
-    $email = $this->input->post('email');
-    $brand_id = $this->input->post('brand_id');
-    $shop_name = $this->input->post('shop_name');
-    $avatar_url = $this->input->post('avatar_url');
+    $user_id      = $this->session->userdata('user_id');
+    $username     = strtolower(trim(ltrim($this->input->post('username'), '@')));
+    $full_name    = $this->input->post('full_name');
+    $category     = $this->input->post('category');
+    $phone        = $this->input->post('phone');
+    $email        = $this->input->post('email');
+    $brand_id     = $this->input->post('brand_id');
+    $shop_name    = $this->input->post('shop_name');
+    $avatar_url   = $this->input->post('avatar_url');
     $follower_count = $this->input->post('follower_count');
-    $gmv_28days = $this->input->post('gmv');
-    
+    $gmv_28days   = $this->input->post('gmv');
+    $force_save   = $this->input->post('force_save') === '1'; // bypass phone duplicate
+
     // Validasi
     if (empty($username)) {
         return $this->output->set_output(json_encode([
@@ -1724,43 +2836,125 @@ public function performance() {
             'message' => 'Username TikTok wajib diisi'
         ]));
     }
-    
-    // Cek duplikat username
-    $existing = $this->db->where('username', $username)->get('creators')->row();
+
+    // Cek duplikat username pada brand yang sama
+    $existing = $this->db->select('c.*, u.full_name AS owner_name, b.name AS brand_name_label')
+                         ->from('creators c')
+                         ->join('brands b', 'c.brand_id = b.id', 'left')
+                         ->join('users u', 'c.is_id = u.id', 'left')
+                         ->where('LOWER(c.username)', $username)
+                         ->where('c.brand_id', $brand_id)
+                         ->get()
+                         ->row();
+
     if ($existing) {
-        return $this->output->set_output(json_encode([
-            'success' => false,
-            'message' => 'Creator dengan username @' . $username . ' sudah ada'
-        ]));
+        if (!empty($existing->is_id)) {
+            $owner_name = $existing->owner_name ?: 'CA lain';
+            $brand_label = $existing->brand_name_label ?: 'brand ini';
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => "Creator @{$username} untuk brand {$brand_label} sudah dikelola oleh {$owner_name}."
+            ]));
+        } else {
+            // Ada record tapi belum ada ownership (is_id NULL). Kita bisa update is_id
+            $update_data = [
+                'is_id'      => $user_id,
+                'status'     => 'PENDING',
+                'updated_at' => date('Y-m-d H:i:s')
+            ];
+            if (!empty($full_name)) $update_data['full_name'] = $full_name;
+            if (!empty($category)) $update_data['category'] = $category;
+            if (!empty($phone)) $update_data['phone'] = $phone;
+            if (!empty($email)) $update_data['email'] = $email;
+            if (!empty($avatar_url)) $update_data['avatar_url'] = $avatar_url;
+            if (!empty($follower_count)) $update_data['imported_followers'] = $follower_count;
+            if (!empty($gmv_28days)) $update_data['imported_gmv'] = $gmv_28days;
+
+            $this->db->where('id', $existing->id)->update('creators', $update_data);
+
+            // Log aktivitas
+            $this->load->model('User_log_model');
+            $this->User_log_model->log(
+                $user_id,
+                $this->session->userdata('username'),
+                'IS',
+                'CLAIM_CREATOR_TASK1',
+                "Claimed ownership of creator @{$username} for brand ID {$brand_id} to Task 1"
+            );
+
+            return $this->output->set_output(json_encode([
+                'success'    => true,
+                'message'    => '✅ @' . $username . ' berhasil ditambahkan ke Task 1 (Scouting)!',
+                'creator_id' => $existing->id,
+                'username'   => $username
+            ]));
+        }
     }
-    
-    // 🔥 INSERT KE TASK 1 (STATUS PENDING)
+
+    // Cek duplikat nomor HP (kecuali force_save)
+    if (!$force_save && !empty($phone)) {
+        $normalized_input = preg_replace('/[^0-9]/', '', $phone);
+        $input_tail = substr($normalized_input, -9);
+
+        if (strlen($input_tail) === 9) {
+            $all_creators = $this->db->select('id, username, full_name, phone, status')
+                ->where('phone IS NOT NULL')
+                ->where('phone !=', '')
+                ->get('creators')
+                ->result();
+
+            $phone_matches = [];
+            foreach ($all_creators as $c) {
+                $db_tail = substr(preg_replace('/[^0-9]/', '', $c->phone), -9);
+                if ($db_tail === $input_tail) {
+                    $phone_matches[] = [
+                        'id'        => $c->id,
+                        'username'  => $c->username,
+                        'full_name' => $c->full_name,
+                        'phone'     => $c->phone,
+                        'status'    => $c->status,
+                    ];
+                }
+            }
+
+            if (!empty($phone_matches)) {
+                return $this->output->set_output(json_encode([
+                    'success'         => false,
+                    'phone_duplicate' => true,
+                    'message'         => 'Nomor HP ini sudah terdaftar untuk creator lain.',
+                    'matches'         => $phone_matches
+                ]));
+            }
+        }
+    }
+
+    // INSERT KE TASK 1 (STATUS PENDING)
     $insert_data = [
-        'username' => $username,
-        'full_name' => $full_name ?: $username,
-        'category' => $category ?: 'Lifestyle',
-        'phone' => $phone,
-        'email' => $email,
-        'is_id' => $user_id,
-        'brand_id' => $brand_id,
-        'shop_name' => $shop_name,
-        'source' => 'manual',
-        'status' => 'PENDING',  // 🔥 TASK 1: SCOUTING
-        'avatar_url' => $avatar_url,
+        'username'      => $username,
+        'full_name'     => $full_name ?: $username,
+        'category'      => $category ?: 'Lifestyle',
+        'phone'         => $phone,
+        'email'         => $email,
+        'is_id'         => $user_id,
+        'brand_id'      => $brand_id,
+        'shop_name'     => $shop_name,
+        'source'        => 'manual',
+        'status'        => 'PENDING',
+        'avatar_url'    => $avatar_url,
         'imported_followers' => $follower_count,
-        'imported_gmv' => $gmv_28days,
-        'created_at' => date('Y-m-d H:i:s'),
-        'updated_at' => date('Y-m-d H:i:s')
+        'imported_gmv'  => $gmv_28days,
+        'created_at'    => date('Y-m-d H:i:s'),
+        'updated_at'    => date('Y-m-d H:i:s')
     ];
-    
-    // Filter null values
+
+    // Filter null/empty values
     $insert_data = array_filter($insert_data, function($value) {
         return $value !== null && $value !== '';
     });
-    
+
     if ($this->db->insert('creators', $insert_data)) {
         $new_id = $this->db->insert_id();
-        
+
         // Log aktivitas
         $this->load->model('User_log_model');
         $this->User_log_model->log(
@@ -1768,17 +2962,17 @@ public function performance() {
             $this->session->userdata('username'),
             'IS',
             'ADD_CREATOR_TASK1',
-            "Added creator @{$username} to Task 1 (Scouting)"
+            "Added creator @{$username} to Task 1 (Scouting)" . ($force_save ? ' [force - phone duplicate bypassed]' : '')
         );
-        
+
         return $this->output->set_output(json_encode([
-            'success' => true,
-            'message' => '✅ @' . $username . ' berhasil ditambahkan ke Task 1 (Scouting)!',
+            'success'    => true,
+            'message'    => '✅ @' . $username . ' berhasil ditambahkan ke Task 1 (Scouting)!',
             'creator_id' => $new_id,
-            'username' => $username
+            'username'   => $username
         ]));
     }
-    
+
     return $this->output->set_output(json_encode([
         'success' => false,
         'message' => 'Gagal menambahkan creator'
@@ -1839,7 +3033,10 @@ public function performance() {
         ')
         ->from('affiliate_creator_links acl')
         ->join('affiliate_campaigns cp', 'cp.campaign_id = acl.campaign_id', 'left')
-        ->where('acl.creator_id', $creator_id)
+        ->group_start()
+            ->where('acl.creator_id', $creator_id)
+            ->or_where('acl.creator_username', $creator->username)
+        ->group_end()
         ->order_by('acl.created_at', 'DESC')
         ->get()
         ->result();
@@ -2849,7 +4046,11 @@ public function get_creator_affiliate_links() {
     if (!$creator_id) {
         return $this->output->set_output(json_encode(['success' => false, 'message' => 'Creator ID required']));
     }
-    
+
+    // Ambil username untuk fallback
+    $creator_row = $this->db->select('username')->where('id', $creator_id)->get('creators')->row();
+    $creator_username = $creator_row->username ?? '';
+
     $links = $this->db->select('
             acl.*,
             cp.campaign_name,
@@ -2857,7 +4058,10 @@ public function get_creator_affiliate_links() {
         ')
         ->from('affiliate_creator_links acl')
         ->join('affiliate_campaigns cp', 'cp.campaign_id = acl.campaign_id', 'left')
-        ->where('acl.creator_id', $creator_id)
+        ->group_start()
+            ->where('acl.creator_id', $creator_id)
+            ->or_where('acl.creator_username', $creator_username)
+        ->group_end()
         ->order_by('acl.created_at', 'DESC')
         ->get()
         ->result();
@@ -4435,8 +5639,11 @@ private function process_import_creators() {
                 continue;
             }
             
-            // Cek existing
-            $existing = $this->db->where('username', $creator['username'])->get('creators')->row();
+            // Cek existing untuk brand yang sama
+            $existing = $this->db->where('username', $creator['username'])
+                                 ->where('brand_id', $brand_id)
+                                 ->get('creators')
+                                 ->row();
             
             if ($existing) {
                 if ($skip_existing) {
@@ -5049,6 +6256,180 @@ public function get_creator_performance_detail() {
         ]));
     }
 }
+
+/**
+ * DEBUG: Cek seluruh flow GMV breakdown untuk creator tertentu
+ * URL: GET /is/debug_gmv_breakdown?username=rilllllll06
+ * atau: GET /is/debug_gmv_breakdown?creator_id=123
+ */
+public function debug_gmv_breakdown() {
+    $this->output->set_content_type('application/json');
+
+    $username   = $this->input->get('username');
+    $creator_id = $this->input->get('creator_id');
+
+    // 1. Cari creator
+    if (!empty($creator_id)) {
+        $creator = $this->db->select('id, username, tiktok_open_id')
+            ->where('id', $creator_id)->get('creators')->row();
+    } elseif (!empty($username)) {
+        $creator = $this->db->select('id, username, tiktok_open_id')
+            ->where('username', $username)->get('creators')->row();
+    } else {
+        return $this->output->set_output(json_encode(['error' => 'Provide ?username= or ?creator_id=']));
+    }
+
+    if (!$creator) {
+        return $this->output->set_output(json_encode(['error' => 'Creator not found']));
+    }
+
+    $out = [
+        'creator_id'     => $creator->id,
+        'username'       => $creator->username,
+        'tiktok_open_id' => $creator->tiktok_open_id,
+        'step'           => [],
+    ];
+
+    // Auto-migrate: pastikan kolom cache ada di server ini
+    $this->db->query("
+        ALTER TABLE creators
+          ADD COLUMN IF NOT EXISTS tap_live_pct         DECIMAL(6,2)  DEFAULT NULL,
+          ADD COLUMN IF NOT EXISTS tap_video_pct        DECIMAL(6,2)  DEFAULT NULL,
+          ADD COLUMN IF NOT EXISTS tap_product_card_pct DECIMAL(6,2)  DEFAULT NULL,
+          ADD COLUMN IF NOT EXISTS tap_gmv_total        DECIMAL(20,2) DEFAULT NULL,
+          ADD COLUMN IF NOT EXISTS tap_gmv_synced_at    DATETIME      DEFAULT NULL
+    ");
+
+    // Cek status cache — gunakan query aman kalau kolom belum ada di server
+    $cache_row = null;
+    try {
+        $cache_row = $this->db->select('tap_live_pct, tap_video_pct, tap_product_card_pct, tap_gmv_total, tap_gmv_synced_at')
+            ->where('id', $creator->id)->get('creators')->row();
+    } catch (Exception $e) {
+        // Kolom belum ada — abaikan, cache dianggap kosong
+        $cache_row = null;
+    }
+    $cache = $cache_row ?: (object)[
+        'tap_live_pct'         => null,
+        'tap_video_pct'        => null,
+        'tap_product_card_pct' => null,
+        'tap_gmv_total'        => null,
+        'tap_gmv_synced_at'    => null,
+    ];
+    $out['cache'] = [
+        'tap_live_pct'         => $cache->tap_live_pct         ?? null,
+        'tap_video_pct'        => $cache->tap_video_pct        ?? null,
+        'tap_product_card_pct' => $cache->tap_product_card_pct ?? null,
+        'tap_gmv_total'        => $cache->tap_gmv_total        ?? null,
+        'tap_gmv_synced_at'    => $cache->tap_gmv_synced_at    ?? null,
+        'age_hours'            => !empty($cache->tap_gmv_synced_at)
+            ? round((time() - strtotime($cache->tap_gmv_synced_at)) / 3600, 1) . 'h'
+            : 'no cache',
+        'is_valid'             => !empty($cache->tap_gmv_synced_at)
+            && (time() - strtotime($cache->tap_gmv_synced_at)) < 24 * 3600
+            ? 'YES (< 24h)' : 'NO (expired or empty)',
+    ];
+
+    // Jika ada ?force_refresh=1, hapus cache dulu
+    if ($this->input->get('force_refresh')) {
+        try {
+            $this->db->where('id', $creator->id)->update('creators', [
+                'tap_gmv_synced_at'    => null,
+                'tap_live_pct'         => null,
+                'tap_video_pct'        => null,
+                'tap_product_card_pct' => null,
+                'tap_gmv_total'        => null,
+            ]);
+            $out['step'][] = 'Cache dihapus — akan fetch ulang dari TAP API';
+        } catch (Exception $e) {
+            $out['step'][] = 'Cache belum ada di DB (kolom baru belum di-migrate): ' . $e->getMessage();
+        }
+    }
+
+    // 2. Resolve tiktok_open_id jika kosong
+    $tap_open_id = $creator->tiktok_open_id ?? null;
+    if (empty($tap_open_id)) {
+        $out['step'][] = 'tiktok_open_id kosong — coba resolve via TAP search';
+        try {
+            $search = $this->jsm_api->search_creators_by_is($creator->username, null, 20);
+            $out['tap_search_success'] = $search['success'] ?? false;
+            $out['tap_search_total']   = count($search['data']['creators'] ?? []);
+            foreach ($search['data']['creators'] ?? [] as $tc) {
+                if (strtolower($tc['username'] ?? '') === strtolower($creator->username)) {
+                    $tap_open_id = $tc['creator_open_id'] ?? null;
+                    $out['step'][] = 'Resolved open_id: ' . $tap_open_id;
+                    break;
+                }
+            }
+            if (empty($tap_open_id)) {
+                $out['step'][] = 'Tidak ditemukan di TAP search';
+                $out['tap_search_sample'] = array_slice(
+                    array_map(fn($c) => ['username' => $c['username'], 'open_id' => $c['creator_open_id'] ?? null],
+                    $search['data']['creators'] ?? []), 0, 5);
+            }
+        } catch (Exception $e) {
+            $out['step'][] = 'TAP search error: ' . $e->getMessage();
+        }
+    } else {
+        $out['step'][] = 'tiktok_open_id sudah ada: ' . $tap_open_id;
+    }
+
+    $out['tap_open_id_used'] = $tap_open_id;
+
+    if (empty($tap_open_id)) {
+        $out['step'][] = 'STOP: tidak ada open_id untuk panggil TAP performance API';
+        return $this->output->set_output(json_encode($out, JSON_PRETTY_PRINT));
+    }
+
+    // 3. Panggil get_marketplace_creator_performance
+    $out['step'][] = 'Memanggil get_marketplace_creator_performance(' . $tap_open_id . ')';
+    try {
+        $perf = $this->jsm_api->get_marketplace_creator_performance($tap_open_id);
+
+        $out['tap_perf_success'] = $perf['success'] ?? false;
+        $out['tap_perf_message'] = $perf['message'] ?? null;
+
+        if (!empty($perf['success']) && !empty($perf['data'])) {
+            $d = $perf['data'];
+            $out['step'][] = 'TAP response success';
+            $out['gmv_fields'] = [
+                'gmv'                      => $d['gmv']       ?? 'NOT SET',
+                'video_gmv'                => $d['video_gmv'] ?? 'NOT SET',
+                'live_gmv'                 => $d['live_gmv']  ?? 'NOT SET',
+                'content_gmv_distribution' => $d['content_gmv_distribution'] ?? 'NOT SET',
+            ];
+
+            $total    = floatval($d['gmv']       ?? 0);
+            $live_gmv = floatval($d['live_gmv']  ?? 0);
+            $vid_gmv  = floatval($d['video_gmv'] ?? 0);
+
+            $out['computed'] = [
+                'total'            => $total,
+                'live_gmv'         => $live_gmv,
+                'video_gmv'        => $vid_gmv,
+                'product_card_gmv' => max(0, $total - $live_gmv - $vid_gmv),
+                'live_pct'         => $total > 0 ? round(($live_gmv / $total) * 100, 2) : 0,
+                'video_pct'        => $total > 0 ? round(($vid_gmv  / $total) * 100, 2) : 0,
+                'product_card_pct' => $total > 0 ? round(max(0, 100 - ($live_gmv/$total)*100 - ($vid_gmv/$total)*100), 2) : 0,
+            ];
+
+            if ($total === 0.0) {
+                $out['step'][] = 'MASALAH: gmv = 0 — TAP mengembalikan data tapi nilai GMV nol. Breakdown tidak akan tampil.';
+            } else {
+                $out['step'][] = 'OK: gmv breakdown berhasil dihitung, breakdown SEHARUSNYA tampil';
+            }
+        } else {
+            $out['step'][] = 'TAP response gagal atau data kosong';
+            $out['tap_raw'] = $perf;
+        }
+    } catch (Exception $e) {
+        $out['step'][] = 'Exception: ' . $e->getMessage();
+        $out['exception'] = $e->getMessage();
+    }
+
+    return $this->output->set_output(json_encode($out, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+}
+
 /**
  * Format number to short (e.g., 1.2K, 2.3M)
  */
@@ -6879,7 +8260,7 @@ public function get_sample_products() {
             $campaign = $campaign_map[$link->campaign_id] ?? null;
             
             $brands[$brand_key]['products'][] = [
-                'product_id' => $link->product_id,
+'product_id' => $link->product_id,
                 'product_name' => $link->product_name,
                 'campaign_id' => $link->campaign_id,
                 'commission_rate' => $link->commission_rate,
@@ -6926,7 +8307,7 @@ public function search_creators_by_task() {
     try {
         $keyword = $this->input->post('keyword');
         $task = $this->input->post('task'); // '2' atau '3'
-        $limit = intval($this->input->post('limit') ?: 50); // 🔥 PASTIKAN INTEGER
+        $limit = intval($this->input->post('limit') ?: 50);
         
         log_message('debug', 'search_creators_by_task - keyword: ' . $keyword . ', task: ' . $task . ', limit: ' . $limit);
         
@@ -6946,7 +8327,57 @@ public function search_creators_by_task() {
         
         $task_num = intval($task);
         
-        if ($task_num == 2) {
+        if ($task_num == 1) {
+            // ============================================================
+            // TASK 1: SCOUTING - SEARCH
+            // ============================================================
+            $results = $this->db->select('
+                    c.id,
+                    c.username,
+                    c.full_name,
+                    c.avatar_url,
+                    c.category,
+                    c.phone,
+                    c.alamat,
+                    c.penerima,
+                    c.created_at,
+                    c.status,
+                    c.imported_gmv,
+                    c.source,
+                    c.is_id as handler_id,
+                    u.username as is_username,
+                    u.full_name as is_full_name,
+                    b.name as brand_name,
+                    b.shop_name,
+                    "registered" as source_type,
+                    "pending" as deal_status,
+                    (SELECT COUNT(DISTINCT acl.id) 
+                     FROM affiliate_creator_links acl 
+                     WHERE acl.creator_id = c.id 
+                       AND acl.status = "ACTIVE") as total_links
+                ')
+                ->from('creators c')
+                ->join('brands b', 'c.brand_id = b.id', 'left')
+                ->join('users u', 'c.is_id = u.id', 'left')
+                ->group_start()
+                    ->like('c.username', $keyword, 'both')
+                    ->or_like('c.full_name', $keyword, 'both')
+                    ->or_like('c.category', $keyword, 'both')
+                    ->or_like('b.name', $keyword, 'both')
+                    ->or_like('b.shop_name', $keyword, 'both')
+                ->group_end()
+                ->where_in('c.status', ['PENDING', 'LINK_SWAPPING'])
+                ->order_by('c.imported_gmv', 'DESC')
+                ->limit($limit)
+                ->get()
+                ->result();
+                
+            // Format created_at date for JS
+            foreach ($results as $item) {
+                $item->created_at_formatted = !empty($item->created_at) ? date('d/m/Y H:i', strtotime($item->created_at)) : '-';
+                $item->follow_up_count = 0;
+            }
+        } elseif ($task_num == 2) {
             // ============================================================
             // TASK 2: WAITING HANDLER - SEARCH
             // ============================================================
@@ -6968,7 +8399,24 @@ public function search_creators_by_task() {
                     b.name as brand_name,
                     b.shop_name,
                     "registered" as source_type,
-                    "no_handler" as deal_status
+                    (SELECT COUNT(DISTINCT acl.id) 
+                      FROM affiliate_creator_links acl 
+                      LEFT JOIN affiliate_products ap ON acl.product_id = ap.product_id AND acl.campaign_id = ap.campaign_id
+                      WHERE (acl.creator_id = c.id OR LOWER(TRIM(acl.creator_username)) = LOWER(TRIM(c.username)))
+                        AND acl.status = "ACTIVE"
+                        AND (TRIM(ap.shop_name) = TRIM(b.shop_name) OR TRIM(ap.shop_name) = TRIM(b.name))) as total_active_links,
+                    CASE 
+                        WHEN c.is_id IS NOT NULL AND c.is_id != ' . intval($user_id) . ' THEN "claimed"
+                        WHEN (c.is_id IS NULL OR c.is_id = ' . intval($user_id) . ') AND EXISTS (
+                            SELECT 1 FROM affiliate_creator_links acl2
+                            LEFT JOIN affiliate_products ap2 ON acl2.product_id = ap2.product_id AND acl2.campaign_id = ap2.campaign_id
+                            WHERE (acl2.creator_id = c.id OR LOWER(TRIM(acl2.creator_username)) = LOWER(TRIM(c.username)))
+                              AND acl2.status = "ACTIVE"
+                              AND (TRIM(ap2.shop_name) = TRIM(b.shop_name) OR TRIM(ap2.shop_name) = TRIM(b.name))
+                              AND acl2.showcase_status = "added"
+                        ) THEN "ready"
+                        ELSE "no_handler"
+                    END as deal_status
                 ')
                 ->from('creators c')
                 ->join('brands b', 'c.brand_id = b.id', 'left')
@@ -6978,13 +8426,12 @@ public function search_creators_by_task() {
                     ->or_like('c.full_name', $keyword, 'both')
                     ->or_like('c.category', $keyword, 'both')
                 ->group_end()
-                ->where('c.is_id IS NULL')
+                ->where('c.status', 'LINK_SENT')
                 ->limit($limit)
                 ->get()
                 ->result();
             
             // 🔥 PART 2: Cari creator yang belum terdaftar (unregistered)
-            // 🔥 PERBAIKAN: Gunakan intval untuk limit
             $unregistered_sql = "
                 SELECT 
                     NULL as id,
@@ -7018,13 +8465,12 @@ public function search_creators_by_task() {
                 LIMIT ?
             ";
             
-            // 🔥 PERBAIKAN: Pastikan limit adalah integer
             $unregistered = $this->db->query($unregistered_sql, [$like_keyword, intval($limit)])->result();
             
             // Gabungkan hasil
             $results = array_merge($registered, $unregistered);
             
-            // Tambahkan total_gmv_30d untuk registered
+            // Tambahkan data detail untuk registered & unregistered
             foreach ($results as $item) {
                 if ($item->source_type == 'registered' && !empty($item->id)) {
                     $gmv_query = "
@@ -7033,13 +8479,34 @@ public function search_creators_by_task() {
                         WHERE LOWER(TRIM(creator_username)) = LOWER(TRIM(?))
                           AND order_date_local >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
                           AND order_status NOT IN ('CANCELLED', 'REFUNDED')
-                    ";
+                     ";
                     $gmv = $this->db->query($gmv_query, [$item->username])->row();
-                    
                     $item->total_gmv_30d = floatval($gmv->total ?? 0);
-                    $item->total_active_links = 0;
-                    $item->top_product = '';
-                    $item->top_product_image = '';
+
+                    // Fetch products sent as active links
+                    $showcase_query = "
+                        SELECT GROUP_CONCAT(acl.product_name SEPARATOR ', ') as top_product
+                        FROM affiliate_creator_links acl
+                        LEFT JOIN affiliate_products ap ON acl.product_id = ap.product_id AND acl.campaign_id = ap.campaign_id
+                        WHERE (acl.creator_id = ? OR LOWER(TRIM(acl.creator_username)) = LOWER(TRIM(?)))
+                          AND acl.status = 'ACTIVE'
+                          AND (TRIM(ap.shop_name) = TRIM(?) OR TRIM(ap.shop_name) = TRIM(?))
+                    ";
+                    $showcase = $this->db->query($showcase_query, [$item->id, $item->username, $item->shop_name, $item->brand_name])->row();
+                    $item->top_product = $showcase->top_product ?? '';
+
+                    $image_query = "
+                        SELECT ap.image_url
+                        FROM affiliate_creator_links acl
+                        LEFT JOIN affiliate_products ap ON acl.product_id = ap.product_id AND acl.campaign_id = ap.campaign_id
+                        WHERE (acl.creator_id = ? OR LOWER(TRIM(acl.creator_username)) = LOWER(TRIM(?)))
+                          AND acl.status = 'ACTIVE'
+                          AND (TRIM(ap.shop_name) = TRIM(?) OR TRIM(ap.shop_name) = TRIM(?))
+                        ORDER BY acl.updated_at DESC
+                        LIMIT 1
+                    ";
+                    $image_res = $this->db->query($image_query, [$item->id, $item->username, $item->shop_name, $item->brand_name])->row();
+                    $item->top_product_image = $image_res->image_url ?? '';
                 } else {
                     // Unregistered: hitung dari orders
                     $gmv_query = "
@@ -7127,19 +8594,27 @@ public function search_creators_by_task() {
                 $links = $this->db->query($links_query, [$item->id])->row();
                 $item->total_links = intval($links->total_links ?? 0);
                 
-                // Top product
-                $top_product_query = "
-                    SELECT product_name
-                    FROM affiliate_orders
-                    WHERE LOWER(TRIM(creator_username)) = LOWER(TRIM(?))
-                      AND order_status NOT IN ('CANCELLED', 'REFUNDED')
-                    GROUP BY product_name
-                    ORDER BY SUM(gmv) DESC
+                // Fetch products added to showcase
+                $showcase_query = "
+                    SELECT GROUP_CONCAT(product_name SEPARATOR ', ') as top_product
+                    FROM affiliate_creator_links
+                    WHERE (creator_id = ? OR LOWER(TRIM(creator_username)) = LOWER(TRIM(?)))
+                      AND showcase_status = 'added'
+                ";
+                $showcase = $this->db->query($showcase_query, [$item->id, $item->username])->row();
+                $item->top_product = $showcase->top_product ?? '';
+
+                $image_query = "
+                    SELECT ap.image_url
+                    FROM affiliate_creator_links acl
+                    LEFT JOIN affiliate_products ap ON acl.product_id = ap.product_id AND acl.campaign_id = ap.campaign_id
+                    WHERE (acl.creator_id = ? OR LOWER(TRIM(acl.creator_username)) = LOWER(TRIM(?)))
+                      AND acl.showcase_status = 'added'
+                    ORDER BY acl.updated_at DESC
                     LIMIT 1
                 ";
-                $top_product = $this->db->query($top_product_query, [$item->username])->row();
-                $item->top_product = $top_product->product_name ?? '';
-                $item->top_product_image = '';
+                $image_res = $this->db->query($image_query, [$item->id, $item->username])->row();
+                $item->top_product_image = $image_res->image_url ?? '';
             }
         }
         
@@ -7779,48 +9254,205 @@ public function get_creator_products_with_links() {
     // ============================================================
     $recommended_products = [];
     if ($this->db->table_exists('bd_affiliate_links')) {
-        // 🔥 PERBAIKAN: Hapus bal.shop_name karena kolom tidak ada di bd_affiliate_links
-        // Gunakan ap.shop_name dari affiliate_products
-        $this->db->select('
-                bal.product_id,
-                bal.product_name,
-                bal.campaign_id,
-                bal.affiliate_link,
-                bal.commission_rate,
-                bal.open_commission_rate,
-                bal.created_by_name,
-                bal.campaign_name,
-                ap.price,
-                ap.image_url,
-                ap.sales_count,
-                ap.category as product_category,
-                ap.shop_name as product_shop_name
-            ')
-            ->from('bd_affiliate_links bal')
-            ->join('affiliate_products ap', 'bal.product_id = ap.product_id AND bal.campaign_id = ap.campaign_id', 'left')
-            ->where('bal.status', 'ACTIVE');
-        
-        // Filter berdasarkan kategori dari affiliate_products
-        $category = $creator->category ?: 'Lifestyle';
+        // Prioritize brand's category if available (Fetched first to avoid Query Builder state pollution)
+        $brand_category = null;
+        if (!empty($creator->brand_id)) {
+            $brand = $this->db->select('category')->where('id', $creator->brand_id)->get('brands')->row();
+            if ($brand && !empty($brand->category)) {
+                $brand_category = $brand->category;
+            }
+        }
+
+        // Determine effective category for keyword filtering:
+        // 1. Try brand category first
+        // 2. If brand category gives no usable keywords (e.g. 'OTHER'), fall back to creator's own category
+        // 3. Final fallback: 'Lifestyle'
+        $category = null;
+        if (!empty($brand_category)) {
+            $test_keywords = $this->getCategoryKeywords($brand_category);
+            if (!empty($test_keywords)) {
+                $category = $brand_category;
+            }
+        }
+        if (empty($category)) {
+            $category = $creator->category ?: 'Lifestyle';
+        }
+
         $category_keywords = $this->getCategoryKeywords($category);
         
-        if (!empty($category_keywords)) {
+        // Also get the brand's shop_name for precise brand-based filtering
+        $brand_shop_name = null;
+        if (!empty($creator->brand_id)) {
+            $brand_shop = $this->db->select('shop_name')->where('id', $creator->brand_id)->get('brands')->row();
+            if ($brand_shop && !empty($brand_shop->shop_name)) {
+                $brand_shop_name = $brand_shop->shop_name;
+            }
+        }
+
+        if (!empty($brand_shop_name)) {
+            // PRIORITY FILTER: Products from the exact brand shop come first
+            // Use a UNION: brand shop products first, then keyword-matched products
+            $brand_sql = "
+                SELECT bal.product_id, bal.product_name, bal.campaign_id, bal.affiliate_link,
+                       bal.commission_rate, bal.open_commission_rate, bal.created_by_name,
+                       bal.campaign_name, bal.link_type, ap.price, ap.image_url, ap.sales_count,
+                       ap.category as product_category, ap.shop_name as product_shop_name,
+                       1 as priority_order
+                FROM bd_affiliate_links bal
+                LEFT JOIN affiliate_products ap ON bal.product_id = ap.product_id AND bal.campaign_id = ap.campaign_id
+                WHERE bal.status = 'ACTIVE'
+                  AND LOWER(ap.shop_name) = LOWER(?)
+            ";
+            
+            $keyword_conditions = [];
+            $keyword_binds = [];
+            foreach ($category_keywords as $kw) {
+                $kw_lower = strtolower($kw);
+                $keyword_conditions[] = "LOWER(ap.category) LIKE ?";
+                $keyword_conditions[] = "LOWER(bal.product_name) LIKE ?";
+                $keyword_conditions[] = "LOWER(ap.shop_name) LIKE ?";
+                $keyword_binds[] = "%{$kw_lower}%";
+                $keyword_binds[] = "%{$kw_lower}%";
+                $keyword_binds[] = "%{$kw_lower}%";
+            }
+
+            if (!empty($keyword_conditions)) {
+                $keyword_where = implode(' OR ', $keyword_conditions);
+                $other_sql = "
+                    SELECT bal.product_id, bal.product_name, bal.campaign_id, bal.affiliate_link,
+                           bal.commission_rate, bal.open_commission_rate, bal.created_by_name,
+                           bal.campaign_name, bal.link_type, ap.price, ap.image_url, ap.sales_count,
+                           ap.category as product_category, ap.shop_name as product_shop_name,
+                           2 as priority_order
+                    FROM bd_affiliate_links bal
+                    LEFT JOIN affiliate_products ap ON bal.product_id = ap.product_id AND bal.campaign_id = ap.campaign_id
+                    WHERE bal.status = 'ACTIVE'
+                      AND LOWER(ap.shop_name) != LOWER(?)
+                      AND ({$keyword_where})
+                ";
+                $combined_sql = "({$brand_sql}) UNION ({$other_sql}) ORDER BY priority_order ASC, product_shop_name ASC LIMIT 50";
+                $binds = array_merge([$brand_shop_name], [$brand_shop_name], $keyword_binds);
+                $recommended_products = $this->db->query($combined_sql, $binds)->result();
+            } else {
+                // No keyword filter available, just show brand shop products
+                $recommended_products = $this->db->query($brand_sql . " LIMIT 50", [$brand_shop_name])->result();
+            }
+        } elseif (!empty($category_keywords)) {
+            // No specific brand shop, filter by category keywords only
+            $this->db->select('
+                    bal.product_id, bal.product_name, bal.campaign_id, bal.affiliate_link,
+                    bal.commission_rate, bal.open_commission_rate, bal.created_by_name,
+                    bal.campaign_name, bal.link_type, ap.price, ap.image_url, ap.sales_count,
+                    ap.category as product_category, ap.shop_name as product_shop_name
+                ')
+                ->from('bd_affiliate_links bal')
+                ->join('affiliate_products ap', 'bal.product_id = ap.product_id AND bal.campaign_id = ap.campaign_id', 'left')
+                ->where('bal.status', 'ACTIVE');
             $this->db->group_start();
             foreach ($category_keywords as $keyword) {
                 $this->db->or_like('LOWER(ap.category)', strtolower($keyword));
                 $this->db->or_like('LOWER(bal.product_name)', strtolower($keyword));
-                // 🔥 HAPUS bal.shop_name karena tidak ada, gunakan ap.shop_name
                 $this->db->or_like('LOWER(ap.shop_name)', strtolower($keyword));
             }
             $this->db->group_end();
+
+            $recommended_products = $this->db->order_by('bal.created_at', 'DESC')
+                ->limit(50)
+                ->get()
+                ->result();
+        } else {
+            // Fallback: no filter, return latest 50 active products
+            $recommended_products = $this->db->select('
+                    bal.product_id, bal.product_name, bal.campaign_id, bal.affiliate_link,
+                    bal.commission_rate, bal.open_commission_rate, bal.created_by_name,
+                    bal.campaign_name, bal.link_type, ap.price, ap.image_url, ap.sales_count,
+                    ap.category as product_category, ap.shop_name as product_shop_name
+                ')
+                ->from('bd_affiliate_links bal')
+                ->join('affiliate_products ap', 'bal.product_id = ap.product_id AND bal.campaign_id = ap.campaign_id', 'left')
+                ->where('bal.status', 'ACTIVE')
+                ->order_by('bal.created_at', 'DESC')
+                ->limit(50)
+                ->get()
+                ->result();
         }
-        
-        $recommended_products = $this->db->order_by('bal.created_at', 'DESC')
-            ->limit(50)
-            ->get()
-            ->result();
     }
     
+    // ============================================================
+    // 🔥 AMBIL DAFTAR BRAND YANG PERNAH BEKERJA SAMA (COLLABORATED BRANDS)
+    // ============================================================
+    $collaborated_shops = [];
+
+    // A. Dari affiliate_orders (berdasarkan history penjualan)
+    if (!empty($creator->username)) {
+        try {
+            $qOrders = $this->db->select('DISTINCT(ap.shop_name) as shop_name')
+                ->from('affiliate_orders o')
+                ->join('affiliate_products ap', 'o.product_id = ap.product_id AND o.campaign_id = ap.campaign_id', 'inner')
+                ->where('o.creator_username', $creator->username)
+                ->where('ap.shop_name !=', '')
+                ->get();
+            if ($qOrders) {
+                foreach ($qOrders->result() as $row) {
+                    $collaborated_shops[strtolower(trim($row->shop_name))] = true;
+                }
+            }
+        } catch (Exception $e) {
+            log_message('error', 'get_creator_products_with_links: Error getting brands from orders: ' . $e->getMessage());
+        }
+    }
+
+    // B. Dari affiliate_creator_links (ACTIVE)
+    try {
+        $qLinks = $this->db->select('DISTINCT(ap.shop_name) as shop_name')
+            ->from('affiliate_creator_links acl')
+            ->join('affiliate_products ap', 'acl.product_id = ap.product_id AND acl.campaign_id = ap.campaign_id', 'inner')
+            ->group_start()
+                ->where('acl.creator_id', $creator_id)
+                ->or_where('acl.creator_username', $creator->username)
+            ->group_end()
+            ->where('ap.shop_name !=', '')
+            ->get();
+        if ($qLinks) {
+            foreach ($qLinks->result() as $row) {
+                $collaborated_shops[strtolower(trim($row->shop_name))] = true;
+            }
+        }
+    } catch (Exception $e) {
+        log_message('error', 'get_creator_products_with_links: Error getting brands from links: ' . $e->getMessage());
+    }
+
+    // C. Dari creator_products (Data FastMoss)
+    if ($this->db->table_exists('creator_products')) {
+        try {
+            $qCreatorProds = $this->db->select('DISTINCT(shop_name) as shop_name')
+                ->from('creator_products')
+                ->where('creator_id', $creator_id)
+                ->where('shop_name !=', '')
+                ->get();
+            if ($qCreatorProds) {
+                foreach ($qCreatorProds->result() as $row) {
+                    $collaborated_shops[strtolower(trim($row->shop_name))] = true;
+                }
+            }
+        } catch (Exception $e) {
+            log_message('error', 'get_creator_products_with_links: Error getting brands from creator_products: ' . $e->getMessage());
+        }
+    }
+
+    // D. Dari creator's brand_id (Brand utama creator)
+    if (!empty($creator->brand_id)) {
+        try {
+            $brandObj = $this->db->select('name, shop_name')->where('id', $creator->brand_id)->get('brands')->row();
+            if ($brandObj) {
+                if (!empty($brandObj->shop_name)) $collaborated_shops[strtolower(trim($brandObj->shop_name))] = true;
+                if (!empty($brandObj->name)) $collaborated_shops[strtolower(trim($brandObj->name))] = true;
+            }
+        } catch (Exception $e) {
+            log_message('error', 'get_creator_products_with_links: Error getting brand by id: ' . $e->getMessage());
+        }
+    }
+
     // ============================================================
     // 🔥 GABUNGKAN SEMUA PRODUK
     // ============================================================
@@ -7871,6 +9503,9 @@ public function get_creator_products_with_links() {
     // ============================================================
     $formatted_products = [];
     foreach ($all_products as $p) {
+        $shop_key = strtolower(trim($p->shop_name ?? ''));
+        $has_collab = ($p->is_assigned ?? false) || (!empty($shop_key) && isset($collaborated_shops[$shop_key]));
+
         $formatted_products[] = [
             'product_id' => $p->product_id,
             'product_name' => $p->product_name,
@@ -7888,12 +9523,14 @@ public function get_creator_products_with_links() {
             'source_label' => $this->getSourceLabel($p->source ?? 'unknown'),
             'campaign_id' => $p->campaign_id ?? null,
             'affiliate_link' => $p->affiliate_link ?? null,
+            'link_type' => $p->link_type ?? null,
             'bd_created_by' => $p->created_by_name ?? null,
             'campaign_name' => $p->campaign_name ?? null,
             'is_matched' => isset($p->is_matched) ? intval($p->is_matched) : 0,
             'matched_product_id' => $p->matched_product_id ?? null,
             'handler_name' => $p->handler_name ?? null,
-            'created_by_user_id' => $p->created_by_user_id ?? null
+            'created_by_user_id' => $p->created_by_user_id ?? null,
+            'has_collaborated_brand' => $has_collab
         ];
     }
     
@@ -7958,20 +9595,92 @@ private function getSourceLabel($source) {
  */
 private function getCategoryKeywords($category) {
     $category_map = [
-        'Beauty' => ['beauty', 'makeup', 'skincare', 'cosmetic', 'lipstick', 'foundation', 'perfume', 'hair', 'face', 'cream', 'serum', 'toner', 'moisturizer', 'hanasui', 'dorskin', 'skincare', 'glow', 'brightening'],
-        'Fashion' => ['fashion', 'clothing', 'apparel', 'wear', 'dress', 'shirt', 'pants', 'jacket', 'bag', 'shoes', 'accessories', 'hijab', 'pashmina', 'sepatu', 'tas', 'baju'],
-        'Tech' => ['tech', 'electronics', 'gadget', 'phone', 'laptop', 'computer', 'camera', 'audio', 'accessories', 'smartphone', 'charger', 'headset'],
-        'Lifestyle' => ['lifestyle', 'home', 'living', 'decor', 'furniture', 'kitchen', 'household', 'organizer', 'storage'],
-        'Gaming' => ['gaming', 'game', 'console', 'controller', 'headset', 'keyboard', 'mouse', 'gamer'],
-        'Food' => ['food', 'snack', 'beverage', 'drink', 'meal', 'cooking', 'bakery', 'candy', 'chocolate', 'coffee', 'tea', 'makanan', 'minuman'],
-        'Travel' => ['travel', 'journey', 'tour', 'vacation', 'luggage', 'backpack', 'travel'],
-        'Sports' => ['sport', 'fitness', 'workout', 'gym', 'exercise', 'yoga', 'running', 'training', 'olahraga'],
-        'Home & Living' => ['home', 'living', 'decor', 'furniture', 'kitchen', 'household', 'rumah', 'dekorasi'],
-        'Health' => ['health', 'wellness', 'vitamin', 'supplement', 'medical', 'pharmacy', 'kesehatan'],
-        'Baby & Kids' => ['baby', 'kids', 'children', 'toy', 'infant', 'parenting', 'bayi', 'anak']
+        'Beauty' => [
+            // Brand/shop names yang pasti beauty
+            'hanasui', 'somethinc', 'scarlett', 'wardah', 'emina', 'ms glow', 'makeupuccino',
+            'whitelab', 'npure', 'hiqween', 'lumiwhite', 'purbasari', 'skintific',
+            // Kategori produk beauty (bahasa Indonesia)
+            'skincare', 'makeup', 'kosmetik', 'kecantikan', 'perawatan wajah', 'perawatan kulit',
+            'serum', 'toner', 'moisturizer', 'sunscreen', 'pelembab', 'pembersih wajah',
+            'lipstik', 'lipstick', 'cushion', 'foundation', 'bedak', 'blush', 'eyeshadow',
+            'maskara', 'mascara', 'eyeliner', 'alis', 'lipliner', 'lulur', 'scrub badan',
+            'micellar', 'face wash', 'face mask', 'sheet mask', 'retinol', 'niacinamide',
+            'brightening', 'whitening', 'glowing', 'acne', 'jerawat',
+            // Kategori TikTok shop yang umum untuk beauty
+            'suplemen kecantikan', 'serum & essence', 'facial sunscreen', 'perawatan jerawat',
+            'pembersih wajah', 'makeup remover', 'moisturiser', 'concealer', 'lipstick',
+            'pensil & gel alis', 'perawatan mata', 'blusher', 'eyeshadow', 'toner',
+            'kit perawatan kulit', 'perawatan bibir', 'semprotan fixer', 'face scrub',
+        ],
+        'Fashion' => [
+            // Kategori fashion (Indonesian context)
+            'fashion', 'pakaian', 'busana', 'baju', 'kemeja', 'dress', 'rok', 'celana',
+            'jaket', 'hoodie', 'sweater', 'kaos', 'blouse', 'gamis', 'hijab', 'pashmina',
+            'kerudung', 'jilbab', 'abaya', 'tunik', 'kaftan',
+            // Alas kaki
+            'sepatu', 'sandal', 'sneakers', 'heels', 'boots', 'flat shoes', 'wedges',
+            // Aksesori fashion
+            'tas wanita', 'tas pria', 'dompet', 'ikat pinggang', 'topi', 'kacamata',
+            'anting', 'kalung', 'gelang', 'cincin', 'jam tangan',
+            // Kategori TikTok shop
+            'sepatu kasual', 'sepatu mary jane', 'sandal & sandal jepit', 'ransel', 'tote bag',
+            'tas selempang', 'tas perjalanan', 'setelan pakaian', 'bra', 'knicker',
+        ],
+        'Tech' => [
+            'elektronik', 'gadget', 'smartphone', 'handphone', 'laptop', 'tablet', 'komputer',
+            'kamera', 'speaker', 'earphone', 'headphone', 'headset', 'charger', 'powerbank',
+            'smartwatch', 'gaming', 'peripheral', 'keyboard', 'mouse', 'monitor',
+            'earphone & headphone', 'aksesoris hp', 'casing hp',
+        ],
+        'Lifestyle' => [
+            'lifestyle', 'dekorasi', 'rumah', 'interior', 'furnitur', 'lampu',
+            'peralatan rumah', 'perlengkapan rumah', 'storage', 'organizer', 'rak',
+            'wewangian rumah', 'lilin aromaterapi', 'diffuser',
+        ],
+        'Gaming' => ['gaming', 'game', 'console', 'controller', 'headset gaming', 'keyboard gaming', 'mouse gaming', 'gamer'],
+        'Food' => [
+            'makanan', 'minuman', 'snack', 'camilan', 'kopi', 'teh', 'coklat', 'biskuit',
+            'keripik', 'mie', 'bumbu', 'saus', 'kecap', 'minyak goreng', 'tepung',
+            'susu', 'jus', 'minuman kesehatan', 'suplemen makanan',
+            'makanan beku', 'frozen food', 'bakery', 'roti', 'kue',
+            'pasta & bumbu masak', 'penambah rasa', 'saus masak', 'kacang-kacangan',
+            'alat pemroses kopi', 'pewarna makanan',
+        ],
+        'Travel' => [
+            'travel', 'wisata', 'liburan', 'koper', 'backpack ransel', 'travel bag',
+            'luggage', 'paspor', 'dompet travel',
+        ],
+        'Sports' => [
+            'olahraga', 'sport', 'fitness', 'gym', 'yoga', 'lari', 'sepeda', 'renang',
+            'sepatu olahraga', 'sepatu lari', 'baju olahraga', 'peralatan olahraga',
+            'suplemen olahraga', 'protein', 'whey', 'dumbbell', 'matras yoga',
+        ],
+        'Home & Living' => [
+            'peralatan dapur', 'peralatan masak', 'kitchen', 'dapur',
+            'panci', 'wajan', 'pisau dapur', 'talenan', 'spatula', 'sodet',
+            'botol minum', 'tumbler', 'termos', 'gelas', 'piring', 'mangkuk',
+            'pembersih rumah', 'pembersih lantai', 'sabun cuci', 'pel',
+            'set blok pisau', 'peralatan memasak', 'botol air', 'talenan', 'termos vakum',
+            'sikat & kop sedot toilet', 'pembersih rumah tangga', 'pelindung percikan',
+        ],
+        'Health' => [
+            'kesehatan', 'vitamin', 'suplemen', 'obat', 'herbal', 'apotek',
+            'masker medis', 'sarung tangan', 'termometer', 'tensimeter',
+            'vitamin, mineral & suplemen', 'suplemen kesehatan',
+        ],
+        'Baby & Kids' => [
+            'bayi', 'anak', 'balita', 'baby', 'kids', 'mainan anak', 'popok', 'susu bayi',
+            'mpasi', 'perlengkapan bayi', 'stroller', 'gendongan',
+            'perawatan kulit bayi', 'sabun bayi', 'lotion bayi', 'bedak bayi',
+        ],
     ];
     
     $category_lower = strtolower($category);
+    if ($category_lower === 'electronics') {
+        $category_lower = 'tech';
+    } elseif ($category_lower === 'mom_baby') {
+        $category_lower = 'baby & kids';
+    }
     
     foreach ($category_map as $key => $keywords) {
         if (strpos($category_lower, strtolower($key)) !== false || $category_lower == strtolower($key)) {
@@ -8043,8 +9752,411 @@ public function update_creator_phone_task1() {
 }
 
 // ========================================================================
+// FETCH PHONE/WA FROM TAP API (TASK 1) 
+// ========================================================================
+public function get_creator_phone_from_tap() {
+    $this->output->set_content_type('application/json');
+
+    if (!$this->session->userdata('logged_in')) {
+        return $this->output->set_output(json_encode([
+            'success' => false,
+            'message' => 'Session expired'
+        ]));
+    }
+
+    $creator_id = $this->input->post('creator_id');
+
+    if (!$creator_id) {
+        return $this->output->set_output(json_encode([
+            'success' => false,
+            'message' => 'Creator ID required'
+        ]));
+    }
+
+    // Ambil data creator dari DB
+    $creator = $this->db->select('id, username, phone, tiktok_open_id')
+        ->where('id', $creator_id)
+        ->get('creators')
+        ->row();
+
+    if (!$creator) {
+        return $this->output->set_output(json_encode([
+            'success' => false,
+            'message' => 'Creator not found'
+        ]));
+    }
+
+    // Jika sudah ada nomor WA, return langsung
+    if (!empty($creator->phone)) {
+        return $this->output->set_output(json_encode([
+            'success' => true,
+            'phone' => $creator->phone,
+            'source' => 'database',
+            'message' => 'Nomor WA sudah tersedia di database'
+        ]));
+    }
+
+    // Pastikan tiktok_open_id tersedia — coba resolve dulu jika kosong
+    $tiktok_open_id = $creator->tiktok_open_id;
+
+    if (empty($tiktok_open_id) && !empty($creator->username)) {
+        try {
+            $this->load->model('BrandCreator_model');
+            $fastmoss_uid = $this->BrandCreator_model->find_creator_in_fastmoss($creator->username);
+            if ($fastmoss_uid) {
+                $this->db->where('id', $creator_id)->update('creators', [
+                    'tiktok_open_id' => $fastmoss_uid,
+                    'updated_at'     => date('Y-m-d H:i:s')
+                ]);
+                $tiktok_open_id = $fastmoss_uid;
+                log_message('debug', 'get_creator_phone_from_tap: resolved tiktok_open_id=' . $tiktok_open_id);
+            }
+        } catch (Exception $e) {
+            log_message('error', 'get_creator_phone_from_tap: resolve open_id failed: ' . $e->getMessage());
+        }
+    }
+
+    if (empty($tiktok_open_id)) {
+        // Fallback: cari via TAP marketplace search dengan username
+        try {
+            $search_result = $this->jsm_api->search_creators_by_is($creator->username, null, 20);
+            if ($search_result['success'] && !empty($search_result['data']['creators'])) {
+                foreach ($search_result['data']['creators'] as $tap_creator) {
+                    if (strtolower($tap_creator['username'] ?? '') === strtolower($creator->username)) {
+                        if (!empty($tap_creator['creator_open_id'])) {
+                            $tiktok_open_id = $tap_creator['creator_open_id'];
+                            $this->db->where('id', $creator_id)->update('creators', [
+                                'tiktok_open_id' => $tiktok_open_id,
+                                'updated_at'     => date('Y-m-d H:i:s')
+                            ]);
+                            log_message('debug', 'get_creator_phone_from_tap: found open_id via search=' . $tiktok_open_id);
+                            break;
+                        }
+                    }
+                }
+            }
+        } catch (Exception $e) {
+            log_message('error', 'get_creator_phone_from_tap: search fallback failed: ' . $e->getMessage());
+        }
+    }
+
+    if (empty($tiktok_open_id)) {
+        return $this->output->set_output(json_encode([
+            'success'  => false,
+            'message'  => 'TikTok Open ID tidak ditemukan untuk creator ini. Nomor WA tidak bisa diambil dari TAP.',
+            'username' => $creator->username
+        ]));
+    }
+
+    // Ambil detail creator dari TAP API (v202509)
+    try {
+        $tap_result = $this->jsm_api->get_creator_detail_by_id($tiktok_open_id);
+
+        log_message('debug', 'get_creator_phone_from_tap TAP response: ' . json_encode($tap_result));
+
+        if (!$tap_result['success']) {
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'TAP API error: ' . ($tap_result['message'] ?? 'Unknown error'),
+                'tap_code' => $tap_result['code'] ?? null
+            ]));
+        }
+
+        $tap_data    = $tap_result['data'] ?? [];
+        $tap_creator = $tap_data['creator'] ?? $tap_data;
+
+        // Prioritas 1: field phone langsung di response
+        $phone = '';
+        $phone_fields = [
+            'phone_number', 'phone', 'mobile', 'whatsapp', 'wa_number',
+            'contact_phone', 'contact_number', 'telephone'
+        ];
+
+        foreach ($phone_fields as $field) {
+            if (!empty($tap_creator[$field])) {
+                $phone = $tap_creator[$field];
+                log_message('debug', 'get_creator_phone_from_tap: found phone in field "' . $field . '": ' . $phone);
+                break;
+            }
+        }
+
+        // Prioritas 2: sub-object contact_info
+        if (empty($phone) && !empty($tap_creator['contact_info'])) {
+            $contact = $tap_creator['contact_info'];
+            foreach ($phone_fields as $field) {
+                if (!empty($contact[$field])) {
+                    $phone = $contact[$field];
+                    log_message('debug', 'get_creator_phone_from_tap: found phone in contact_info.' . $field . ': ' . $phone);
+                    break;
+                }
+            }
+        }
+
+        // Prioritas 3: parse nomor telepon dari bio_description (tampil sebagai "Endorsement" di TAP UI)
+        // Creator sering menyimpan nomor WA, IG, dll di bio mereka dalam format teks bebas
+        if (empty($phone)) {
+            $bio_text = $tap_creator['bio_description']
+                ?? $tap_creator['bio']
+                ?? $tap_creator['description']
+                ?? '';
+            if (!empty($bio_text)) {
+                $phone = $this->extractPhoneFromBio($bio_text);
+                if (!empty($phone)) {
+                    log_message('info', 'get_creator_phone_from_tap: extracted phone from bio_description: ' . $phone);
+                }
+            }
+        }
+
+        if (empty($phone)) {
+            $bio_preview = substr($tap_creator['bio_description'] ?? $tap_creator['bio'] ?? '', 0, 100);
+            log_message('info', 'get_creator_phone_from_tap: no phone found. bio="' . $bio_preview . '" keys=' . implode(', ', array_keys($tap_creator)));
+            
+            // Simpan 'no_phone' ke DB agar CA team tahu harus mencari manual
+            $this->db->where('id', $creator_id)->update('creators', [
+                'phone'      => 'no_phone',
+                'updated_at' => date('Y-m-d H:i:s')
+            ]);
+
+            return $this->output->set_output(json_encode([
+                'success'          => false,
+                'phone'            => 'no_phone',
+                'message'          => 'Nomor WA tidak ditemukan di profil TAP creator ini (tidak ada di bio/deskripsi)',
+                'tap_bio_preview'  => $bio_preview,
+                'tap_fields_found' => array_keys($tap_creator),
+                'username'         => $creator->username
+            ]));
+        }
+
+        // Format nomor
+        $phone = preg_replace('/[^0-9+]/', '', $phone);
+        if (preg_match('/^0/', $phone)) {
+            $phone = '62' . substr($phone, 1);
+        } elseif (preg_match('/^\+/', $phone)) {
+            $phone = substr($phone, 1);
+        } elseif (!preg_match('/^62/', $phone) && strlen($phone) > 0) {
+            $phone = '62' . $phone;
+        }
+
+        // Simpan ke DB
+        $this->db->where('id', $creator_id)->update('creators', [
+            'phone'      => $phone,
+            'updated_at' => date('Y-m-d H:i:s')
+        ]);
+
+        log_message('info', 'get_creator_phone_from_tap: saved phone=' . $phone . ' for creator_id=' . $creator_id);
+
+        return $this->output->set_output(json_encode([
+            'success' => true,
+            'phone'   => $phone,
+            'source'  => 'tap_api',
+            'message' => 'Nomor WA berhasil diambil dari TAP API'
+        ]));
+
+    } catch (Exception $e) {
+        log_message('error', 'get_creator_phone_from_tap exception: ' . $e->getMessage());
+        return $this->output->set_output(json_encode([
+            'success' => false,
+            'message' => 'Exception: ' . $e->getMessage()
+        ]));
+    }
+}
+
+// ========================================================================
 // SEND LINK TO CREATOR (TASK 1)
 // ========================================================================
+
+// ========================================================================
+// BATCH FETCH PHONE/WA FROM TAP API (AUTO ON PAGE LOAD)
+// POST: creator_ids[] — max 20 creator per request
+// ========================================================================
+public function batch_fetch_phones() {
+    $this->output->set_content_type('application/json');
+
+    if (!$this->session->userdata('logged_in')) {
+        return $this->output->set_output(json_encode([
+            'success' => false,
+            'message' => 'Session expired'
+        ]));
+    }
+
+    $creator_ids = $this->input->post('creator_ids');
+
+    if (empty($creator_ids) || !is_array($creator_ids)) {
+        return $this->output->set_output(json_encode([
+            'success' => true,
+            'results' => [],
+            'message' => 'No creator IDs provided'
+        ]));
+    }
+
+    // Batasi max 20 per request agar tidak timeout
+    $creator_ids = array_slice(array_map('intval', $creator_ids), 0, 20);
+
+    // Ambil semua creator sekaligus (1 query)
+    $creators = $this->db->select('id, username, phone, tiktok_open_id')
+        ->where_in('id', $creator_ids)
+        ->where('(phone IS NULL OR phone = \'\')', null, false)
+        ->get('creators')
+        ->result();
+
+    if (empty($creators)) {
+        return $this->output->set_output(json_encode([
+            'success' => true,
+            'results' => [],
+            'message' => 'All creators already have phone numbers'
+        ]));
+    }
+
+    $phone_fields = [
+        'phone_number', 'phone', 'mobile', 'whatsapp', 'wa_number',
+        'contact_phone', 'contact_number', 'telephone'
+    ];
+
+    $results = [];
+
+    foreach ($creators as $creator) {
+        $result_item = [
+            'id'       => $creator->id,
+            'username' => $creator->username,
+            'phone'    => null,
+            'found'    => false,
+            'source'   => null,
+        ];
+
+        $open_id = $creator->tiktok_open_id;
+
+        // Resolve tiktok_open_id jika kosong
+        if (empty($open_id) && !empty($creator->username)) {
+            try {
+                $search = $this->jsm_api->search_creators_by_is($creator->username, null, 20);
+                if ($search['success'] && !empty($search['data']['creators'])) {
+                    foreach ($search['data']['creators'] as $tc) {
+                        if (strtolower($tc['username'] ?? '') === strtolower($creator->username)) {
+                            if (!empty($tc['creator_open_id'])) {
+                                $open_id = $tc['creator_open_id'];
+                                $this->db->where('id', $creator->id)->update('creators', [
+                                    'tiktok_open_id' => $open_id,
+                                    'updated_at'     => date('Y-m-d H:i:s')
+                                ]);
+                                log_message('debug', 'batch_fetch_phones: resolved open_id for ' . $creator->username . ' → ' . $open_id);
+                                break;
+                            }
+                        }
+                    }
+                }
+            } catch (Exception $e) {
+                log_message('error', 'batch_fetch_phones: search open_id failed for ' . $creator->username . ': ' . $e->getMessage());
+            }
+        }
+
+        if (empty($open_id)) {
+            $result_item['source'] = 'no_open_id';
+            $results[] = $result_item;
+            continue;
+        }
+
+        // Ambil detail dari TAP API
+        try {
+            $tap_result = $this->jsm_api->get_creator_detail_by_id($open_id);
+
+            if (!$tap_result['success']) {
+                log_message('debug', 'batch_fetch_phones: TAP API failed for ' . $creator->username . ': ' . ($tap_result['message'] ?? ''));
+                $result_item['source'] = 'tap_error';
+                $results[] = $result_item;
+                continue;
+            }
+
+            $tap_data    = $tap_result['data'] ?? [];
+            $tap_creator = $tap_data['creator'] ?? $tap_data;
+
+            $phone = '';
+
+            // Prioritas 1: field phone langsung
+            foreach ($phone_fields as $field) {
+                if (!empty($tap_creator[$field])) {
+                    $phone = $tap_creator[$field];
+                    break;
+                }
+            }
+
+            // Prioritas 2: sub-object contact_info
+            if (empty($phone) && !empty($tap_creator['contact_info'])) {
+                foreach ($phone_fields as $field) {
+                    if (!empty($tap_creator['contact_info'][$field])) {
+                        $phone = $tap_creator['contact_info'][$field];
+                        break;
+                    }
+                }
+            }
+
+            // Prioritas 3: parse dari bio_description / teks bio
+            if (empty($phone)) {
+                $bio_text = $tap_creator['bio_description']
+                    ?? $tap_creator['bio']
+                    ?? $tap_creator['description']
+                    ?? '';
+                if (!empty($bio_text)) {
+                    $phone = $this->extractPhoneFromBio($bio_text);
+                }
+            }
+
+            if (!empty($phone)) {
+                // Format ke standar 62xxx
+                $phone = preg_replace('/[^0-9+]/', '', $phone);
+                if (preg_match('/^0/', $phone)) {
+                    $phone = '62' . substr($phone, 1);
+                } elseif (preg_match('/^\+/', $phone)) {
+                    $phone = substr($phone, 1);
+                } elseif (!preg_match('/^62/', $phone) && strlen($phone) > 0) {
+                    $phone = '62' . $phone;
+                }
+
+                // Simpan ke DB
+                $this->db->where('id', $creator->id)->update('creators', [
+                    'phone'      => $phone,
+                    'updated_at' => date('Y-m-d H:i:s')
+                ]);
+
+                log_message('info', 'batch_fetch_phones: saved phone=' . $phone . ' for creator_id=' . $creator->id);
+
+                $result_item['phone']  = $phone;
+                $result_item['found']  = true;
+                $result_item['source'] = 'tap_api';
+            } else {
+                log_message('debug', 'batch_fetch_phones: no phone found for ' . $creator->username . ', saving "no_phone" to DB');
+                // Simpan 'no_phone' ke DB agar CA team tahu harus mencari manual
+                $this->db->where('id', $creator->id)->update('creators', [
+                    'phone'      => 'no_phone',
+                    'updated_at' => date('Y-m-d H:i:s')
+                ]);
+                $result_item['phone']  = 'no_phone';
+                $result_item['found']  = false;
+                $result_item['source'] = 'not_found';
+            }
+
+        } catch (Exception $e) {
+            log_message('error', 'batch_fetch_phones: exception for ' . $creator->username . ': ' . $e->getMessage());
+            $result_item['source'] = 'exception';
+        }
+
+        $results[] = $result_item;
+        
+        // Jeda 1.5 detik untuk menghindari rate limit API TikTok (Too many requests downstream)
+        usleep(1500000);
+    }
+
+    $found_count = count(array_filter($results, fn($r) => $r['found']));
+
+    return $this->output->set_output(json_encode([
+        'success'     => true,
+        'processed'   => count($results),
+        'found'       => $found_count,
+        'results'     => $results,
+        'message'     => "Berhasil menemukan $found_count dari " . count($results) . " nomor WA"
+    ]));
+}
+
+
 public function send_link_task1() {
     $this->output->set_content_type('application/json');
     
@@ -8092,6 +10204,57 @@ public function send_link_task1() {
     }
     $cleanPhone = ltrim($phone, '+');
     
+    // Simpan/Dapatkan link_id untuk link saat ini
+    $existing = $this->db->where('creator_id', $creator_id)
+        ->where('product_id', $product_id)
+        ->where('campaign_id', $campaign_id)
+        ->get('affiliate_creator_links')
+        ->row();
+    
+    $link_id = $existing ? $existing->link_id : md5($creator->username . $campaign_id . $product_id);
+    if (empty($link_id)) {
+        $link_id = md5($creator->username . $campaign_id . $product_id);
+    }
+    
+    if (!$existing) {
+        $product = $this->db->select('product_name')
+            ->where('product_id', $product_id)
+            ->get('affiliate_products')
+            ->row();
+        
+        $link_data = [
+            'link_id' => $link_id,
+            'creator_id' => $creator_id,
+            'creator_username' => $creator->username,
+            'campaign_id' => $campaign_id,
+            'product_id' => $product_id,
+            'product_name' => $product->product_name ?? '',
+            'affiliate_link' => $link,
+            'shared_date' => date('Y-m-d H:i:s'),
+            'status' => 'ACTIVE',
+            'created_at' => date('Y-m-d H:i:s'),
+            'updated_at' => date('Y-m-d H:i:s')
+        ];
+        $this->db->insert('affiliate_creator_links', $link_data);
+    } else if (empty($existing->link_id)) {
+        $this->db->where('id', $existing->id)->update('affiliate_creator_links', [
+            'link_id' => $link_id,
+            'updated_at' => date('Y-m-d H:i:s')
+        ]);
+    }
+    
+    // Ganti raw link dengan redirect link di dalam pesan WhatsApp
+    $creator_links = $this->db->where('creator_id', $creator_id)->get('affiliate_creator_links')->result();
+    foreach ($creator_links as $cl) {
+        if (!empty($cl->link_id)) {
+            $redirect_url = base_url('r/' . $cl->link_id);
+            $message = str_replace($cl->affiliate_link, $redirect_url, $message);
+        }
+    }
+    // Backup: Ganti link saat ini juga jika belum masuk DB
+    $redirect_url = base_url('r/' . $link_id);
+    $message = str_replace($link, $redirect_url, $message);
+
     // Log WhatsApp
     $this->db->insert('whatsapp_logs', [
         'creator_id' => $creator_id,
@@ -8099,7 +10262,7 @@ public function send_link_task1() {
         'user_name' => $this->session->userdata('full_name') ?: $this->session->userdata('username'),
         'phone_number' => $phone,
         'message' => $message,
-        'link' => $link,
+        'link' => $redirect_url,
         'link_type' => 'task1_send_link',
         'status' => 'SENT',
         'sent_at' => date('Y-m-d H:i:s')
@@ -8113,34 +10276,6 @@ public function send_link_task1() {
         ]);
     }
     
-    // Simpan ke affiliate_creator_links jika belum ada
-    $existing = $this->db->where('creator_id', $creator_id)
-        ->where('product_id', $product_id)
-        ->where('campaign_id', $campaign_id)
-        ->get('affiliate_creator_links')
-        ->row();
-    
-    if (!$existing) {
-        $product = $this->db->select('product_name')
-            ->where('product_id', $product_id)
-            ->get('affiliate_products')
-            ->row();
-        
-        $link_data = [
-            'creator_id' => $creator_id,
-            'creator_username' => $creator->username,
-            'campaign_id' => $campaign_id,
-            'product_id' => $product_id,
-            'product_name' => $product->product_name ?? '',
-            'affiliate_link' => $link,
-            'shared_date' => date('Y-m-d H:i:s'),
-            'status' => 'ACTIVE',
-            'created_at' => date('Y-m-d H:i:s'),
-            'updated_at' => date('Y-m-d H:i:s')
-        ];
-        $this->db->insert('affiliate_creator_links', $link_data);
-    }
-    
     $whatsapp_url = "https://wa.me/{$cleanPhone}?text=" . urlencode($message);
     
     return $this->output->set_output(json_encode([
@@ -8151,6 +10286,1772 @@ public function send_link_task1() {
     ]));
 }
 
+/**
+ * Synchronize Bestseller and Trending status automatically for system brands
+ * Menggunakan data TAP API (get_bestselling_products) sebagai sumber utama:
+ * - Ambil produk bestselling dari TAP → group by shop_name → hitung total GMV per brand
+ * - Cocokkan shop_name dengan tabel brands → update is_bestseller
+ * - Fallback ke data internal (brand_creators.total_gmv) jika TAP API tidak tersedia
+ */
+public function sync_brand_tap_performance() {
+    // Auto-migrate database columns if missing on server database
+    if (!$this->db->field_exists('day7_gmv', 'brand_creators')) {
+        $this->db->query("ALTER TABLE brand_creators ADD COLUMN day7_gmv DECIMAL(15,2) DEFAULT 0.00 AFTER total_gmv");
+    }
+    if (!$this->db->field_exists('is_bestseller', 'brands')) {
+        $this->db->query("ALTER TABLE brands ADD COLUMN is_bestseller TINYINT(1) DEFAULT 0, ADD COLUMN is_trending TINYINT(1) DEFAULT 0, ADD COLUMN day7_gmv DECIMAL(15,2) DEFAULT 0.00");
+    }
 
+    // =========================================================
+    // STEP 1: Coba ambil data dari TAP API (get_bestselling_products)
+    // =========================================================
+    $tap_brand_gmv   = [];  // [ shop_name_lower => gmv_total ]
+    $tap_api_success = false;
 
+    try {
+        // Ambil 7-hari dan 28-hari dari TAP API
+        $time_slots = ['7D' => 'gmv_7d', '28D' => 'gmv_28d'];
+        foreach ($time_slots as $slot => $gmv_key) {
+            $result = $this->jsm_api->get_bestselling_products([
+                'time_slot' => $slot,
+                'page_size' => 100,
+            ]);
+
+            if (!empty($result['success']) && !empty($result['data']['products'])) {
+                $tap_api_success = true;
+                foreach ($result['data']['products'] as $item) {
+                    $shop_name = strtolower(trim($item['shop_name'] ?? ''));
+                    if (empty($shop_name)) continue;
+
+                    // Parse GMV dari string range, e.g. "IDR1000000~IDR5000000"
+                    $gmv_range = $item['gmv_range'] ?? '';
+                    $gmv_value = 0.0;
+                    if (preg_match('/IDR([0-9.]+)~IDR([0-9.]+)/', $gmv_range, $matches)) {
+                        // Gunakan nilai maksimum sebagai estimasi GMV
+                        $gmv_value = floatval($matches[2]);
+                    } elseif (preg_match('/IDR([0-9.]+)/', $gmv_range, $matches)) {
+                        $gmv_value = floatval($matches[1]);
+                    }
+
+                    if (!isset($tap_brand_gmv[$shop_name])) {
+                        $tap_brand_gmv[$shop_name] = ['gmv_7d' => 0.0, 'gmv_28d' => 0.0];
+                    }
+                    $tap_brand_gmv[$shop_name][$gmv_key] += $gmv_value;
+                }
+            }
+        }
+    } catch (Exception $e) {
+        log_message('error', 'sync_brand_tap_performance TAP API error: ' . $e->getMessage());
+        $tap_api_success = false;
+    }
+
+    // =========================================================
+    // STEP 2: Ambil semua brand aktif (Step 4 Monitoring di BA)
+    // Sebelumnya hanya mengambil brand yg terhubung creator Step 1 — perbaikan:
+    // ambil SEMUA brand ACTIVE agar brand seperti Hanasui juga ikut di-sync
+    // =========================================================
+    $brands = $this->db->query("
+        SELECT DISTINCT b.id, b.shop_name, b.name as brand_name
+        FROM brands b
+        LEFT JOIN affiliate_products ap ON TRIM(b.name) = TRIM(ap.shop_name) AND ap.review_status = 'PENDING'
+        WHERE b.status = 'ACTIVE'
+          AND ap.id IS NULL
+    ")->result();
+    if (empty($brands)) return;
+
+    $has_day7_col = $this->db->field_exists('day7_gmv', 'brand_creators');
+
+    $brand_stats = [];
+    foreach ($brands as $b) {
+        $shop_key = strtolower(trim($b->shop_name ?? $b->brand_name ?? ''));
+
+        if ($tap_api_success && isset($tap_brand_gmv[$shop_key])) {
+            // ✅ Gunakan data GMV dari TAP API
+            $gmv_28d = $tap_brand_gmv[$shop_key]['gmv_28d'];
+            $gmv_7d  = $tap_brand_gmv[$shop_key]['gmv_7d'];
+        } else {
+            // 🔁 Fallback: hitung dari affiliate_orders (data penjualan nyata)
+            // Ini lebih akurat untuk brand seperti Hanasui yang creatornya sudah ACTIVE
+            $brand_name_match = $b->shop_name ?: $b->brand_name;
+
+            $gmv_28d_q = $this->db->query("
+                SELECT COALESCE(SUM(o.gmv), 0) as gmv
+                FROM affiliate_orders o
+                JOIN affiliate_products ap ON o.product_id = ap.product_id
+                WHERE TRIM(ap.shop_name) = TRIM(?)
+                  AND ap.review_status = 'APPROVED'
+                  AND o.order_status NOT IN ('CANCELLED', 'REFUNDED')
+                  AND o.order_date_local >= DATE_SUB(CURDATE(), INTERVAL 28 DAY)
+            ", [$brand_name_match]);
+            $gmv_28d = ($gmv_28d_q && is_object($gmv_28d_q) && $gmv_28d_q->num_rows() > 0)
+                       ? floatval($gmv_28d_q->row()->gmv ?? 0) : 0.0;
+
+            // Fallback ke brand_creators jika orders kosong
+            if ($gmv_28d == 0.0) {
+                $bc_q = $this->db->query("
+                    SELECT COALESCE(SUM(bc.total_gmv), 0) as gmv
+                    FROM brand_creators bc
+                    WHERE bc.brand_id = ?
+                ", [$b->id]);
+                $gmv_28d = ($bc_q && is_object($bc_q) && $bc_q->num_rows() > 0)
+                           ? floatval($bc_q->row()->gmv ?? 0) : 0.0;
+            }
+
+            $gmv_7d = 0.0;
+            $gmv_7d_q = $this->db->query("
+                SELECT COALESCE(SUM(o.gmv), 0) as gmv
+                FROM affiliate_orders o
+                JOIN affiliate_products ap ON o.product_id = ap.product_id
+                WHERE TRIM(ap.shop_name) = TRIM(?)
+                  AND ap.review_status = 'APPROVED'
+                  AND o.order_status NOT IN ('CANCELLED', 'REFUNDED')
+                  AND o.order_date_local >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+            ", [$brand_name_match]);
+            $gmv_7d = ($gmv_7d_q && is_object($gmv_7d_q) && $gmv_7d_q->num_rows() > 0)
+                      ? floatval($gmv_7d_q->row()->gmv ?? 0) : 0.0;
+
+            // Fallback ke brand_creators.day7_gmv
+            if ($gmv_7d == 0.0 && $has_day7_col) {
+                $bc7_q = $this->db->query("
+                    SELECT COALESCE(SUM(bc.day7_gmv), 0) as gmv
+                    FROM brand_creators bc
+                    WHERE bc.brand_id = ?
+                ", [$b->id]);
+                $gmv_7d = ($bc7_q && is_object($bc7_q) && $bc7_q->num_rows() > 0)
+                          ? floatval($bc7_q->row()->gmv ?? 0) : 0.0;
+            }
+        }
+
+        $brand_stats[$b->id] = [
+            'brand_id'   => $b->id,
+            'gmv_28d'    => $gmv_28d,
+            'gmv_7d'     => $gmv_7d,
+            'source'     => ($tap_api_success && isset($tap_brand_gmv[$shop_key])) ? 'tap_api' : 'internal',
+        ];
+    }
+
+    $max_gmv_28d = 0;
+    $max_gmv_7d  = 0;
+    foreach ($brand_stats as $bs) {
+        if ($bs['gmv_28d'] > $max_gmv_28d) $max_gmv_28d = $bs['gmv_28d'];
+        if ($bs['gmv_7d']  > $max_gmv_7d)  $max_gmv_7d  = $bs['gmv_7d'];
+    }
+
+    uasort($brand_stats, function($a, $b) {
+        return ($a['gmv_28d'] < $b['gmv_28d']) ? 1 : -1;
+    });
+
+    $rank = 0;
+    foreach ($brand_stats as $bid => $stat) {
+        $rank++;
+
+        // Kategorisasi brand:
+        // ✅ Bestseller  = brand yang punya GMV 28 hari > 0 (aktif berjualan)
+        // ✅ Trending    = brand yang punya GMV 7 hari > 0 (aktif dalam seminggu terakhir)
+        // Jika dari TAP API: langsung ikut klasifikasi TAP
+        // Jika dari internal: berdasarkan data affiliate_orders
+        $is_bestseller = ($stat['gmv_28d'] > 0) ? 1 : 0;
+        $is_trending   = ($stat['gmv_7d']  > 0) ? 1 : 0;
+
+        $update_data = [
+            'total_gmv'  => $stat['gmv_28d'],
+            'updated_at' => date('Y-m-d H:i:s')
+        ];
+        if ($this->db->field_exists('day7_gmv', 'brands')) {
+            $update_data['day7_gmv'] = $stat['gmv_7d'];
+        }
+        if ($this->db->field_exists('is_bestseller', 'brands')) {
+            $update_data['is_bestseller'] = $is_bestseller;
+        }
+        if ($this->db->field_exists('is_trending', 'brands')) {
+            $update_data['is_trending'] = $is_trending;
+        }
+
+        $this->db->where('id', $bid)->update('brands', $update_data);
+    }
+
+    log_message('info', 'sync_brand_tap_performance: updated ' . count($brand_stats) . ' brands. TAP API used: ' . ($tap_api_success ? 'YES' : 'NO (fallback to internal)'));
 }
+
+// =====================================================================
+// AUTO CREATOR SCOUTING — IS ENDPOINTS
+// =====================================================================
+
+/**
+ * AJAX — Ambil creator list untuk detail brand
+ */
+public function get_brand_creators() {
+    $this->output->set_content_type('application/json');
+
+    if (!$this->session->userdata('logged_in')) {
+        return $this->output->set_output(json_encode(['success' => false, 'message' => 'Session expired']));
+    }
+
+    $brand_id = $this->input->post('brand_id');
+    $brand_name = $this->input->post('brand_name');
+
+    if (empty($brand_id) && empty($brand_name)) {
+        return $this->output->set_output(json_encode(['success' => false, 'message' => 'Brand ID or Brand Name is required']));
+    }
+
+    if ($brand_name === 'Belum ada brand' || $brand_id == 0) {
+        $this->db->select('
+            c.*,
+            "Belum ada brand" as brand_name,
+            "" as shop_name,
+            u.username as is_username,
+            u.full_name as is_full_name,
+            0 as brand_specific_gmv,
+            (SELECT COUNT(DISTINCT acl.id) 
+             FROM affiliate_creator_links acl 
+             WHERE acl.creator_id = c.id 
+               AND acl.status = "ACTIVE") as total_links,
+            (SELECT MAX(acl.created_at) 
+             FROM affiliate_creator_links acl 
+             WHERE acl.creator_id = c.id 
+               AND acl.status = "ACTIVE") as last_link_created,
+            (SELECT COALESCE(SUM(o.gmv), 0) 
+             FROM affiliate_orders o 
+             WHERE o.creator_username = c.username 
+               AND o.order_date_local >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+               AND o.order_status NOT IN ("CANCELLED", "REFUNDED")) as total_gmv_30d,
+             (SELECT GROUP_CONCAT(DISTINCT u2.full_name SEPARATOR ", ")
+              FROM users u2
+              WHERE u2.role = "IS"
+                AND (
+                    u2.id = c.is_id
+                    OR u2.id IN (SELECT DISTINCT ul.user_id FROM user_logs ul WHERE ul.role = "IS" AND ul.action = "GENERATE_AFFILIATE_LINK" AND ul.description LIKE CONCAT("%creator @", c.username, ",%"))
+                )
+             ) as contacted_ca_names
+         ', false)
+        ->from('creators c')
+        ->join('users u', 'c.is_id = u.id', 'left')
+        ->group_start()
+            ->where('c.brand_id IS NULL')
+            ->or_where('c.brand_id', 0)
+        ->group_end()
+        ->where_in('c.status', ['PENDING', 'LINK_SWAPPING']);
+    } else {
+        $this->db->select('
+            c.*,
+            b.name as brand_name,
+            b.shop_name,
+            u.username as is_username,
+            u.full_name as is_full_name,
+            COALESCE(GREATEST(
+                COALESCE(bc.total_gmv, 0),
+                (SELECT COALESCE(SUM(o.gmv), 0) 
+                 FROM affiliate_orders o 
+                 JOIN affiliate_products ap ON o.product_id = ap.product_id
+                 WHERE o.creator_username = c.username 
+                   AND (TRIM(ap.shop_name) = TRIM(b.shop_name) OR TRIM(ap.shop_name) = TRIM(b.name))
+                   AND o.order_date_local >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+                   AND o.order_status NOT IN ("CANCELLED", "REFUNDED"))
+            ), 0) as brand_specific_gmv,
+            (SELECT COUNT(DISTINCT acl.id) 
+             FROM affiliate_creator_links acl 
+             WHERE acl.creator_id = c.id 
+               AND acl.status = "ACTIVE") as total_links,
+            (SELECT MAX(acl.created_at) 
+             FROM affiliate_creator_links acl 
+             WHERE acl.creator_id = c.id 
+               AND acl.status = "ACTIVE") as last_link_created,
+            (SELECT COALESCE(SUM(o.gmv), 0) 
+             FROM affiliate_orders o 
+             WHERE o.creator_username = c.username 
+               AND o.order_date_local >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+               AND o.order_status NOT IN ("CANCELLED", "REFUNDED")) as total_gmv_30d,
+             (SELECT GROUP_CONCAT(DISTINCT u2.full_name SEPARATOR ", ")
+              FROM users u2
+              WHERE u2.role = "IS"
+                AND (
+                    u2.id = c.is_id
+                    OR u2.id IN (SELECT DISTINCT ul.user_id FROM user_logs ul WHERE ul.role = "IS" AND ul.action = "GENERATE_AFFILIATE_LINK" AND ul.description LIKE CONCAT("%creator @", c.username, ",%"))
+                )
+             ) as contacted_ca_names
+         ', false)
+        ->from('creators c')
+        ->join('brands b', '1=1', 'inner')
+        ->join('brand_creators bc', 'bc.brand_id = b.id AND bc.creator_username = c.username', 'left')
+        ->join('users u', 'c.is_id = u.id', 'left')
+        ->group_start()
+            ->where('c.brand_id = b.id')
+            ->or_where('bc.id IS NOT NULL')
+        ->group_end()
+        ->where_in('c.status', ['PENDING', 'LINK_SWAPPING']);
+
+        if (!empty($brand_id)) {
+            $this->db->where('b.id', $brand_id);
+        } else {
+            $this->db->group_start()
+                     ->where('b.name', $brand_name)
+                     ->or_where('b.shop_name', $brand_name)
+                     ->group_end();
+        }
+    }
+
+    $creators = $this->db->order_by('COALESCE(bc.total_gmv, 0)', 'DESC', false)
+                         ->order_by('COALESCE(c.fastmoss_gmv_28d, c.imported_gmv, 0)', 'DESC', false)
+                         ->get()
+                         ->result();
+
+    // Ambil detail brand (termasuk PIC BA / user BA yang deal)
+    $brand_detail = null;
+    if (!empty($brand_id)) {
+        $brand_detail = $this->db->select('b.id, b.name, b.shop_name, b.bd_id, u.full_name as pic_ba_full_name, u.username as pic_ba_username')
+                                 ->from('brands b')
+                                 ->join('users u', 'b.bd_id = u.id', 'left')
+                                 ->where('b.id', $brand_id)
+                                 ->get()
+                                 ->row();
+    } else if (!empty($brand_name) && $brand_name !== 'Belum ada brand') {
+        $brand_detail = $this->db->select('b.id, b.name, b.shop_name, b.bd_id, u.full_name as pic_ba_full_name, u.username as pic_ba_username')
+                                 ->from('brands b')
+                                 ->join('users u', 'b.bd_id = u.id', 'left')
+                                 ->group_start()
+                                     ->where('b.name', $brand_name)
+                                     ->or_where('b.shop_name', $brand_name)
+                                 ->group_end()
+                                 ->get()
+                                 ->row();
+    }
+
+    return $this->output->set_output(json_encode([
+        'success'      => true,
+        'brand_detail' => $brand_detail,
+        'creators'     => $creators
+    ]));
+}
+
+
+/**
+ * AJAX — Ambil scouting list
+ */
+public function get_scouting_list() {
+    $this->output->set_content_type('application/json');
+
+    if (!$this->session->userdata('logged_in')) {
+        return $this->output->set_output(json_encode(['success' => false, 'message' => 'Session expired']));
+    }
+
+    $this->load->model('CreatorScouting_model');
+
+    $filters = [
+        'status'   => ['pending', 'contacted'],
+        'brand_id' => $this->input->get('brand_id') ?: null,
+        'source'   => $this->input->get('source')   ?: null,
+        'search'   => $this->input->get('search')   ?: '',
+        'limit'    => 50,
+        'offset'   => intval($this->input->get('offset') ?: 0),
+    ];
+
+    $list   = $this->CreatorScouting_model->get_scouting_list($filters);
+    $total  = $this->CreatorScouting_model->get_scouting_count(['pending', 'contacted'], $filters['brand_id']);
+    $brands = $this->CreatorScouting_model->get_brands_in_scouting();
+
+    return $this->output->set_output(json_encode([
+        'success' => true,
+        'total'   => $total,
+        'data'    => $list,
+        'brands'  => $brands,
+    ]));
+}
+
+/**
+ * AJAX — Hubungi creator dari scouting list (WhatsApp redirect & update status)
+ * POST params: scouting_id, phone (optional)
+ */
+public function get_scouting_contact_link() {
+    $this->output->set_content_type('application/json');
+
+    if (!$this->session->userdata('logged_in')) {
+        return $this->output->set_output(json_encode(['success' => false, 'message' => 'Session expired']));
+    }
+
+    $scouting_id = $this->input->post('scouting_id');
+    $input_phone = $this->input->post('phone');
+
+    if (!$scouting_id) {
+        return $this->output->set_output(json_encode(['success' => false, 'message' => 'Scouting ID wajib diisi']));
+    }
+
+    $this->load->model('CreatorScouting_model');
+    $item = $this->CreatorScouting_model->get_by_id($scouting_id);
+
+    if (!$item) {
+        return $this->output->set_output(json_encode(['success' => false, 'message' => 'Scouting item tidak ditemukan']));
+    }
+
+    if ($input_phone) {
+        $this->db->where('id', $scouting_id)->update('creator_scouting', [
+            'phone'      => $input_phone,
+            'updated_at' => date('Y-m-d H:i:s')
+        ]);
+        $item->phone = $input_phone;
+    }
+
+    if (empty($item->phone)) {
+        return $this->output->set_output(json_encode(['success' => false, 'message' => 'Creator tidak memiliki nomor WhatsApp']));
+    }
+
+    // Cari link di bd_affiliate_links
+    $link_row = $this->db->select('affiliate_link')
+                         ->from('bd_affiliate_links')
+                         ->where('campaign_id', $item->campaign_id)
+                         ->where('product_id', $item->product_id)
+                         ->where('status', 'ACTIVE')
+                         ->limit(1)
+                         ->get()
+                         ->row();
+
+    // Fallback: cari link lain dari campaign_id yang sama
+    if (!$link_row) {
+        $link_row = $this->db->select('affiliate_link')
+                             ->from('bd_affiliate_links')
+                             ->where('campaign_id', $item->campaign_id)
+                             ->where('status', 'ACTIVE')
+                             ->limit(1)
+                             ->get()
+                             ->row();
+    }
+
+    if (!$link_row) {
+        return $this->output->set_output(json_encode([
+            'success' => false,
+            'message' => 'Belum ada link afiliasi aktif untuk campaign ini. Silakan hubungi BD/BA untuk membuat link terlebih dahulu.'
+        ]));
+    }
+
+    $affiliate_link = $link_row->affiliate_link;
+
+    // Update status di creator_scouting ke 'contacted'
+    $user_id = $this->session->userdata('user_id');
+    $this->db->where('id', $scouting_id)->update('creator_scouting', [
+        'status'       => 'contacted',
+        'contacted_by' => $user_id,
+        'contacted_at' => date('Y-m-d H:i:s'),
+        'updated_at'   => date('Y-m-d H:i:s')
+    ]);
+
+    // Format phone
+    $phone = preg_replace('/[^0-9+]/', '', $item->phone);
+    if (preg_match('/^0/', $phone)) {
+        $phone = '+62' . substr($phone, 1);
+    } elseif (!preg_match('/^\+/', $phone)) {
+        $phone = '+' . $phone;
+    }
+    $cleanPhone = ltrim($phone, '+');
+
+    $ca_name = $this->session->userdata('full_name') ?: $this->session->userdata('username');
+    $message = "Halo Kak @" . $item->username . ",\n\nPerkenalkan saya " . $ca_name . " dari Toopai. Kami sangat menyukai konten Kakak dan ingin mengundang Kakak untuk bekerja sama dalam campaign *{$item->campaign_name}* untuk brand *{$item->brand_name}*.\n\nBerikut adalah Product Palette Link (Link Produk) untuk ditambahkan ke Showcase Kakak:\n" . $affiliate_link . "\n\nTerima kasih, ditunggu kabarnya ya Kak! 😊";
+
+    // Catat data ke whatsapp_logs untuk tracking
+    $log_data = [
+        'user_id'      => $user_id,
+        'brand_id'     => $item->brand_id,
+        'phone_number' => $phone,
+        'message'      => $message,
+        'status'       => 'SENT',
+        'sent_at'      => date('Y-m-d H:i:s')
+    ];
+
+    $columns = $this->db->list_fields('whatsapp_logs');
+    if (in_array('creator_id', $columns)) {
+        $log_data['creator_id'] = 0;
+    }
+    if (in_array('link_type', $columns)) {
+        $log_data['link_type'] = 'scouting_contact';
+    }
+    if (in_array('link', $columns)) {
+        $log_data['link'] = $affiliate_link;
+    }
+
+    $this->db->insert('whatsapp_logs', $log_data);
+
+    $whatsapp_url = "https://wa.me/{$cleanPhone}?text=" . urlencode($message);
+
+    return $this->output->set_output(json_encode([
+        'success'      => true,
+        'redirect_url' => $whatsapp_url,
+        'message'      => 'WhatsApp url generated successfully'
+    ]));
+}
+
+/**
+ * AJAX — Onboard creator dari scouting list ke Task 1 (PENDING)
+ * POST: scouting_id
+ */
+public function onboard_creator_from_scouting() {
+    $this->output->set_content_type('application/json');
+
+    if (!$this->session->userdata('logged_in')) {
+        return $this->output->set_output(json_encode(['success' => false, 'message' => 'Session expired']));
+    }
+
+    $scouting_id = $this->input->post('scouting_id');
+    if (!$scouting_id) {
+        return $this->output->set_output(json_encode(['success' => false, 'message' => 'Scouting ID wajib diisi']));
+    }
+
+    $this->load->model('CreatorScouting_model');
+    $user_id = $this->session->userdata('user_id');
+
+    $result = $this->CreatorScouting_model->onboard_creator($scouting_id, $user_id);
+
+    if ($result['success']) {
+        $this->load->model('User_log_model');
+        $this->User_log_model->log(
+            $user_id,
+            $this->session->userdata('username'),
+            'IS',
+            'ONBOARD_SCOUTING',
+            "Onboard creator from scouting ID={$scouting_id}, creator_id={$result['creator_id']}"
+        );
+    }
+
+    return $this->output->set_output(json_encode($result));
+}
+
+/**
+ * AJAX — Abaikan creator dari scouting list
+ * POST: scouting_id
+ */
+public function ignore_scouting_creator() {
+    $this->output->set_content_type('application/json');
+
+    if (!$this->session->userdata('logged_in')) {
+        return $this->output->set_output(json_encode(['success' => false, 'message' => 'Session expired']));
+    }
+
+    $scouting_id = $this->input->post('scouting_id');
+    if (!$scouting_id) {
+        return $this->output->set_output(json_encode(['success' => false, 'message' => 'Scouting ID wajib diisi']));
+    }
+
+    $this->load->model('CreatorScouting_model');
+    $result = $this->CreatorScouting_model->ignore_creator($scouting_id);
+
+    return $this->output->set_output(json_encode($result));
+}
+
+/**
+ * Trigger manual populate scouting list (opsional, bisa dari tombol UI)
+ */
+public function refresh_scouting_list() {
+    $this->output->set_content_type('application/json');
+
+    if (!$this->session->userdata('logged_in')) {
+        return $this->output->set_output(json_encode(['success' => false, 'message' => 'Session expired']));
+    }
+
+    $this->load->model('CreatorScouting_model');
+
+    try {
+        $stats = $this->CreatorScouting_model->populate_from_orders();
+
+        $this->load->model('User_log_model');
+        $this->User_log_model->log(
+            $this->session->userdata('user_id'),
+            $this->session->userdata('username'),
+            'IS',
+            'REFRESH_SCOUTING',
+            "Manual refresh: inserted={$stats['inserted']}, skipped_dup={$stats['skipped_duplicate']}"
+        );
+
+        $msg = $stats['inserted'] > 0
+            ? "✅ Scouting list diperbarui. {$stats['inserted']} creator baru ditemukan."
+            : "ℹ️ 0 creator baru. " . implode(' | ', $stats['debug'] ?? []);
+
+        return $this->output->set_output(json_encode([
+            'success' => true,
+            'message' => $msg,
+            'stats'   => $stats,
+        ]));
+    } catch (Exception $e) {
+        return $this->output->set_output(json_encode(['success' => false, 'message' => $e->getMessage()]));
+    }
+}
+
+
+// ============================================================================
+// FITUR F: PENGIRIMAN SAMPLE PRODUCT CREATOR
+// ============================================================================
+
+// --------------------------------------------------------------------------
+// F.2 — KONFIRMASI KESEDIAAN CREATOR MENERIMA SAMPLE
+// --------------------------------------------------------------------------
+
+/**
+ * Konfirmasi apakah creator bersedia menerima sample.
+ * Dipanggil dari modal Detail Creator via AJAX POST.
+ *
+ * POST params: creator_id, willing (1|0), notes
+ *
+ * Jika NOT willing (0):
+ *   → status creator diupdate ke ACTIVE (masuk Monitoring langsung)
+ * Jika willing (1):
+ *   → status tetap LINK_SENT/SAMPLE_SENT, lanjut ke pemilihan produk
+ */
+public function confirm_sample_willingness() {
+    $this->output->set_content_type('application/json');
+
+    try {
+        $creator_id = $this->input->post('creator_id');
+        $willing    = intval($this->input->post('willing')); // 1 = Ya, 0 = Tidak
+        $notes      = $this->input->post('notes') ?? '';
+
+        if (!$creator_id) {
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Creator ID required'
+            ]));
+        }
+
+        $creator = $this->db->where('id', $creator_id)->get('creators')->row();
+        if (!$creator) {
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Creator not found'
+            ]));
+        }
+
+        $this->load->model('SampleProduct_model');
+
+        // Simpan konfirmasi ke sample_requests
+        $this->SampleProduct_model->save_sample_willingness([
+            'creator_id'  => $creator_id,
+            'campaign_id' => null,
+            'willing'     => $willing,
+            'notes'       => $notes,
+        ]);
+
+        // Jika creator TIDAK bersedia → langsung masuk Monitoring (status ACTIVE)
+        if (!$willing) {
+            $this->db->where('id', $creator_id)->update('creators', [
+                'status'     => 'ACTIVE',
+                'updated_at' => date('Y-m-d H:i:s'),
+            ]);
+
+            return $this->output->set_output(json_encode([
+                'success'    => true,
+                'willing'    => false,
+                'new_status' => 'ACTIVE',
+                'message'    => 'Creator tidak bersedia menerima sample. Creator dipindahkan ke Monitoring.',
+            ]));
+        }
+
+        // Jika bersedia → biarkan status saat ini, kembalikan konfirmasi
+        return $this->output->set_output(json_encode([
+            'success' => true,
+            'willing' => true,
+            'message' => 'Creator bersedia. Lanjutkan ke pemilihan produk sample.',
+        ]));
+
+    } catch (Exception $e) {
+        log_message('error', 'confirm_sample_willingness error: ' . $e->getMessage());
+        return $this->output->set_output(json_encode([
+            'success' => false,
+            'message' => 'Server error: ' . $e->getMessage()
+        ]));
+    }
+}
+
+// --------------------------------------------------------------------------
+// F.3 — REKOMENDASI PRODUK SAMPLE
+// --------------------------------------------------------------------------
+
+/**
+ * Cek validasi requirement brand (Minimum GMV) sebelum pengiriman sample.
+ * POST param: creator_id
+ */
+public function check_sample_requirement() {
+    $this->output->set_content_type('application/json');
+
+    try {
+        $creator_id = $this->input->post('creator_id');
+
+        if (!$creator_id) {
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Creator ID required'
+            ]));
+        }
+
+        // Ambil data creator dan brand yang sedang dipromosikan
+        $creator = $this->db->select('c.id, c.username, c.brand_id, c.imported_gmv, c.fastmoss_gmv_28d, b.name as brand_name, b.shop_name, COALESCE(b.creator_gmv, b.requirement_creator_gmv, 0) as min_gmv_req')
+            ->from('creators c')
+            ->join('brands b', 'c.brand_id = b.id', 'left')
+            ->where('c.id', $creator_id)
+            ->get()
+            ->row();
+
+        if (!$creator) {
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Creator tidak ditemukan'
+            ]));
+        }
+
+        // Minimum GMV yang ditentukan oleh brand pada requirement
+        $min_gmv_req = floatval($creator->min_gmv_req ?? 0);
+
+        // Hitung GMV creator khusus pada brand yang sedang dipromosikan
+        $brand_gmv = 0;
+        if (!empty($creator->username) && (!empty($creator->brand_id) || !empty($creator->shop_name))) {
+            $this->db->select('COALESCE(SUM(o.gmv), 0) as total_gmv')
+                ->from('affiliate_orders o')
+                ->where('o.creator_username', $creator->username)
+                ->where('o.order_status NOT IN ("CANCELLED", "REFUNDED")');
+
+            if (!empty($creator->shop_name)) {
+                $this->db->join('affiliate_products ap', 'o.product_id = ap.product_id', 'left');
+                $this->db->where('LOWER(TRIM(ap.shop_name))', strtolower(trim($creator->shop_name)));
+            }
+
+            $res = $this->db->get()->row();
+            $brand_gmv = floatval($res->total_gmv ?? 0);
+        }
+
+        // Fallback: Jika orders belum ter-sync ke affiliate_orders tapi creator terikat di brand ini
+        if ($brand_gmv <= 0) {
+            $brand_gmv = floatval($creator->fastmoss_gmv_28d ?? $creator->imported_gmv ?? 0);
+        }
+
+        // Pengecekan requirement: jika min_gmv_req <= 0, maka dianggap memenuhi requirement
+        $meets_requirement = ($min_gmv_req <= 0) || ($brand_gmv >= $min_gmv_req);
+
+        return $this->output->set_output(json_encode([
+            'success'               => true,
+            'meets_requirement'     => $meets_requirement,
+            'brand_name'            => $creator->brand_name ?: ($creator->shop_name ?: 'Brand'),
+            'creator_brand_gmv'     => $brand_gmv,
+            'min_gmv_req'           => $min_gmv_req,
+            'formatted_creator_gmv' => 'Rp ' . number_format($brand_gmv, 0, ',', '.'),
+            'formatted_min_gmv'     => 'Rp ' . number_format($min_gmv_req, 0, ',', '.'),
+        ]));
+
+    } catch (Exception $e) {
+        log_message('error', 'check_sample_requirement error: ' . $e->getMessage());
+        return $this->output->set_output(json_encode([
+            'success' => false,
+            'message' => 'Server error: ' . $e->getMessage()
+        ]));
+    }
+}
+
+/**
+ * Ambil rekomendasi produk sample untuk creator.
+ * Berbasis kategori sama, brand berbeda dari produk yang sudah dimiliki.
+ *
+ * POST params: creator_id
+ */
+public function get_sample_recommendations() {
+    $this->output->set_content_type('application/json');
+
+    try {
+        $creator_id = $this->input->post('creator_id');
+
+        if (!$creator_id) {
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Creator ID required'
+            ]));
+        }
+
+        $this->load->model('SampleProduct_model');
+        $result = $this->SampleProduct_model->get_sample_recommendation($creator_id, 30);
+
+        return $this->output->set_output(json_encode([
+            'success'             => true,
+            'recommendations'     => $result['recommendations'],
+            'creator_brands'      => $result['creator_brands'],
+            'creator_categories'  => $result['creator_categories'],
+            'total'               => count($result['recommendations']),
+        ]));
+
+    } catch (Exception $e) {
+        log_message('error', 'get_sample_recommendations error: ' . $e->getMessage());
+        return $this->output->set_output(json_encode([
+            'success' => false,
+            'message' => 'Server error: ' . $e->getMessage()
+        ]));
+    }
+}
+
+// --------------------------------------------------------------------------
+// F.4 — SIMPAN PENGIRIMAN SAMPLE (MANUAL)
+// --------------------------------------------------------------------------
+
+/**
+ * Simpan data pengiriman sample manual ke database.
+ * Menggantikan pencatatan di Google Sheets.
+ *
+ * POST params: creator_id, product_id, campaign_id, quantity,
+ *              shipping_address, brand_id, brand_name, notes, delivery_method
+ */
+public function save_sample_delivery() {
+    $this->output->set_content_type('application/json');
+
+    try {
+        $creator_id      = $this->input->post('creator_id');
+        $products        = json_decode($this->input->post('products'), true);
+        $shipping_address= $this->input->post('shipping_address');
+        $delivery_method = $this->input->post('delivery_method') ?: 'manual';
+        $tap_request_id  = $this->input->post('tap_request_id') ?: null;
+
+        if (!$creator_id || empty($products)) {
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Creator ID dan produk wajib diisi'
+            ]));
+        }
+
+        $this->load->model('SampleProduct_model');
+
+        $saved       = 0;
+        $request_ids = [];
+        $errors      = [];
+
+        foreach ($products as $product) {
+            // Validasi: product_id wajib ada
+            if (empty($product['product_id'])) {
+                $errors[] = 'product_id kosong, produk dilewati';
+                continue;
+            }
+
+            $result = $this->SampleProduct_model->save_sample_delivery([
+                'creator_id'       => $creator_id,
+                'product_id'       => $product['product_id'],
+                'campaign_id'      => $product['campaign_id'] ?? null,
+                'quantity'         => $product['quantity'] ?? 1,
+                'shipping_address' => $shipping_address,
+                'delivery_method'  => $delivery_method,
+                'tap_request_id'   => $tap_request_id,
+                'brand_id'         => $product['brand_id'] ?? null,
+                'brand_name'       => $product['brand_name'] ?? null,
+                'notes'            => $product['notes'] ?? null,
+            ]);
+
+            if ($result['success']) {
+                $saved++;
+                $request_ids[] = $result['request_id'];
+            } else {
+                $errors[] = 'Gagal insert product_id=' . $product['product_id'] . ': ' . ($result['message'] ?? '?');
+                log_message('error', 'save_sample_delivery: gagal insert product_id=' . $product['product_id']);
+            }
+        }
+
+        if ($saved === 0) {
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Tidak ada produk yang berhasil disimpan. ' . implode('; ', $errors),
+            ]));
+        }
+
+        // Update status creator ke SAMPLE_SENT
+        $this->db->where('id', $creator_id)->update('creators', [
+            'status'     => 'SAMPLE_SENT',
+            'updated_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        return $this->output->set_output(json_encode([
+            'success'     => true,
+            'saved'       => $saved,
+            'request_ids' => $request_ids,
+            'message'     => "{$saved} produk sample berhasil dicatat. Status creator diperbarui ke SAMPLE_SENT.",
+        ]));
+
+    } catch (Exception $e) {
+        log_message('error', 'save_sample_delivery error: ' . $e->getMessage());
+        return $this->output->set_output(json_encode([
+            'success' => false,
+            'message' => 'Server error: ' . $e->getMessage()
+        ]));
+    }
+}
+
+// --------------------------------------------------------------------------
+// F.5 — HALAMAN MONITORING CREATOR (PAGE RENDER)
+// --------------------------------------------------------------------------
+
+/**
+ * Render halaman dedicated Monitoring Creator.
+ * URL: /is/monitoring
+ */
+public function monitoring() {
+    $user_id      = $this->session->userdata('user_id');
+    $is_supervisor = ($user_id == 2);
+
+    // Ambil semua creator ACTIVE yang di-handle IS ini (atau semua jika supervisor)
+    // Urutkan berdasarkan total GMV tertinggi dalam 30 hari terakhir
+    $thirty_days_ago = date('Y-m-d', strtotime('-30 days'));
+    
+    $query = $this->db
+        ->select('c.id, c.username, c.full_name, c.avatar_url, c.category, c.status,
+                  c.brand_id, c.is_id, b.name as brand_name, u.full_name as is_name,
+                  COALESCE(SUM(ao.gmv), 0) as total_gmv_30d,
+                  COUNT(DISTINCT ao.order_id) as total_orders_30d')
+        ->from('creators c')
+        ->join('brands b', 'c.brand_id = b.id', 'left')
+        ->join('users u', 'c.is_id = u.id', 'left')
+        ->join('affiliate_orders ao', "c.username = ao.creator_username AND ao.order_date_local >= '{$thirty_days_ago}' AND ao.order_status NOT IN ('CANCELLED', 'REFUNDED')", 'left')
+        ->where_in('c.status', ['ACTIVE', 'SAMPLE_SENT']);
+
+    if (!$is_supervisor) {
+        $query->where('c.is_id', $user_id);
+    }
+
+    $creators = $query->group_by(array('c.id', 'b.name', 'u.full_name'))
+                      ->order_by('total_gmv_30d', 'DESC')
+                      ->limit(200)
+                      ->get()
+                      ->result();
+
+    // Hitung statistik ringkas per creator
+    foreach ($creators as &$creator) {
+        $creator->total_gmv_30d   = floatval($creator->total_gmv_30d);
+        $creator->total_orders_30d = intval($creator->total_orders_30d);
+
+        // Jumlah sample yang sudah dikirim
+        $creator->sample_count = $this->db
+            ->where('creator_id', $creator->id)
+            ->where('product_id IS NOT NULL')
+            ->count_all_results('sample_requests');
+
+        // Jumlah video
+        $creator->video_count = 0;
+        $tables = $this->db->list_tables();
+        if (in_array('creator_content_statistics', $tables)) {
+            $creator->video_count = $this->db
+                ->where('creator_username', $creator->username)
+                ->count_all_results('creator_content_statistics');
+        }
+
+        // Apakah ada trigger keranjang kuning (ada transaksi)
+        $creator->has_orders = $creator->total_orders_30d > 0;
+    }
+    unset($creator);
+
+    $data = [
+        'title'         => 'Monitoring Creator - Toopai',
+        'creators'      => $creators,
+        'is_supervisor' => $is_supervisor,
+        'total_creators'=> count($creators),
+    ];
+
+    $this->load->view('templates/new/header', $data);
+    $this->load->view('is/monitoring', $data);
+    $this->load->view('templates/new/footer');
+}
+
+// --------------------------------------------------------------------------
+// F.5 — AJAX: DATA DETAIL MONITORING SATU CREATOR
+// --------------------------------------------------------------------------
+
+/**
+ * Ambil semua data monitoring detail satu creator (AJAX).
+ * Meliputi: GMV breakdown, video, keranjang kuning, sample history & summary.
+ *
+ * POST params: creator_id, start_date (opt), end_date (opt)
+ */
+public function get_monitoring_creator_detail() {
+    $this->output->set_content_type('application/json');
+
+    try {
+        $creator_id = $this->input->post('creator_id');
+        $start_date = $this->input->post('start_date') ?: date('Y-m-d', strtotime('-30 days'));
+        $end_date   = $this->input->post('end_date')   ?: date('Y-m-d');
+
+        if (!$creator_id) {
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Creator ID required'
+            ]));
+        }
+
+        $creator = $this->db
+            ->select('c.*, b.name as brand_name, b.shop_name, u.full_name as is_name')
+            ->from('creators c')
+            ->join('brands b', 'c.brand_id = b.id', 'left')
+            ->join('users u', 'c.is_id = u.id', 'left')
+            ->where('c.id', $creator_id)
+            ->get()->row();
+
+        if (!$creator) {
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Creator not found'
+            ]));
+        }
+
+        $this->load->model('SampleProduct_model');
+
+        // GMV Breakdown
+        $gmv_data = $this->SampleProduct_model->get_gmv_breakdown(
+            $creator->username, $start_date, $end_date
+        );
+
+        // Keranjang Kuning
+        $keranjang = $this->SampleProduct_model->get_keranjang_kuning($creator->username);
+
+        // Video
+        $videos = $this->SampleProduct_model->get_creator_videos($creator_id, $creator->username, 30);
+
+        // Sample History & Summary
+        $sample_history = $this->SampleProduct_model->get_creator_sample_history($creator_id);
+        $sample_summary = $this->SampleProduct_model->get_creator_sample_summary($creator_id);
+
+        // Konfirmasi kesediaan terakhir
+        $last_willing = $this->SampleProduct_model->get_last_willingness($creator_id);
+
+        return $this->output->set_output(json_encode([
+            'success'        => true,
+            'creator'        => $creator,
+            'gmv'            => $gmv_data,
+            'keranjang'      => $keranjang,
+            'videos'         => $videos,
+            'sample_history' => $sample_history,
+            'sample_summary' => $sample_summary,
+            'last_willing'   => $last_willing,
+            'date_range'     => ['start' => $start_date, 'end' => $end_date],
+        ]));
+
+    } catch (Exception $e) {
+        log_message('error', 'get_monitoring_creator_detail error: ' . $e->getMessage());
+        return $this->output->set_output(json_encode([
+            'success' => false,
+            'message' => 'Server error: ' . $e->getMessage()
+        ]));
+    }
+}
+
+// --------------------------------------------------------------------------
+// F.5 — AJAX: GMV BREAKDOWN PER PRODUK (POPUP)
+// --------------------------------------------------------------------------
+
+/**
+ * Ambil GMV breakdown per produk untuk ditampilkan di pop-up.
+ *
+ * POST params: creator_id, start_date, end_date
+ */
+public function get_creator_gmv_breakdown() {
+    $this->output->set_content_type('application/json');
+
+    try {
+        $creator_id = $this->input->post('creator_id');
+        $start_date = $this->input->post('start_date') ?: date('Y-m-d', strtotime('-30 days'));
+        $end_date   = $this->input->post('end_date')   ?: date('Y-m-d');
+
+        $creator = $this->db->where('id', $creator_id)->get('creators')->row();
+        if (!$creator) {
+            return $this->output->set_output(json_encode(['success' => false, 'message' => 'Creator not found']));
+        }
+
+        $this->load->model('SampleProduct_model');
+        $data = $this->SampleProduct_model->get_gmv_breakdown($creator->username, $start_date, $end_date);
+
+        return $this->output->set_output(json_encode([
+            'success'  => true,
+            'products' => $data['rows'],
+            'total_gmv'   => $data['total_gmv'],
+            'total_sold'  => $data['total_sold'],
+            'total_orders'=> $data['total_orders'],
+        ]));
+
+    } catch (Exception $e) {
+        return $this->output->set_output(json_encode(['success' => false, 'message' => $e->getMessage()]));
+    }
+}
+
+// --------------------------------------------------------------------------
+// F.5 — AJAX: TAMBAH VIDEO MANUAL
+// --------------------------------------------------------------------------
+
+/**
+ * Simpan link video creator yang diinput manual oleh tim CA.
+ *
+ * POST params: creator_id, video_url, product_id (opt), product_name (opt), posted_at (opt)
+ */
+public function add_creator_video() {
+    $this->output->set_content_type('application/json');
+
+    try {
+        $creator_id = $this->input->post('creator_id');
+        $video_url  = trim($this->input->post('video_url'));
+
+        if (!$creator_id || empty($video_url)) {
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Creator ID dan URL video wajib diisi'
+            ]));
+        }
+
+        $creator = $this->db->where('id', $creator_id)->get('creators')->row();
+        if (!$creator) {
+            return $this->output->set_output(json_encode(['success' => false, 'message' => 'Creator not found']));
+        }
+
+        $this->load->model('SampleProduct_model');
+
+        $result = $this->SampleProduct_model->save_manual_video([
+            'creator_id'       => $creator_id,
+            'creator_username' => $creator->username,
+            'video_url'        => $video_url,
+            'product_id'       => $this->input->post('product_id'),
+            'product_name'     => $this->input->post('product_name'),
+            'posted_at'        => $this->input->post('posted_at') ?: date('Y-m-d H:i:s'),
+            'views'            => intval($this->input->post('views') ?? 0),
+            'likes'            => intval($this->input->post('likes') ?? 0),
+        ]);
+
+        return $this->output->set_output(json_encode($result));
+
+    } catch (Exception $e) {
+        log_message('error', 'add_creator_video error: ' . $e->getMessage());
+        return $this->output->set_output(json_encode(['success' => false, 'message' => $e->getMessage()]));
+    }
+}
+
+// --------------------------------------------------------------------------
+// F.5 — AJAX: UPDATE LINK VIDEO KE SAMPLE REQUEST
+// --------------------------------------------------------------------------
+
+/**
+ * Update link video creator ke sample_request tertentu
+ * untuk tracking efektivitas sample.
+ *
+ * POST params: sample_id, video_url
+ */
+public function update_sample_video_link() {
+    $this->output->set_content_type('application/json');
+
+    try {
+        $sample_id = $this->input->post('sample_id');
+        $video_url = trim($this->input->post('video_url'));
+
+        if (!$sample_id || empty($video_url)) {
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Sample ID dan URL video wajib diisi'
+            ]));
+        }
+
+        $this->load->model('SampleProduct_model');
+        $ok = $this->SampleProduct_model->update_sample_video_status($sample_id, $video_url);
+
+        return $this->output->set_output(json_encode([
+            'success' => (bool)$ok,
+            'message' => $ok ? 'Video link berhasil diupdate' : 'Gagal mengupdate video link',
+        ]));
+
+    } catch (Exception $e) {
+        return $this->output->set_output(json_encode(['success' => false, 'message' => $e->getMessage()]));
+    }
+}
+
+// --------------------------------------------------------------------------
+// F.2 — AJAX: CEK TRIGGER KERANJANG KUNING (apakah siap proses sample)
+// --------------------------------------------------------------------------
+
+/**
+ * Cek apakah creator sudah layak masuk proses pengiriman sample.
+ * Kriteria: sudah ada transaksi nyata di affiliate_orders untuk brand yang relevan.
+ *
+ * POST params: creator_id
+ */
+public function get_sample_keranjang_trigger() {
+    $this->output->set_content_type('application/json');
+
+    try {
+        $creator_id = $this->input->post('creator_id');
+
+        if (!$creator_id) {
+            return $this->output->set_output(json_encode(['success' => false, 'message' => 'Creator ID required']));
+        }
+
+        $creator = $this->db->where('id', $creator_id)->get('creators')->row();
+        if (!$creator) {
+            return $this->output->set_output(json_encode(['success' => false, 'message' => 'Creator not found']));
+        }
+
+        // Cek apakah ada transaksi nyata (keranjang kuning = order nyata)
+        $has_orders = $this->db
+            ->where('creator_username', $creator->username)
+            ->where('order_status NOT IN ("CANCELLED", "REFUNDED")')
+            ->count_all_results('affiliate_orders');
+
+        // Cek konfirmasi kesediaan sebelumnya
+        $this->load->model('SampleProduct_model');
+        $last_willing = $this->SampleProduct_model->get_last_willingness($creator_id);
+
+        // Cek sample yang sudah pernah dikirim
+        $sample_count = $this->db
+            ->where('creator_id', $creator_id)
+            ->where('product_id IS NOT NULL')
+            ->count_all_results('sample_requests');
+
+        return $this->output->set_output(json_encode([
+            'success'      => true,
+            'has_orders'   => $has_orders > 0,
+            'order_count'  => $has_orders,
+            'last_willing' => $last_willing,
+            'sample_count' => $sample_count,
+            'creator'      => [
+                'id'       => $creator->id,
+                'username' => $creator->username,
+                'status'   => $creator->status,
+            ],
+            'can_process_sample' => $has_orders > 0,
+            'message' => $has_orders > 0
+                ? "Creator sudah memiliki {$has_orders} transaksi. Siap proses sample."
+                : "Creator belum memiliki transaksi. Tunggu creator menggunakan link terlebih dahulu.",
+        ]));
+
+    } catch (Exception $e) {
+        log_message('error', 'get_sample_keranjang_trigger error: ' . $e->getMessage());
+        return $this->output->set_output(json_encode(['success' => false, 'message' => $e->getMessage()]));
+    }
+}
+
+    // ============================================================
+    // SCOUTING CREATOR DETAIL — Brand Collaboration & GMV
+    // ============================================================
+    /**
+     * AJAX endpoint: ambil brand kolaborasi + GMV dari FastMoss
+     * untuk creator tertentu di scouting list.
+     *
+     * POST params:
+     *   scouting_id  — ID baris di tabel creator_scouting
+     *   username     — username creator (fallback jika UID tidak ditemukan)
+     *
+     * Response JSON:
+     *   success, creator {username, full_name, avatar_url, follower_count, gmv},
+     *   brands [{shop_name, shop_logo, product_count, sales_count, gmv}],
+     *   total_gmv, total_brands
+     */
+    public function get_scouting_creator_detail() {
+        $this->output->set_content_type('application/json');
+
+        if (!$this->session->userdata('logged_in')) {
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Session expired'
+            ]));
+        }
+
+        $scouting_id = $this->input->post('scouting_id');
+        $username    = trim($this->input->post('username') ?? '');
+
+        if (empty($scouting_id)) {
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'scouting_id wajib diisi'
+            ]));
+        }
+
+        // ── 1. Ambil baris scouting ──────────────────────────────
+        $this->load->model('CreatorScouting_model');
+        $item = $this->CreatorScouting_model->get_by_id($scouting_id);
+
+        if (!$item) {
+            return $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Scouting item tidak ditemukan'
+            ]));
+        }
+
+        $username = $username ?: ($item->username ?? '');
+
+        // ── 2. Cari FastMoss UID (tiktok_open_id) ────────────────
+        // Prioritas: creators table → BrandCreator_model->find_creator_in_fastmoss()
+        $fastmoss_uid = null;
+
+        $creator_row = $this->db
+            ->select('id, username, full_name, avatar_url, follower_count, tiktok_open_id, total_gmv, imported_gmv, category, phone')
+            ->from('creators')
+            ->where('LOWER(username)', strtolower($username))
+            ->limit(1)
+            ->get()
+            ->row();
+
+        if ($creator_row && !empty($creator_row->tiktok_open_id)) {
+            $fastmoss_uid = $creator_row->tiktok_open_id;
+        }
+
+        // Tidak ada UID di DB → cari dari FastMoss (search by username)
+        if (empty($fastmoss_uid) && !empty($username)) {
+            try {
+                $this->load->model('BrandCreator_model');
+                $fastmoss_uid = $this->BrandCreator_model->find_creator_in_fastmoss($username);
+
+                // Simpan ke creators table kalau creator sudah ada
+                if ($fastmoss_uid && $creator_row) {
+                    $this->db->where('id', $creator_row->id)
+                             ->update('creators', [
+                                 'tiktok_open_id' => $fastmoss_uid,
+                                 'updated_at'     => date('Y-m-d H:i:s')
+                             ]);
+                }
+            } catch (Exception $e) {
+                log_message('error', '[ScoutingDetail] find_creator_in_fastmoss error: ' . $e->getMessage());
+            }
+        }
+
+        // ── 3. Fetch brand collab dari FastMoss ──────────────────
+        $brands    = [];
+        $total_gmv = 0;
+        $fm_error  = null;
+
+        if (!empty($fastmoss_uid)) {
+            try {
+                $this->load->model('Fastmoss_model');
+                $brands = $this->Fastmoss_model->get_all_creator_brand_collabs($fastmoss_uid, 5);
+
+                foreach ($brands as $b) {
+                    $total_gmv += floatval($b['gmv']);
+                }
+
+                // Sort by GMV desc (sudah dari API, tapi pastikan)
+                usort($brands, function($a, $b) {
+                    return $b['gmv'] <=> $a['gmv'];
+                });
+
+            } catch (Exception $e) {
+                $fm_error = $e->getMessage();
+                log_message('error', '[ScoutingDetail] get_all_creator_brand_collabs error: ' . $e->getMessage());
+            }
+        }
+
+        // ── 4. Fallback GMV: dari scouting row atau creators table ─
+        // Jika FastMoss tidak return data, pakai data lokal sebagai referensi
+        $fallback_gmv = floatval(
+            $item->gmv
+            ?? $creator_row->total_gmv
+            ?? $creator_row->imported_gmv
+            ?? 0
+        );
+
+        if (empty($brands) && $fallback_gmv > 0) {
+            // Tampilkan 1 entry fallback dari data lokal
+            $brands = [[
+                'shop_id'       => '',
+                'shop_name'     => $item->brand_name ?? 'Brand',
+                'shop_logo'     => '',
+                'product_count' => intval($item->sales_count ?? 0),
+                'sales_count'   => intval($item->sales_count ?? 0),
+                'gmv'           => $fallback_gmv,
+                'region'        => 'ID',
+                '_source'       => 'local',
+            ]];
+            $total_gmv = $fallback_gmv;
+        }
+
+        // ── 5. Susun response ─────────────────────────────────────
+        $creator_info = [
+            'username'       => $username,
+            'full_name'      => $creator_row->full_name      ?? $item->full_name ?? $username,
+            'avatar_url'     => $creator_row->avatar_url     ?? $item->avatar_url ?? null,
+            'follower_count' => intval($creator_row->follower_count ?? $item->follower_count ?? 0),
+            'category'       => $creator_row->category       ?? null,
+            'phone'          => $creator_row->phone          ?? $item->phone ?? null,
+            'fastmoss_uid'   => $fastmoss_uid,
+            'gmv_local'      => floatval($creator_row->total_gmv ?? $creator_row->imported_gmv ?? $item->gmv ?? 0),
+        ];
+
+        return $this->output->set_output(json_encode([
+            'success'      => true,
+            'creator'      => $creator_info,
+            'brands'       => $brands,
+            'total_gmv'    => $total_gmv,
+            'total_brands' => count($brands),
+            'has_fastmoss' => !empty($fastmoss_uid),
+            'error_detail' => $fm_error,
+        ]));
+    }
+
+    public function update_fastmoss_cookie() {
+        $input = $this->input->post('cookie_data');
+        if (empty($input)) {
+            return $this->output->set_output(json_encode(['success' => false, 'message' => 'Input kosong']));
+        }
+        
+        $cookie = trim($input);
+        
+        // Cek jika input berupa cURL command
+        if (stripos($cookie, 'curl') !== false) {
+            if (preg_match('/-b\s+[\'"]([^\'"]+)[\'"]/', $cookie, $matches)) {
+                $cookie = $matches[1];
+            } elseif (preg_match('/--cookie\s+[\'"]([^\'"]+)[\'"]/', $cookie, $matches)) {
+                $cookie = $matches[1];
+            } elseif (preg_match('/-H\s+[\'"]cookie:\s*([^\'"]+)[\'"]/i', $cookie, $matches)) {
+                $cookie = $matches[1];
+            }
+        }
+        
+        // Simpan ke database
+        $this->db->query("
+            INSERT INTO app_config (`key`, `value`, `updated_at`) 
+            VALUES ('fastmoss_cookie', ?, NOW())
+            ON DUPLICATE KEY UPDATE `value` = ?, `updated_at` = NOW()
+        ", [$cookie, $cookie]);
+        
+        return $this->output->set_output(json_encode([
+            'success' => true, 
+            'message' => 'Cookie FastMoss berhasil diperbarui!',
+            'cookie' => substr($cookie, 0, 30) . '...'
+        ]));
+    }
+
+
+    /**
+     * DEBUG: Lihat raw response FastMoss baseInfo untuk satu creator.
+     * Akses: /is/debug_fastmoss_base_info/{uid}
+     * Hanya untuk IS/admin — dilindungi constructor.
+     */
+    public function debug_fastmoss_base_info($uid = null)
+    {
+        $this->output->set_content_type('application/json');
+
+        if (empty($uid)) {
+            $username = $this->input->get('username');
+            if (!empty($username)) {
+                $row = $this->db->select('tiktok_open_id')
+                    ->where('LOWER(username)', strtolower(trim($username)))
+                    ->get('creators')->row();
+                $uid = $row->tiktok_open_id ?? null;
+            }
+        }
+
+        if (empty($uid)) {
+            return $this->output->set_output(json_encode([
+                'error' => 'UID diperlukan. Gunakan /is/debug_fastmoss_base_info/{uid} atau ?username=xxx'
+            ]));
+        }
+
+        $cookie = $this->Fastmoss_model->get_cookie_string_public();
+
+        // Fungsi helper cURL
+        $do_request = function($url) use ($cookie) {
+            $headers = [
+                'accept: application/json, text/plain, */*',
+                'accept-language: id-ID,id;q=0.9',
+                'lang: ID_ID',
+                'region: ID',
+                'source: pc',
+                'referer: https://www.fastmoss.com/id/influencer/detail/' . explode('uid=', explode('&', $url)[0])[1],
+                'user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36',
+            ];
+            $ch = curl_init();
+            curl_setopt_array($ch, [
+                CURLOPT_URL            => $url,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_HTTPHEADER     => $headers,
+                CURLOPT_ENCODING       => '',
+                CURLOPT_TIMEOUT        => 10,
+                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_SSL_VERIFYHOST => false,
+                CURLOPT_COOKIE         => $cookie,
+            ]);
+            $raw = curl_exec($ch);
+            curl_close($ch);
+            return json_decode($raw, true);
+        };
+
+        $base  = 'https://www.fastmoss.com/api/author/v3/detail/';
+        $t     = time();
+        $cn    = rand(10000000, 99999999);
+        $q     = "?uid={$uid}&_time={$t}&cnonce={$cn}";
+
+        // Probe semua endpoint kandidat yang kemungkinan berisi GMV
+        $endpoints = [
+            'baseInfo'  => $base . 'baseInfo'  . $q,
+            'saleInfo'  => $base . 'saleInfo'  . $q,
+            'goodsInfo' => $base . 'goodsInfo' . $q,
+            'saleData'  => $base . 'saleData'  . $q,
+            'gmvInfo'   => $base . 'gmvInfo'   . $q,
+            'overview'  => $base . 'overview'  . $q,
+            'summary'   => $base . 'summary'   . $q,
+            'salesStat' => $base . 'salesStat' . $q,
+            'shopList'  => $base . 'shopList'  . "?uid={$uid}&page=1&pagesize=5&order=gmv,2&date_type=0&_time={$t}&cnonce={$cn}",
+        ];
+
+        $results = [];
+        foreach ($endpoints as $name => $url) {
+            $resp = $do_request($url);
+            $code = $resp['code'] ?? null;
+            $data = $resp['data'] ?? [];
+            // Cari key yang mengandung kata gmv/sale/amount di data
+            $gmv_keys = [];
+            if (is_array($data)) {
+                foreach ($data as $k => $v) {
+                    if (is_numeric($v) && (
+                        stripos($k, 'gmv') !== false ||
+                        stripos($k, 'sale') !== false ||
+                        stripos($k, 'amount') !== false ||
+                        stripos($k, 'revenue') !== false
+                    )) {
+                        $gmv_keys[$k] = $v;
+                    }
+                }
+            }
+            $results[$name] = [
+                'url'          => $url,
+                'code'         => $code,
+                'msg'          => $resp['msg'] ?? null,
+                'is_login'     => $resp['ext']['is_login'] ?? null,
+                'all_keys'     => is_array($data) ? array_keys($data) : [],
+                'gmv_keys'     => $gmv_keys,
+                'data_preview' => $data,   // full data untuk endpoint yang berhasil
+            ];
+        }
+
+        return $this->output->set_output(json_encode([
+            'uid'     => $uid,
+            'results' => $results,
+        ], JSON_PRETTY_PRINT));
+    }
+
+
+    /**
+     * Batch populate tiktok_open_id untuk semua creator yang belum punya UID.
+     * Panggil sekali dari browser: /is/populate_tiktok_open_ids
+     * Bisa diakses oleh role IS atau ADMIN.
+     */
+    public function populate_tiktok_open_ids()
+    {
+        $this->output->set_content_type('application/json');
+
+        // Role IS sudah lolos constructor, tidak perlu cek tambahan
+
+        $this->load->model('Fastmoss_model');
+
+        // Ambil semua creator yang tiktok_open_id masih kosong, limit per-batch 50
+        $creators = $this->db
+            ->select('id, username')
+            ->group_start()
+                ->where('tiktok_open_id IS NULL', null, false)
+                ->or_where('tiktok_open_id', '')
+            ->group_end()
+            ->limit(50)
+            ->get('creators')
+            ->result();
+
+        $total    = count($creators);
+        $resolved = 0;
+        $failed   = [];
+
+        foreach ($creators as $c) {
+            if (empty($c->username)) {
+                $failed[] = ['id' => $c->id, 'reason' => 'username kosong'];
+                continue;
+            }
+
+            $uid = $this->Fastmoss_model->resolve_uid_by_username($c->username);
+
+            if ($uid) {
+                $this->db->where('id', $c->id)
+                         ->update('creators', [
+                             'tiktok_open_id' => $uid,
+                             'updated_at'     => date('Y-m-d H:i:s')
+                         ]);
+                $resolved++;
+                log_message('info', '[populate_tiktok_open_ids] Resolved: ' . $c->username . ' → ' . $uid);
+            } else {
+                $failed[] = ['id' => $c->id, 'username' => $c->username, 'reason' => 'tidak ditemukan di FastMoss'];
+                log_message('debug', '[populate_tiktok_open_ids] Not found: ' . $c->username);
+            }
+
+            // Jeda kecil agar tidak di-rate-limit FastMoss
+            usleep(300000); // 0.3 detik
+        }
+
+        // Hitung sisa yang belum ter-resolve
+        $remaining = $this->db
+            ->group_start()
+                ->where('tiktok_open_id IS NULL', null, false)
+                ->or_where('tiktok_open_id', '')
+            ->group_end()
+            ->count_all_results('creators');
+
+        return $this->output->set_output(json_encode([
+            'success'   => true,
+            'processed' => $total,
+            'resolved'  => $resolved,
+            'failed'    => count($failed),
+            'remaining' => $remaining,
+            'details'   => $failed,
+            'message'   => "Berhasil resolve $resolved dari $total creator. Sisa yang belum: $remaining. "
+                         . ($remaining > 0 ? 'Panggil endpoint ini lagi untuk batch berikutnya.' : 'Semua selesai!')
+        ]));
+    }
+
+    /**
+     * Batch Sync Step 1 (PENDING) Creators
+     * CLI: php index.php is sync_step1_creators
+     */
+    public function sync_step1_creators()
+    {
+        $is_cli = is_cli();
+        if (!$is_cli) {
+            $this->output->set_content_type('application/json');
+        }
+
+        $this->load->model('Fastmoss_model');
+
+        // 1. Resolve UID untuk yang non-numeric / placeholder
+        $unresolved = $this->db->select('id, username, tiktok_open_id')
+            ->where('status', 'PENDING')
+            ->group_start()
+                ->where('tiktok_open_id IS NULL')
+                ->or_where('tiktok_open_id', '')
+                ->or_where('tiktok_open_id = username')
+                ->or_where('tiktok_open_id NOT REGEXP "^[0-9]+$"')
+            ->group_end()
+            ->get('creators')
+            ->result();
+
+        if (!empty($unresolved)) {
+            $msg = "Resolving UIDs for " . count($unresolved) . " creators...\n";
+            if ($is_cli) {
+                echo $msg;
+            } else {
+                log_message('info', '[sync_step1_creators] ' . $msg);
+            }
+
+            foreach ($unresolved as $c) {
+                $uid = $this->Fastmoss_model->resolve_uid_by_username($c->username);
+                if ($uid && is_numeric($uid)) {
+                    $this->db->where('id', $c->id)->update('creators', [
+                        'tiktok_open_id' => $uid,
+                        'updated_at' => date('Y-m-d H:i:s')
+                    ]);
+                    $msg2 = "Resolved @{$c->username} to {$uid}\n";
+                } else {
+                    $msg2 = "Failed to resolve @{$c->username}\n";
+                }
+
+                if ($is_cli) {
+                    echo $msg2;
+                } else {
+                    log_message('info', '[sync_step1_creators] ' . $msg2);
+                }
+                sleep(2);
+            }
+        }
+
+        // 2. Ambil semua creator di Step 1 (PENDING) yang tiktok_open_id-nya valid (numeric)
+        // tapi fastmoss_gmv_28d-nya masih NULL atau 0
+        $creators = $this->db->select('id, username, tiktok_open_id')
+            ->where('status', 'PENDING')
+            ->where('tiktok_open_id REGEXP "^[0-9]+$"')
+            ->where('(fastmoss_gmv_28d IS NULL OR fastmoss_gmv_28d = 0)')
+            ->order_by('id', 'DESC')
+            ->get('creators')
+            ->result();
+
+        $msg_count = "Found " . count($creators) . " creators to sync.\n";
+        if ($is_cli) {
+            echo $msg_count;
+        } else {
+            log_message('info', '[sync_step1_creators] ' . $msg_count);
+        }
+
+        $count = 0;
+        foreach ($creators as $c) {
+            $count++;
+            $msg_item = "[{$count}/" . count($creators) . "] Syncing @{$c->username} (UID: {$c->tiktok_open_id})... ";
+            if ($is_cli) {
+                echo $msg_item;
+            }
+
+            try {
+                // Ambil brand collabs dari FastMoss (28 hari terakhir)
+                $fm_brands = $this->Fastmoss_model->get_all_creator_brand_collabs($c->tiktok_open_id, 10);
+                
+                $sum = 0;
+                foreach ($fm_brands as $fb) {
+                    $s_name = trim($fb['shop_name'] ?? '');
+                    if (empty($s_name)) continue;
+
+                    // --- SAVE TO brand_creators TABLE ---
+                    // 1. Cari brand_id yang cocok dari database brands
+                    $db_brand = $this->db->select('id')
+                        ->group_start()
+                            ->where('name', $s_name)
+                            ->or_where('shop_name', $s_name)
+                        ->group_end()
+                        ->get('brands')
+                        ->row();
+
+                    if ($db_brand) {
+                        $existing_bc = $this->db->where('brand_id', $db_brand->id)
+                            ->where('creator_username', $c->username)
+                            ->get('brand_creators')
+                            ->row();
+
+                        $bc_data = [
+                            'brand_id'         => $db_brand->id,
+                            'creator_username' => $c->username,
+                            'creator_nickname' => $c->username,
+                            'follower_count'   => 0,
+                            'total_gmv'        => floatval($fb['gmv']),
+                            'day7_gmv'         => floatval($fb['day7_gmv'] ?? 0),
+                            'rating'           => floatval($fb['shop_rating'] ?? 0),
+                            'total_orders'     => intval($fb['sales_count']),
+                            'creator_open_id'  => $c->tiktok_open_id,
+                            'last_sync'        => date('Y-m-d H:i:s'),
+                            'updated_at'       => date('Y-m-d H:i:s')
+                        ];
+
+                        if (!empty($fb['shop_rating']) && floatval($fb['shop_rating']) > 0) {
+                            $this->db->where('id', $db_brand->id)->update('brands', ['rating' => floatval($fb['shop_rating'])]);
+                        }
+
+                        if ($existing_bc) {
+                            $this->db->where('id', $existing_bc->id)->update('brand_creators', $bc_data);
+                        } else {
+                            $bc_data['created_at'] = date('Y-m-d H:i:s');
+                            $this->db->insert('brand_creators', $bc_data);
+                        }
+                    }
+                    // ------------------------------------
+
+                    $sum += floatval($fb['gmv']);
+                }
+                
+                $final_gmv = $sum;
+                
+                // Update DB
+                $this->db->where('id', $c->id)->update('creators', [
+                    'fastmoss_gmv_28d' => $final_gmv,
+                    'fastmoss_synced_at' => date('Y-m-d H:i:s'),
+                    'updated_at' => date('Y-m-d H:i:s')
+                ]);
+                
+                $msg_res = "Success (GMV: Rp " . number_format($final_gmv, 2) . ")\n";
+            } catch (Exception $e) {
+                $msg_res = "Failed: " . $e->getMessage() . "\n";
+            }
+            
+            if ($is_cli) {
+                echo $msg_res;
+            } else {
+                log_message('info', '[sync_step1_creators] ' . $msg_item . $msg_res);
+            }
+            
+            // Jeda 2 detik untuk menghindari rate limit / block dari FastMoss
+            sleep(2);
+        }
+
+        $msg_done = "Completed!\n";
+        if ($is_cli) {
+            echo $msg_done;
+        } else {
+            return $this->output->set_output(json_encode([
+                'success' => true,
+                'message' => 'Sync completed'
+            ]));
+        }
+    }
+
+} // end class Is

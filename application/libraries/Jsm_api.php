@@ -206,12 +206,18 @@ class Jsm_api
     {
         $shop_cipher = $data['shop_cipher'] ?? $data['seller_id'] ?? $data['open_id'] ?? $data['shop_id'] ?? 'AFFILIATE_' . time();
         
+        $expire_in = $data['access_token_expire_in'] ?? 7200;
+        $access_expire = ($expire_in > 1000000000) ? $expire_in : time() + $expire_in;
+        
+        $refresh_in = $data['refresh_token_expire_in'] ?? 2592000;
+        $refresh_expire = ($refresh_in > 1000000000) ? $refresh_in : time() + $refresh_in;
+        
         $token_data = [
             'shop_id' => $shop_cipher,
             'access_token' => $data['access_token'],
             'refresh_token' => $data['refresh_token'],
-            'access_token_expire' => time() + ($data['access_token_expire_in'] ?? 7200),
-            'refresh_token_expire' => time() + ($data['refresh_token_expire_in'] ?? 2592000),
+            'access_token_expire' => $access_expire,
+            'refresh_token_expire' => $refresh_expire,
             'user_type' => $user_type,
             'scope' => $data['scope'] ?? '',
             'tap_type' => $this->api_type,
@@ -1182,7 +1188,7 @@ public function search_affiliate_orders_raw($filters = []) {
         if (!empty($filters['target_collabration_id'])) $body['target_collabration_id'] = $filters['target_collabration_id'];
         if (!empty($filters['status'])) $body['status'] = $filters['status'];
         
-        $params = ['page_size' => $filters['page_size'] ?? 100];
+        $params = ['page_size' => $filters['page_size'] ?? 50];
         if (!empty($filters['page_token'])) $params['page_token'] = $filters['page_token'];
         
         $result = $this->_api_request_seller($path, $params, 'POST', $body);
@@ -1402,6 +1408,7 @@ public function search_affiliate_orders_raw($filters = []) {
             
             if (curl_error($ch)) {
                 $error = curl_error($ch);
+                log_message('error', "TikTok API cURL Error for path {$path}: {$error}");
                 curl_close($ch);
                 return ['success' => false, 'message' => "cURL Error: {$error}"];
             }
@@ -1411,10 +1418,12 @@ public function search_affiliate_orders_raw($filters = []) {
             $decoded = json_decode($response, true);
             
             if (!$decoded) {
+                log_message('error', "TikTok API Invalid JSON response for path {$path}: Response=" . substr($response, 0, 1000));
                 return ['success' => false, 'message' => 'Invalid JSON response'];
             }
             
             if (!isset($decoded['code']) || $decoded['code'] != 0) {
+                log_message('error', "TikTok API Error for path {$path}: Code=" . ($decoded['code'] ?? 'N/A') . ", Message=" . ($decoded['message'] ?? 'Unknown API Error') . ", Response=" . json_encode($decoded));
                 return [
                     'success' => false,
                     'message' => $decoded['message'] ?? 'Unknown API Error',
@@ -2874,81 +2883,23 @@ public function get_product_performance_2($product_id, $params = []) {
  * Endpoint: GET /affiliate_seller/202508/marketplace_creators/{creator_user_id}
  */
 public function get_creator_detail_by_id($creator_open_id) {
-    // 🔥 Gunakan endpoint versi 202509
-    $path = "/affiliate_seller/202509/marketplace_creators/{$creator_open_id}";
+    // Gunakan endpoint versi 202508 (versi valid yang tersedia)
+    $path = "/affiliate_seller/202508/marketplace_creators/{$creator_open_id}";
     
     try {
-        $access_token = $this->get_valid_seller_token();
+        // Gunakan _api_request_seller yang sudah proven — konsisten dengan method lain
+        $result = $this->_api_request_seller($path, [], 'GET');
         
-        $seller_token = $this->CI->Jsm_token_model->get_latest_token_by_type(2);
-        $shop_cipher = $seller_token->shop_id ?? $this->default_cipher;
-        
-        $timestamp = time();
-        
-        $query = [
-            'app_key' => $this->app_key,
-            'timestamp' => $timestamp,
-            'shop_cipher' => $shop_cipher
-        ];
-        
-        ksort($query);
-        
-        $param_string = '';
-        foreach ($query as $key => $value) {
-            $param_string .= $key . $value;
+        if (!$result['success']) {
+            log_message('error', 'get_creator_detail_by_id failed: ' . json_encode($result));
+            return $result;
         }
         
-        $string_to_sign = $this->app_secret . $path . $param_string . $this->app_secret;
-        $query['sign'] = hash_hmac('sha256', $string_to_sign, $this->app_secret);
-        
-        $url = $this->openapi_base . $path . '?' . http_build_query($query);
-        
-        log_message('debug', 'Get Creator Detail URL (v202509): ' . $url);
-        
-        $headers = [
-            "x-tts-access-token: " . $access_token,
-            "Content-Type: application/json"
-        ];
-        
-        $ch = curl_init();
-        curl_setopt_array($ch, [
-            CURLOPT_URL => $url,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_HTTPHEADER => $headers,
-            CURLOPT_TIMEOUT => 60,
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_FOLLOWLOCATION => true
-        ]);
-        
-        $response = curl_exec($ch);
-        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        
-        if (curl_error($ch)) {
-            $error = curl_error($ch);
-            curl_close($ch);
-            return ['success' => false, 'message' => "cURL Error: {$error}"];
-        }
-        
-        curl_close($ch);
-        
-        $decoded = json_decode($response, true);
-        
-        if (!$decoded) {
-            return ['success' => false, 'message' => 'Invalid JSON response'];
-        }
-        
-        if (!isset($decoded['code']) || $decoded['code'] != 0) {
-            return [
-                'success' => false,
-                'message' => $decoded['message'] ?? 'Unknown API Error',
-                'code' => $decoded['code'] ?? 'unknown'
-            ];
-        }
+        log_message('debug', 'get_creator_detail_by_id raw data keys: ' . implode(', ', array_keys($result['data'] ?? [])));
         
         return [
             'success' => true,
-            'data' => $decoded['data'] ?? [],
-            'http_code' => $http_code
+            'data'    => $result['data'] ?? [],
         ];
         
     } catch (Exception $e) {

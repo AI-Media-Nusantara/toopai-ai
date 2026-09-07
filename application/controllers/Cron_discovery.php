@@ -485,6 +485,51 @@ class Cron_discovery extends CI_Controller {
         echo json_encode($result, JSON_PRETTY_PRINT);
     }
     
+    // ================================================================
+    // POPULATE SCOUTING LIST — dari affiliate_orders
+    // ================================================================
+
+    /**
+     * Populate creator_scouting dari riwayat affiliate_orders.
+     * Jalankan setiap jam via cron:
+     *   CLI: php index.php cron_discovery populate_scouting_list
+     *   URL: /cron_discovery/populate_scouting_list?token=YOUR_TOKEN
+     */
+    public function populate_scouting_list() {
+        $is_cli     = $this->input->is_cli_request();
+        $token      = $this->input->get('token');
+        $cron_token = CRON_SECRET_TOKEN ?? 'Toopai2026?_12345';
+
+        if (!$is_cli && $token !== $cron_token) {
+            die('Access denied');
+        }
+
+        $start_time = microtime(true);
+        $start_date = date('Y-m-d H:i:s');
+        $this->_log("[SCOUTING] [{$start_date}] Starting populate_scouting_list\n");
+        echo "[SCOUTING] [{$start_date}] Starting populate_scouting_list\n";
+
+        $this->load->model('CreatorScouting_model');
+
+        try {
+            // Populate dari affiliate_orders (semua brand ACTIVE)
+            $stats = $this->CreatorScouting_model->populate_from_orders();
+
+            $duration = round(microtime(true) - $start_time, 2);
+            $summary  = "inserted={$stats['inserted']}, skipped_duplicate={$stats['skipped_duplicate']}, skipped_existing={$stats['skipped_existing']}, duration={$duration}s";
+
+            $this->_log("[SCOUTING] DONE: {$summary}\n");
+            echo "[SCOUTING] DONE: {$summary}\n";
+
+            $this->User_log_model->log(1, 'system', 'SYSTEM', 'CRON_SCOUTING', $summary);
+
+        } catch (Exception $e) {
+            $msg = "[SCOUTING] ERROR: " . $e->getMessage();
+            $this->_log_error($msg);
+            echo $msg . "\n";
+        }
+    }
+
     private function _log($message) {
         $log_dir = APPPATH . 'logs/sync/';
         if (!is_dir($log_dir)) {

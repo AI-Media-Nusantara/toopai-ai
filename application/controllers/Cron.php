@@ -78,7 +78,38 @@ private function get_utc_range_from_local_date($local_date, $timezone = 'Asia/Ja
     echo "\nProcessing queue items...\n";
     $this->process_queue();
     
+    // 8. Auto-detect creator link usage
+    echo "\n[8/7] Running auto-detection of creator link usage...\n";
+    $this->auto_detect_creator_link_usage();
+    
+    // 9. Check creator showcases via FastMoss
+    echo "\n[9/7] Running check on creator showcases...\n";
+    $this->check_creator_showcases();
+
     echo "\n[" . date('Y-m-d H:i:s') . "] ========== FULL SYNC COMPLETED ==========\n";
+}
+
+/**
+ * Auto-detect creator link usage (onboard from contacted list when they use the link)
+ */
+public function auto_detect_creator_link_usage() {
+    echo "[" . date('Y-m-d H:i:s') . "] Starting auto-detection of creator link usage...\n";
+    $this->load->model('CreatorScouting_model');
+    $results = $this->CreatorScouting_model->run_auto_detection();
+    echo "  Processed " . $results['scouting_onboarded'] . " new onboardings from contacted Scouting List.\n";
+    echo "  Activated " . $results['creators_activated'] . " creators in creators table.\n";
+    echo "[" . date('Y-m-d H:i:s') . "] Auto-detection completed.\n";
+}
+
+/**
+ * Trigger showcase checking for creators with active links
+ */
+public function check_creator_showcases() {
+    echo "[" . date('Y-m-d H:i:s') . "] Starting check of creator showcases...\n";
+    require_once(APPPATH . 'controllers/Showcase_checker.php');
+    $checker = new Showcase_checker();
+    $checker->check_all_pending();
+    echo "[" . date('Y-m-d H:i:s') . "] Showcase check completed.\n";
 }
     
     /**
@@ -254,6 +285,13 @@ if (isset($product['lowest_price']) && is_array($product['lowest_price'])) {
         // 🔥 ADS COLLABORATION (TAMBAHKAN INI!)
         $ads_collaboration = $product['partner_shop_ads_commission_rate'] ?? 0;
         
+        $category_name = '';
+        if (isset($product['category']['name'])) {
+            $category_name = $product['category']['name'];
+        } elseif (isset($product['category']) && is_string($product['category'])) {
+            $category_name = $product['category'];
+        }
+        
                 // 🔥 GUNAKAN NAMA KOLOM YANG BENAR
                 $product_data = [
                     'product_id' => $product_id,
@@ -263,6 +301,7 @@ if (isset($product['lowest_price']) && is_array($product['lowest_price'])) {
                     'lowest_price' =>floatval($product['lowest_price']['amount'] ?? 0),
                     'highest_price' => floatval($product['highest_price']['amount'] ?? 0),
                     'image_url' => $product['main_image_url'] ?? '',
+                    'category' => $category_name,
                     'shop_name' => $product['shop_name'] ?? '',
                     'review_status' => $product['review_status'] ?? 'PENDING',
                     'open_commission_rate' => $open_commission,
@@ -360,12 +399,20 @@ public function sync_approved_products() {
                 $total_commission = $product['total_commission_rate'] ?? 0;
                 $shop_ads = $product['shop_ads_commission_rate'] ?? 0;
                 
+                $category_name = '';
+                if (isset($product['category']['name'])) {
+                    $category_name = $product['category']['name'];
+                } elseif (isset($product['category']) && is_string($product['category'])) {
+                    $category_name = $product['category'];
+                }
+                
                 $product_data = [
                     'product_id' => $product_id,
                     'campaign_id' => $campaign_id,
                     'product_name' => $product['name'] ?? '',
                     'price' => $product['price'] ?? 0,
                     'image_url' => $product['main_image_url'] ?? '',
+                    'category' => $category_name,
                     'shop_name' => $product['shop_name'] ?? '',
                     'review_status' => 'APPROVED',
                     'open_commission_rate' => $open_commission,
@@ -378,7 +425,8 @@ public function sync_approved_products() {
                     'sample_quota' => $product['sample_quota'] ?? 0,
                     'approved_at' => date('Y-m-d H:i:s'),
                     'last_sync' => date('Y-m-d H:i:s'),
-                    'updated_at' => date('Y-m-d H:i:s')
+                    'updated_at' => date('Y-m-d H:i:s'),
+                    'raw_data' => json_encode($product)
                 ];
                 
                 $existing = $this->db->where('product_id', $product_id)
@@ -705,6 +753,96 @@ public function force_sync($date = null) {
         }
     }
     
+    /**
+     * Sync brands data & Bestseller/Trending performance status
+     */
+    public function sync_brands_data() {
+        echo "  Syncing brands performance status (Bestseller & Trending)...\n";
+        
+        // Auto-migrate database columns if missing on server database
+        if (!$this->db->field_exists('day7_gmv', 'brand_creators')) {
+            $this->db->query("ALTER TABLE brand_creators ADD COLUMN day7_gmv DECIMAL(15,2) DEFAULT 0.00 AFTER total_gmv");
+        }
+        if (!$this->db->field_exists('is_bestseller', 'brands')) {
+            $this->db->query("ALTER TABLE brands ADD COLUMN is_bestseller TINYINT(1) DEFAULT 0, ADD COLUMN is_trending TINYINT(1) DEFAULT 0, ADD COLUMN day7_gmv DECIMAL(15,2) DEFAULT 0.00");
+        }
+
+        $brands = $this->db->query("
+            SELECT DISTINCT b.id
+            FROM brands b
+            JOIN brand_creators bc ON bc.brand_id = b.id
+            JOIN creators c ON bc.creator_username = c.username
+            WHERE c.status IN ('PENDING', 'LINK_SWAPPING')
+               OR b.id IN (SELECT DISTINCT brand_id FROM creators WHERE status IN ('PENDING', 'LINK_SWAPPING'))
+        ")->result();
+        if (empty($brands)) return;
+
+        $has_day7_col = $this->db->field_exists('day7_gmv', 'brand_creators');
+
+        $brand_stats = [];
+        foreach ($brands as $b) {
+            $gmv_28d_q = $this->db->query("
+                SELECT COALESCE(SUM(bc.total_gmv), 0) as gmv
+                FROM brand_creators bc
+                JOIN creators c ON bc.creator_username = c.username
+                WHERE bc.brand_id = ? AND c.status IN ('PENDING', 'LINK_SWAPPING')
+            ", [$b->id]);
+            
+            $gmv_28d = ($gmv_28d_q && is_object($gmv_28d_q) && $gmv_28d_q->num_rows() > 0) ? floatval($gmv_28d_q->row()->gmv ?? 0) : 0.0;
+
+            $gmv_7d = 0.0;
+            if ($has_day7_col) {
+                $gmv_7d_q = $this->db->query("
+                    SELECT COALESCE(SUM(bc.day7_gmv), 0) as gmv
+                    FROM brand_creators bc
+                    JOIN creators c ON bc.creator_username = c.username
+                    WHERE bc.brand_id = ? AND c.status IN ('PENDING', 'LINK_SWAPPING')
+                ", [$b->id]);
+                $gmv_7d = ($gmv_7d_q && is_object($gmv_7d_q) && $gmv_7d_q->num_rows() > 0) ? floatval($gmv_7d_q->row()->gmv ?? 0) : 0.0;
+            }
+
+            $brand_stats[$b->id] = [
+                'brand_id' => $b->id,
+                'gmv_28d' => $gmv_28d,
+                'gmv_7d' => $gmv_7d
+            ];
+        }
+
+        $max_gmv_28d = 0;
+        $max_gmv_7d = 0;
+        foreach ($brand_stats as $bs) {
+            if ($bs['gmv_28d'] > $max_gmv_28d) $max_gmv_28d = $bs['gmv_28d'];
+            if ($bs['gmv_7d'] > $max_gmv_7d) $max_gmv_7d = $bs['gmv_7d'];
+        }
+
+        uasort($brand_stats, function($a, $b) {
+            return ($a['gmv_28d'] < $b['gmv_28d']) ? 1 : -1;
+        });
+
+        $rank = 0;
+        foreach ($brand_stats as $bid => $stat) {
+            $rank++;
+            $is_bestseller = ($stat['gmv_28d'] > 0 && ($rank <= 3 || ($max_gmv_28d > 0 && $stat['gmv_28d'] >= ($max_gmv_28d * 0.2)))) ? 1 : 0;
+            $is_trending = ($stat['gmv_7d'] > 0) ? 1 : 0;
+
+            $update_data = [
+                'total_gmv' => $stat['gmv_28d'],
+                'updated_at' => date('Y-m-d H:i:s')
+            ];
+            if ($this->db->field_exists('day7_gmv', 'brands')) {
+                $update_data['day7_gmv'] = $stat['gmv_7d'];
+            }
+            if ($this->db->field_exists('is_bestseller', 'brands')) {
+                $update_data['is_bestseller'] = $is_bestseller;
+            }
+            if ($this->db->field_exists('is_trending', 'brands')) {
+                $update_data['is_trending'] = $is_trending;
+            }
+
+            $this->db->where('id', $bid)->update('brands', $update_data);
+        }
+    }
+
     /**
      * Update campaign totals based on orders
      */
