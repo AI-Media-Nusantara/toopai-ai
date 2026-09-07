@@ -1836,93 +1836,152 @@ public function get_creator_task1_detail() {
         }
 
         // ============================================================
-        // 8.9 FETCH GMV BREAKDOWN PER CHANNEL DARI TAP API
-        // Ambil video_gmv, live_gmv, content_gmv_distribution dari
-        // endpoint marketplace_creators jika tiktok_open_id tersedia.
-        // Silent — tidak memblokir response jika gagal.
+        // 8.9 FETCH GMV BREAKDOWN PER CHANNEL — DENGAN CACHE DB
+        // Cache tersimpan di kolom tap_live_pct, tap_video_pct, tap_product_card_pct,
+        // tap_gmv_total, tap_gmv_synced_at pada tabel creators.
+        // TAP API hanya dipanggil jika cache kosong atau sudah > 24 jam.
+        // Ini mencegah rate limit dari TAP API.
         // ============================================================
         $gmv_breakdown = null;
         $tap_open_id   = $creator->tiktok_open_id ?? null;
 
-        // Jika tiktok_open_id belum ada, coba cari dari TAP via username
-        if (empty($tap_open_id) && !empty($creator->username)) {
-            try {
-                $search_result = $this->jsm_api->search_creators_by_is($creator->username, null, 20);
-                if (!empty($search_result['success']) && !empty($search_result['data']['creators'])) {
-                    foreach ($search_result['data']['creators'] as $tc) {
-                        if (strtolower($tc['username'] ?? '') === strtolower($creator->username)) {
-                            if (!empty($tc['creator_open_id'])) {
-                                $tap_open_id = $tc['creator_open_id'];
-                                // Simpan ke DB untuk request berikutnya
-                                $this->db->where('id', $creator_id)->update('creators', [
-                                    'tiktok_open_id' => $tap_open_id,
-                                    'updated_at'     => date('Y-m-d H:i:s')
-                                ]);
-                                $creator->tiktok_open_id = $tap_open_id;
-                                break;
+        // ── Ambil kolom cache dari DB (mungkin belum ada di $creator karena SELECT terbatas) ──
+        $creator_cache = $this->db->select(
+                'tap_live_pct, tap_video_pct, tap_product_card_pct, tap_gmv_total, tap_gmv_synced_at'
+            )
+            ->where('id', $creator_id)
+            ->get('creators')
+            ->row();
+
+        $cache_synced_at  = $creator_cache->tap_gmv_synced_at ?? null;
+        $cache_live_pct   = $creator_cache->tap_live_pct       ?? null;
+        $cache_video_pct  = $creator_cache->tap_video_pct      ?? null;
+        $cache_card_pct   = $creator_cache->tap_product_card_pct ?? null;
+        $cache_gmv_total  = $creator_cache->tap_gmv_total      ?? null;
+
+        // Cache valid jika ada data dan belum lebih dari 24 jam
+        $cache_is_valid = !empty($cache_synced_at)
+            && ($cache_live_pct !== null || $cache_video_pct !== null)
+            && (time() - strtotime($cache_synced_at)) < 24 * 3600;
+
+        if ($cache_is_valid) {
+            // ── Gunakan data cache dari DB ──────────────────────────
+            $live_pct         = floatval($cache_live_pct);
+            $video_pct        = floatval($cache_video_pct);
+            $product_card_pct = floatval($cache_card_pct);
+            $total_gmv_cache  = floatval($cache_gmv_total);
+
+            if ($live_pct > 0 || $video_pct > 0 || $product_card_pct > 0) {
+                $gmv_breakdown = [
+                    'total_gmv'        => $total_gmv_cache,
+                    'live_gmv'         => round($total_gmv_cache * $live_pct / 100, 2),
+                    'video_gmv'        => round($total_gmv_cache * $video_pct / 100, 2),
+                    'product_card_gmv' => round($total_gmv_cache * $product_card_pct / 100, 2),
+                    'live_pct'         => $live_pct,
+                    'video_pct'        => $video_pct,
+                    'product_card_pct' => $product_card_pct,
+                    'source'           => 'cache',
+                    'cached_at'        => $cache_synced_at,
+                ];
+                log_message('debug', '[task1_detail] gmv_breakdown dari cache DB: live=' . $live_pct . '% video=' . $video_pct . '%');
+            }
+        } else {
+            // ── Cache kosong/expired → panggil TAP API ──────────────
+
+            // Resolve tiktok_open_id jika belum ada
+            if (empty($tap_open_id) && !empty($creator->username)) {
+                try {
+                    $search_result = $this->jsm_api->search_creators_by_is($creator->username, null, 20);
+                    if (!empty($search_result['success']) && !empty($search_result['data']['creators'])) {
+                        foreach ($search_result['data']['creators'] as $tc) {
+                            if (strtolower($tc['username'] ?? '') === strtolower($creator->username)) {
+                                if (!empty($tc['creator_open_id'])) {
+                                    $tap_open_id = $tc['creator_open_id'];
+                                    $this->db->where('id', $creator_id)->update('creators', [
+                                        'tiktok_open_id' => $tap_open_id,
+                                        'updated_at'     => date('Y-m-d H:i:s')
+                                    ]);
+                                    $creator->tiktok_open_id = $tap_open_id;
+                                    break;
+                                }
                             }
                         }
                     }
+                } catch (Exception $e) {
+                    log_message('error', '[task1_detail] gmv_breakdown search open_id error: ' . $e->getMessage());
                 }
-            } catch (Exception $e) {
-                log_message('error', '[task1_detail] gmv_breakdown search open_id error: ' . $e->getMessage());
             }
-        }
 
-        if (!empty($tap_open_id)) {
-            try {
-                $perf = $this->jsm_api->get_marketplace_creator_performance($tap_open_id);
+            if (!empty($tap_open_id)) {
+                try {
+                    $perf = $this->jsm_api->get_marketplace_creator_performance($tap_open_id);
 
-                if (!empty($perf['success']) && !empty($perf['data'])) {
-                    $d         = $perf['data'];
-                    $total     = floatval($d['gmv'] ?? 0);
-                    $live_gmv  = floatval($d['live_gmv'] ?? 0);
-                    $video_gmv = floatval($d['video_gmv'] ?? 0);
+                    if (!empty($perf['success']) && !empty($perf['data'])) {
+                        $d         = $perf['data'];
+                        $total     = floatval($d['gmv']       ?? 0);
+                        $live_gmv  = floatval($d['live_gmv']  ?? 0);
+                        $video_gmv = floatval($d['video_gmv'] ?? 0);
+                        $raw_dist  = $d['content_gmv_distribution'] ?? [];
 
-                    // content_gmv_distribution: array dari TAP API jika tersedia
-                    $raw_dist  = $d['content_gmv_distribution'] ?? [];
+                        if ($total > 0) {
+                            $live_pct         = round(($live_gmv  / $total) * 100, 2);
+                            $video_pct        = round(($video_gmv / $total) * 100, 2);
+                            $product_card_pct = round(max(0, 100 - $live_pct - $video_pct), 2);
+                            $product_card_gmv = max(0, $total - $live_gmv - $video_gmv);
 
-                    if ($total > 0) {
-                        // Hitung product_card GMV sebagai sisa
-                        $product_card_gmv = max(0, $total - $live_gmv - $video_gmv);
+                            $gmv_breakdown = [
+                                'total_gmv'        => $total,
+                                'live_gmv'         => $live_gmv,
+                                'video_gmv'        => $video_gmv,
+                                'product_card_gmv' => $product_card_gmv,
+                                'live_pct'         => $live_pct,
+                                'video_pct'        => $video_pct,
+                                'product_card_pct' => $product_card_pct,
+                                'source'           => 'tap_api_fresh',
+                                'raw_distribution' => $raw_dist,
+                            ];
 
-                        // Persentase
-                        $live_pct         = round(($live_gmv / $total) * 100, 2);
-                        $video_pct        = round(($video_gmv / $total) * 100, 2);
-                        $product_card_pct = round(max(0, 100 - $live_pct - $video_pct), 2);
+                            // ── Simpan ke cache DB ──
+                            $this->db->where('id', $creator_id)->update('creators', [
+                                'tap_live_pct'         => $live_pct,
+                                'tap_video_pct'        => $video_pct,
+                                'tap_product_card_pct' => $product_card_pct,
+                                'tap_gmv_total'        => $total,
+                                'tap_gmv_synced_at'    => date('Y-m-d H:i:s'),
+                                'updated_at'           => date('Y-m-d H:i:s'),
+                            ]);
 
-                        $gmv_breakdown = [
-                            'total_gmv'        => $total,
-                            'live_gmv'         => $live_gmv,
-                            'video_gmv'        => $video_gmv,
-                            'product_card_gmv' => $product_card_gmv,
-                            'live_pct'         => $live_pct,
-                            'video_pct'        => $video_pct,
-                            'product_card_pct' => $product_card_pct,
-                            'source'           => 'tap_api',
-                            'raw_distribution' => $raw_dist,
-                        ];
-
-                        log_message('debug', '[task1_detail] gmv_breakdown: '
-                            . "live={$live_pct}% video={$video_pct}% product_card={$product_card_pct}%"
-                            . " total={$total} open_id={$tap_open_id}");
-                    } elseif (!empty($raw_dist) && is_array($raw_dist)) {
-                        // Hanya raw_dist tersedia, tidak ada nilai absolut
-                        $gmv_breakdown = [
-                            'total_gmv'        => 0,
-                            'live_gmv'         => 0,
-                            'video_gmv'        => 0,
-                            'product_card_gmv' => 0,
-                            'live_pct'         => 0,
-                            'video_pct'        => 0,
-                            'product_card_pct' => 0,
-                            'source'           => 'tap_api_partial',
-                            'raw_distribution' => $raw_dist,
-                        ];
+                            log_message('debug', '[task1_detail] gmv_breakdown fresh dari TAP: '
+                                . "live={$live_pct}% video={$video_pct}% card={$product_card_pct}%"
+                                . " total={$total} open_id={$tap_open_id}");
+                        }
+                    } else {
+                        // TAP gagal (rate limit, dsb) — jika ada cache lama, tetap pakai
+                        if (!empty($cache_synced_at) && $cache_live_pct !== null) {
+                            $live_pct         = floatval($cache_live_pct);
+                            $video_pct        = floatval($cache_video_pct);
+                            $product_card_pct = floatval($cache_card_pct);
+                            $total_gmv_cache  = floatval($cache_gmv_total);
+                            if ($live_pct > 0 || $video_pct > 0 || $product_card_pct > 0) {
+                                $gmv_breakdown = [
+                                    'total_gmv'        => $total_gmv_cache,
+                                    'live_gmv'         => round($total_gmv_cache * $live_pct / 100, 2),
+                                    'video_gmv'        => round($total_gmv_cache * $video_pct / 100, 2),
+                                    'product_card_gmv' => round($total_gmv_cache * $product_card_pct / 100, 2),
+                                    'live_pct'         => $live_pct,
+                                    'video_pct'        => $video_pct,
+                                    'product_card_pct' => $product_card_pct,
+                                    'source'           => 'cache_stale',
+                                    'cached_at'        => $cache_synced_at,
+                                ];
+                                log_message('debug', '[task1_detail] gmv_breakdown fallback ke cache lama (TAP rate limit)');
+                            }
+                        }
+                        log_message('debug', '[task1_detail] TAP perf gagal: ' . ($perf['message'] ?? 'unknown'));
                     }
+                } catch (Exception $e) {
+                    log_message('error', '[task1_detail] gmv_breakdown TAP error: ' . $e->getMessage());
                 }
-            } catch (Exception $e) {
-                log_message('error', '[task1_detail] gmv_breakdown TAP error: ' . $e->getMessage());
             }
         }
 
@@ -6178,6 +6237,35 @@ public function debug_gmv_breakdown() {
         'tiktok_open_id' => $creator->tiktok_open_id,
         'step'           => [],
     ];
+
+    // Cek status cache
+    $cache = $this->db->select('tap_live_pct, tap_video_pct, tap_product_card_pct, tap_gmv_total, tap_gmv_synced_at')
+        ->where('id', $creator->id)->get('creators')->row();
+    $out['cache'] = [
+        'tap_live_pct'         => $cache->tap_live_pct         ?? null,
+        'tap_video_pct'        => $cache->tap_video_pct        ?? null,
+        'tap_product_card_pct' => $cache->tap_product_card_pct ?? null,
+        'tap_gmv_total'        => $cache->tap_gmv_total        ?? null,
+        'tap_gmv_synced_at'    => $cache->tap_gmv_synced_at    ?? null,
+        'age_hours'            => !empty($cache->tap_gmv_synced_at)
+            ? round((time() - strtotime($cache->tap_gmv_synced_at)) / 3600, 1) . 'h'
+            : 'no cache',
+        'is_valid'             => !empty($cache->tap_gmv_synced_at)
+            && (time() - strtotime($cache->tap_gmv_synced_at)) < 24 * 3600
+            ? 'YES (< 24h)' : 'NO (expired or empty)',
+    ];
+
+    // Jika ada ?force_refresh=1, hapus cache dulu
+    if ($this->input->get('force_refresh')) {
+        $this->db->where('id', $creator->id)->update('creators', [
+            'tap_gmv_synced_at' => null,
+            'tap_live_pct'      => null,
+            'tap_video_pct'     => null,
+            'tap_product_card_pct' => null,
+            'tap_gmv_total'     => null,
+        ]);
+        $out['step'][] = 'Cache dihapus — akan fetch ulang dari TAP API';
+    }
 
     // 2. Resolve tiktok_open_id jika kosong
     $tap_open_id = $creator->tiktok_open_id ?? null;
