@@ -1112,7 +1112,8 @@ public function get_creator_task1_detail() {
         $creator->total_gmv = $total_gmv;
         
         try {
-            // Cek apakah ada link afiliasi — fallback ke creator_username jika creator_id NULL
+            $existing_pids = [];
+            // A. Ambil dari affiliate_creator_links
             $has_links = $this->db
                 ->group_start()
                     ->where('creator_id', $creator_id)
@@ -1120,8 +1121,6 @@ public function get_creator_task1_detail() {
                 ->group_end()
                 ->where('status', 'ACTIVE')
                 ->count_all_results('affiliate_creator_links');
-            
-            log_message('debug', 'Has affiliate_creator_links: ' . $has_links);
             
             if ($has_links > 0) {
                 $products_query = $this->db->select('
@@ -1145,12 +1144,51 @@ public function get_creator_task1_detail() {
                 ->group_end()
                 ->where('acl.status', 'ACTIVE')
                 ->order_by('acl.total_gmv', 'DESC')
-                ->limit(20)
+                ->limit(200)
                 ->get();
                 
-                $products = $products_query->result();
-                log_message('debug', 'Products found: ' . count($products));
+                if ($products_query) {
+                    $products = $products_query->result();
+                    foreach ($products as $p_item) {
+                        if (!empty($p_item->product_id)) {
+                            $existing_pids[] = $p_item->product_id;
+                        }
+                    }
+                }
             }
+
+            // B. Ambil dari creator_products (Data FastMoss/TikTok Shop yang disinkronkan)
+            if ($this->db->table_exists('creator_products')) {
+                $cp_query = $this->db->select('
+                    cp.product_id,
+                    cp.product_name,
+                    cp.commission_rate,
+                    cp.gmv as product_gmv,
+                    cp.sales_count as product_orders,
+                    cp.price,
+                    cp.image_url,
+                    cp.shop_name,
+                    cp.category,
+                    cp.sales_count
+                ')
+                ->from('creator_products cp')
+                ->where('cp.creator_id', $creator_id)
+                ->order_by('cp.gmv', 'DESC')
+                ->limit(300)
+                ->get();
+
+                if ($cp_query) {
+                    foreach ($cp_query->result() as $cp_row) {
+                        if (empty($cp_row->product_id) || !in_array($cp_row->product_id, $existing_pids)) {
+                            $products[] = $cp_row;
+                            if (!empty($cp_row->product_id)) {
+                                $existing_pids[] = $cp_row->product_id;
+                            }
+                        }
+                    }
+                }
+            }
+            log_message('debug', 'Total products found for creator_id ' . $creator_id . ': ' . count($products));
         } catch (Exception $e) {
             log_message('error', 'Error getting products: ' . $e->getMessage());
         }

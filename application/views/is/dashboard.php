@@ -3729,8 +3729,8 @@ function closeTask1DetailModal() {
     }
 }
 
-async function showTask1DetailModal(creatorId) {
-    console.log('showTask1DetailModal called with creatorId:', creatorId);
+async function showTask1DetailModal(creatorId, activeBrandId = null, activeBrandName = null) {
+    console.log('showTask1DetailModal called with creatorId:', creatorId, 'activeBrand:', activeBrandId, activeBrandName);
     
     if (!creatorId) {
         showToastGlobal('Creator ID tidak valid', 'error');
@@ -3787,10 +3787,39 @@ async function showTask1DetailModal(creatorId) {
         
         const c = result.creator;
         const followUpCount = c.follow_up_count || 0;
-        const brands = result.brands || [];
+        const rawBrands = result.brands || [];
         const products = result.products || [];
         const multiLinks = result.multi_links || [];
         const whatsappLogs = result.whatsapp_logs || [];
+        
+        // ── KONDISI JIKA DIBUKA DARI MODAL DETAIL BRAND ─────────────────────
+        const isFromBrandModal = !!(activeBrandId || activeBrandName);
+        let brands = rawBrands;
+
+        if (isFromBrandModal && rawBrands.length > 0) {
+            const targetName = (activeBrandName || '').toLowerCase().trim();
+            const targetId   = activeBrandId ? String(activeBrandId) : '';
+
+            brands = rawBrands.filter(b => {
+                const bName = (b.brand_name || b.shop_name || b.name || '').toLowerCase().trim();
+                const bShop = (b.shop_name || '').toLowerCase().trim();
+                const matchesId   = targetId && b.brand_id && (String(b.brand_id) === targetId);
+                const matchesName = targetName && (bName === targetName || bShop === targetName || bName.includes(targetName) || targetName.includes(bName));
+                return matchesId || matchesName;
+            });
+
+            if (brands.length === 0 && activeBrandName) {
+                brands = [{
+                    brand_id: activeBrandId || null,
+                    brand_name: activeBrandName,
+                    shop_name: activeBrandName,
+                    total_products: products.length || 0,
+                    total_gmv: 0,
+                    is_in_toopai: true,
+                    is_partner: true
+                }];
+            }
+        }
         
         let totalProductsDisplay = result.total_products || 0;
         if (brands.length > 0) {
@@ -4024,42 +4053,73 @@ async function showTask1DetailModal(creatorId) {
             `;
         }
         
-        /*
-        // PRODUCTS
+        // PRODUCTS SECTION — Produk Promosi Creator
         if (products.length > 0) {
+            let displayProducts = products;
+
+            // Jika dibuka dari detail brand, utamakan saring produk yang sesuai dengan nama brand tersebut jika cocok
+            if (isFromBrandModal && activeBrandName) {
+                const targetName = (activeBrandName || '').toLowerCase().trim();
+                const brandProds = products.filter(p => {
+                    const sName = (p.shop_name || p.brand_name || '').toLowerCase().trim();
+                    return sName && (sName === targetName || sName.includes(targetName) || targetName.includes(sName));
+                });
+                if (brandProds.length > 0) {
+                    displayProducts = brandProds;
+                }
+            }
+
             html += `
                 <div style="margin-bottom:16px;">
-                    <h4 style="color:var(--text-primary); font-size:13px; margin-bottom:8px; display:flex; align-items:center; gap:8px;">
-                        <i class="fas fa-box" style="color: #fbbf24;"></i> Products (${products.length})
+                    <h4 style="color:var(--text-primary); font-size:13px; margin-bottom:10px; display:flex; align-items:center; justify-content:space-between;">
+                        <span style="display:flex; align-items:center; gap:8px;">
+                            <i class="fas fa-box" style="color: #fbbf24;"></i> Produk Promosi Creator
+                        </span>
+                        <span style="background:rgba(251,191,36,0.15); color:#fbbf24; font-size:10px; font-weight:600; padding:2px 8px; border-radius:10px;">
+                            ${displayProducts.length} produk
+                        </span>
                     </h4>
-                    <div style="max-height:200px; overflow-y:auto; background:var(--bg-elevated); border-radius:8px; padding:8px; border: 1px solid var(--border);">
+                    <div style="max-height:360px; overflow-y:auto; background:var(--bg-elevated); border-radius:12px; padding:10px; border: 1px solid var(--border); display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap:10px;">
             `;
-            
-            products.forEach(p => {
+
+            displayProducts.forEach(p => {
                 const priceFormatted = p.price ? 'Rp ' + formatNumber(p.price) : '-';
+                const prodName       = p.product_name || p.name || 'Produk';
+                const shopName       = p.shop_name || '-';
+                const commRate       = parseFloat(p.commission_rate || 0);
+
                 html += `
-                    <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; border-bottom:1px solid var(--border); font-size:11px;">
-                        <div style="flex:1; display:flex; align-items:center; gap:8px; min-width:0;">
-                            ${p.image_url ? `<img src="${escapeHtml(p.image_url)}" style="width:30px; height:30px; border-radius:4px; object-fit:cover; flex-shrink:0;" onerror="this.style.display='none'">` : '<i class="fas fa-box" style="color:var(--text-muted); flex-shrink:0;"></i>'}
-                            <div style="min-width:0;">
-                                <div style="color:var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(p.product_name.substring(0, 35))}</div>
-                                <div style="color:var(--text-muted); font-size:9px;">${escapeHtml(p.shop_name || '-')}</div>
+                    <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:8px; padding:10px; display:flex; gap:10px; align-items:center;">
+                        <div style="width:44px; height:44px; border-radius:6px; overflow:hidden; flex-shrink:0; background:rgba(0,0,0,0.2); display:flex; align-items:center; justify-content:center;">
+                            ${p.image_url ? `<img src="${escapeHtml(p.image_url)}" style="width:100%; height:100%; object-fit:cover;" onerror="this.style.display='none'">` : '<i class="fas fa-box" style="color:var(--text-muted); font-size:16px;"></i>'}
+                        </div>
+                        <div style="flex:1; min-width:0;">
+                            <div style="color:var(--text-primary); font-size:11px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(prodName)}">
+                                ${escapeHtml(prodName)}
+                            </div>
+                            <div style="color:var(--text-muted); font-size:9.5px; margin-top:2px;">
+                                <i class="fas fa-store" style="font-size:8.5px; opacity:0.7;"></i> ${escapeHtml(shopName)}
+                            </div>
+                            <div style="display:flex; gap:8px; margin-top:4px; font-size:9.5px;">
+                                <span style="color:#4ade80; font-weight:600;">${priceFormatted}</span>
+                                ${commRate > 0 ? `<span style="color:#fbbf24; font-weight:600;"><i class="fas fa-percentage" style="font-size:8px;"></i> ${commRate}%</span>` : ''}
                             </div>
                         </div>
-                        <div style="text-align:right; font-size:10px; flex-shrink:0; margin-left:8px;">
-                            <div style="color:#fbbf24;">${p.commission_rate || 0}%</div>
-                            <div style="color:#4ade80;">${priceFormatted}</div>
+                        ${(p.product_orders || p.sales_count) ? `
+                        <div style="text-align:right; flex-shrink:0;">
+                            <div style="color:#34d399; font-size:10px; font-weight:700;">${formatNumber(p.product_orders || p.sales_count)}</div>
+                            <div style="color:var(--text-muted); font-size:8px;">terjual</div>
                         </div>
+                        ` : ''}
                     </div>
                 `;
             });
-            
+
             html += `
                     </div>
                 </div>
             `;
         }
-        */
         
         // MULTI LINKS
         if (multiLinks.length > 0) {
@@ -4984,22 +5044,16 @@ async function showBrandCreatorsModal(brandId, brandName) {
                             <i class="fab fa-whatsapp" style="color: #25D366;"></i> 
                             ${isPhoneValid ? escapeHtml(phone) : '<span style="color: #ef4444;">Tidak ada</span>'}
                         </span>
-                        ${gmv_display > 0 ? `
                         <span style="display: inline-flex; align-items: center; gap: 4px; color:#34d399;">
-                            <i class="fas fa-chart-line"></i> GMV: Rp ${formatNumber(gmv_display)}
+                            <i class="fas fa-chart-line"></i> GMV: Rp ${formatNumber(gmv_display || 0)}
                         </span>
-                        ` : ''}
                     </div>
                     
-                    ${c.is_full_name ? `
-                    <div style="font-size: 9.5px; color: var(--is-muted-2);">
-                        <i class="fas fa-user-tie"></i> Handler: <strong>${escapeHtml(c.is_full_name)}</strong>
-                    </div>
-                    ` : ''}
+
 
                     <!-- Tombol Aksi -->
                     <div style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
-                        <button onclick="closeBrandCreatorsModal(); showTask1DetailModal('${c.id}')"
+                        <button onclick="closeBrandCreatorsModal(); showTask1DetailModal('${c.id}', '${brandId}', '${escapeHtml(brandName)}')"
                                 style="background: rgba(139,92,246,0.1); color: #a78bfa; border: 1px solid rgba(139,92,246,0.25); padding: 4px 10px; border-radius: 20px; cursor: pointer; font-size: 9px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; outline: none; transition: 0.2s;">
                             <i class="fas fa-info-circle"></i> Detail
                         </button>
