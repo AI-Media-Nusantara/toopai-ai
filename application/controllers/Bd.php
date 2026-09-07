@@ -2864,19 +2864,53 @@ public function check_brand_registration() {
         return $this->output->set_output(json_encode(['success' => false, 'message' => 'Brand ID required']));
     }
     
-    $brand = $this->db->select('name, status')->where('id', $brand_id)->get('brands')->row();
+    $brand = $this->db->select('id, name, status, is_duplicate, duplicate_of')->where('id', $brand_id)->get('brands')->row();
     
     if (!$brand) {
         return $this->output->set_output(json_encode(['success' => false, 'message' => 'Brand not found']));
     }
     
-    // 🔥 CEK PRODUK DI AFFILIATE_PRODUCTS
-    $product_count = $this->db->select('COUNT(*) as total')
-        ->from('affiliate_products')
-        ->where('shop_name', $brand->name)
+    // Resolve keluarga brand (original + semua duplikat)
+    $original_id = ($brand->is_duplicate && $brand->duplicate_of) ? $brand->duplicate_of : $brand->id;
+    $family_brands = $this->db->select('id, name')
+        ->from('brands')
+        ->group_start()
+            ->where('id', $original_id)
+            ->or_where('duplicate_of', $original_id)
+        ->group_end()
         ->get()
-        ->row()
-        ->total ?? 0;
+        ->result();
+        
+    $family_ids = [];
+    $family_names = [];
+    foreach ($family_brands as $fb) {
+        $family_ids[] = (int)$fb->id;
+        if (!empty($fb->name)) {
+            $family_names[] = trim($fb->name);
+        }
+    }
+    if (!empty($brand->name)) {
+        $family_names[] = trim($brand->name);
+    }
+    $family_names = array_values(array_unique(array_filter($family_names)));
+    $family_ids = array_values(array_unique(array_filter($family_ids)));
+
+    // 🔥 CEK PRODUK DI AFFILIATE_PRODUCTS TERMASUK SEMUA NAMA/ID DUPLIKAT
+    $this->db->select('COUNT(*) as total')->from('affiliate_products ap');
+    $this->db->group_start();
+    foreach ($family_names as $idx => $fn) {
+        if ($idx === 0) {
+            $this->db->where('LOWER(TRIM(ap.shop_name))', strtolower($fn));
+        } else {
+            $this->db->or_where('LOWER(TRIM(ap.shop_name))', strtolower($fn));
+        }
+    }
+    if (!empty($family_ids)) {
+        $this->db->or_where_in('ap.product_id', "SELECT product_id FROM brand_products WHERE brand_id IN (" . implode(',', $family_ids) . ")", FALSE);
+    }
+    $this->db->group_end();
+
+    $product_count = $this->db->get()->row()->total ?? 0;
     
     $has_products = $product_count > 0;
     
@@ -2934,17 +2968,46 @@ public function get_pending_products_with_recommendations() {
         //   sehingga has_duplicates/needs_claim_resolution dihitung keliru.
         if ($brand_id) {
             // Selalu gunakan brand_id jika tersedia (original ATAU duplikat milik current user)
-            $brand = $this->db->select('name, category, status, owner_id, is_duplicate, duplicate_of')->where('id', $brand_id)->get('brands')->row();
+            $brand = $this->db->select('id, name, category, status, owner_id, is_duplicate, duplicate_of')->where('id', $brand_id)->get('brands')->row();
             $brand_name = $brand->name ?? $brand_name;
             $brand_category = $brand->category ?? '';
         } else {
             // Fallback ke brand_name hanya jika brand_id tidak tersedia
-            $brand = $this->db->select('category, status, owner_id, is_duplicate, duplicate_of')->where('name', $brand_name)->get('brands')->row();
+            $brand = $this->db->select('id, name, category, status, owner_id, is_duplicate, duplicate_of')->where('name', $brand_name)->get('brands')->row();
+            $brand_name = $brand->name ?? $brand_name;
             $brand_category = $brand->category ?? '';
         }
         
-        // 🔥 AMBIL PRODUK PENDING DENGAN FIELD LENGKAP
-        $pending_products = $this->db->select('
+        // Resolve keluarga brand (original + semua duplikat) agar semua produk brand ini terpanggil
+        $family_ids = [];
+        $family_names = [];
+        if (isset($brand) && $brand) {
+            $is_dup = ($brand->is_duplicate || !empty($brand->duplicate_of));
+            $orig_id = ($is_dup && $brand->duplicate_of) ? $brand->duplicate_of : ($brand_id ?: $brand->id);
+
+            $family_brands = $this->db->select('id, name')
+                ->from('brands')
+                ->group_start()
+                    ->where('id', $orig_id)
+                    ->or_where('duplicate_of', $orig_id)
+                ->group_end()
+                ->get()
+                ->result();
+            foreach ($family_brands as $fb) {
+                $family_ids[] = (int)$fb->id;
+                if (!empty($fb->name)) {
+                    $family_names[] = trim($fb->name);
+                }
+            }
+        }
+        if (!empty($brand_name)) {
+            $family_names[] = trim($brand_name);
+        }
+        $family_names = array_values(array_unique(array_filter($family_names)));
+        $family_ids = array_values(array_unique(array_filter($family_ids)));
+
+        // 🔥 AMBIL PRODUK PENDING DENGAN FIELD LENGKAP (TERMASUK SEMUA ENTRI BRAND DALAM KELUARGA DUPLIKAT)
+        $this->db->select('
             ap.product_id,
             ap.campaign_id,
             ap.product_name,
@@ -2969,9 +3032,22 @@ public function get_pending_products_with_recommendations() {
         ')
         ->from('affiliate_products ap')
         ->join('affiliate_campaigns ac', 'ap.campaign_id = ac.campaign_id', 'left')
-        ->where('ap.shop_name', $brand_name)
-        ->where('ap.review_status', 'PENDING')
-        ->order_by('ap.created_at', 'DESC')
+        ->where('ap.review_status', 'PENDING');
+
+        $this->db->group_start();
+        foreach ($family_names as $idx => $fn) {
+            if ($idx === 0) {
+                $this->db->where('LOWER(TRIM(ap.shop_name))', strtolower($fn));
+            } else {
+                $this->db->or_where('LOWER(TRIM(ap.shop_name))', strtolower($fn));
+            }
+        }
+        if (!empty($family_ids)) {
+            $this->db->or_where_in('ap.product_id', "SELECT product_id FROM brand_products WHERE brand_id IN (" . implode(',', $family_ids) . ")", FALSE);
+        }
+        $this->db->group_end();
+
+        $pending_products = $this->db->order_by('ap.created_at', 'DESC')
         ->get()
         ->result();
         
@@ -3019,13 +3095,24 @@ public function get_pending_products_with_recommendations() {
         }
         
         // 4. Cek apakah sudah ada approved products
-        $has_approved = $this->db->select('COUNT(*) as total')
-            ->from('affiliate_products')
-            ->where('shop_name', $brand_name)
-            ->where('review_status', 'APPROVED')
-            ->get()
-            ->row()
-            ->total > 0;
+        $this->db->select('COUNT(*) as total')
+            ->from('affiliate_products ap')
+            ->where('ap.review_status', 'APPROVED');
+
+        $this->db->group_start();
+        foreach ($family_names as $idx => $fn) {
+            if ($idx === 0) {
+                $this->db->where('LOWER(TRIM(ap.shop_name))', strtolower($fn));
+            } else {
+                $this->db->or_where('LOWER(TRIM(ap.shop_name))', strtolower($fn));
+            }
+        }
+        if (!empty($family_ids)) {
+            $this->db->or_where_in('ap.product_id', "SELECT product_id FROM brand_products WHERE brand_id IN (" . implode(',', $family_ids) . ")", FALSE);
+        }
+        $this->db->group_end();
+
+        $has_approved = ($this->db->get()->row()->total ?? 0) > 0;
         
         // Format produk pending untuk JavaScript
         $formatted_products = [];
@@ -3707,10 +3794,26 @@ public function get_brand_products() {
         ]));
     }
     
-    // Ambil produk dari tabel brand_products
+    $brand = $this->db->select('id, is_duplicate, duplicate_of')->where('id', $brand_id)->get('brands')->row();
+    $family_ids = [(int)$brand_id];
+    if ($brand) {
+        $orig_id = ($brand->is_duplicate && $brand->duplicate_of) ? $brand->duplicate_of : $brand->id;
+        $family_brands = $this->db->select('id')->from('brands')
+            ->group_start()
+                ->where('id', $orig_id)
+                ->or_where('duplicate_of', $orig_id)
+            ->group_end()
+            ->get()->result();
+        foreach ($family_brands as $fb) {
+            $family_ids[] = (int)$fb->id;
+        }
+        $family_ids = array_values(array_unique($family_ids));
+    }
+
+    // Ambil produk dari tabel brand_products untuk seluruh keluarga brand
     $products = $this->db->select('*')
         ->from('brand_products')
-        ->where('brand_id', $brand_id)
+        ->where_in('brand_id', $family_ids)
         ->order_by('id', 'DESC')
         ->get()
         ->result();
@@ -7428,6 +7531,39 @@ public function get_active_brands_list() {
             ->get('brands')
             ->row();
         $my_brand_id = $my_brand_entry ? $my_brand_entry->id : $brand_id;
+
+        // Sync / Re-link brand_products dari seluruh keluarga brand ke my_brand_id
+        $family_brand_ids = [$original_id];
+        $dups = $this->db->select('id')->where('duplicate_of', $original_id)->get('brands')->result();
+        foreach ($dups as $d) {
+            $family_brand_ids[] = (int)$d->id;
+        }
+        $family_brand_ids = array_values(array_unique($family_brand_ids));
+
+        $family_products = $this->db->select('product_id, campaign_id, product_name, price, image_url, affiliate_link, source')
+            ->from('brand_products')
+            ->where_in('brand_id', $family_brand_ids)
+            ->get()
+            ->result();
+
+        foreach ($family_products as $fp) {
+            $exists = $this->db->where('brand_id', $my_brand_id)
+                               ->where('product_id', $fp->product_id)
+                               ->count_all_results('brand_products');
+            if ($exists == 0) {
+                $this->db->insert('brand_products', [
+                    'brand_id'       => $my_brand_id,
+                    'product_id'     => $fp->product_id,
+                    'campaign_id'    => $fp->campaign_id,
+                    'product_name'   => $fp->product_name,
+                    'price'          => $fp->price,
+                    'image_url'      => $fp->image_url,
+                    'affiliate_link' => $fp->affiliate_link,
+                    'source'         => $fp->source ?? 'api',
+                    'created_at'     => date('Y-m-d H:i:s')
+                ]);
+            }
+        }
 
         return $this->output->set_output(json_encode([
             'success'      => true,
