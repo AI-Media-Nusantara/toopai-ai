@@ -3,3 +3,9 @@
 vendor.zip
 application/config/database.php
 .DS_Store
+
+# Database Merge Tool
+.env.merge
+backups/
+logs/
+*.sql

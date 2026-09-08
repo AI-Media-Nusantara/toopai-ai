@@ -368,22 +368,25 @@ private function get_active_creators_from_orders() {
      * Trigger manual sync
      */
     public function trigger_sync() {
-        if (!$this->input->is_cli_request() && $this->session->userdata('role') !== 'admin') {
-            show_error('Access denied');
+        if (!$this->input->is_cli_request() && !$this->session->userdata('logged_in')) {
+            $this->output->set_content_type('application/json');
+            echo json_encode(['success' => false, 'message' => 'Access denied']);
+            return;
         }
         
-        $this->load->library('Cron');
+        $php_binary = defined('PHP_BINARY') && file_exists(PHP_BINARY) ? PHP_BINARY : '/usr/local/bin/php';
+        $cmd = escapeshellarg($php_binary) . " " . escapeshellarg(FCPATH . "index.php") . " cron sync_all 2>&1";
         
-        $type = $this->input->post('type') ?? 'all';
+        $output_lines = [];
+        exec($cmd, $output_lines, $return_var);
         
-        ob_start();
-        $this->cron->sync_all();
-        $output = ob_get_clean();
+        $output = implode("\n", $output_lines);
         
+        $this->output->set_content_type('application/json');
         echo json_encode([
             'success' => true,
-            'message' => 'Sync triggered',
-            'output' => $output
+            'message' => 'Sync completed successfully',
+            'output'  => $output
         ]);
     }
 
