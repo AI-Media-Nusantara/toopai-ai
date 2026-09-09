@@ -30,8 +30,9 @@ class Bd extends CI_Controller {
     
 public function dashboard() {
     $user_id = $this->session->userdata('user_id');
+    $email = $this->session->userdata('email');
     $role = $this->session->userdata('role');
-    $is_supervisor = ($user_id == 1 || $role == 'admin');
+    $is_supervisor = ($email === 'bd@toopai.com' || $role === 'admin');
     $today = date('Y-m-d');
     $seven_days_ago = date('Y-m-d', strtotime('-7 days'));
     
@@ -321,9 +322,7 @@ public function dashboard() {
     }
     
     // ========== 🔥 TASK 3: SETUP CAMPAIGN ==========
-    // Tampilkan brand berdasarkan bd_id — setiap user hanya melihat brand miliknya sendiri
     if ($is_supervisor) {
-        // Supervisor: tampilkan semua entry original (is_duplicate=0) dari semua BD
         $setup_items_campaign_ready = $this->db->select('b.*, u.username as bd_username, u.full_name as bd_name, b.input_by, b.input_by_name')
             ->from('brands b')
             ->join('users u', 'b.bd_id = u.id', 'left')
@@ -334,7 +333,6 @@ public function dashboard() {
             ->get()
             ->result();
     } else {
-        // Non-supervisor: filter ketat berdasarkan bd_id milik user ini saja, dan hanya brand yang belum di-claim atau di-claim oleh user ini
         $setup_items_campaign_ready = $this->db->select('b.*, u.username as bd_username, u.full_name as bd_name, b.input_by, b.input_by_name')
             ->from('brands b')
             ->join('users u', 'b.bd_id = u.id', 'left')
@@ -720,9 +718,24 @@ public function get_pending_products_for_brand() {
     }
     
     try {
-        // Ambil brand name
+        // Ambil brand name (harus milik user atau supervisor)
+        $user_id = $this->session->userdata('user_id');
+        $email = $this->session->userdata('email');
+        $role = $this->session->userdata('role');
+        $is_supervisor = ($email === 'bd@toopai.com' || $role === 'admin');
         if ($brand_id && !$brand_name) {
-            $brand = $this->db->select('name')->where('id', $brand_id)->get('brands')->row();
+            $this->db->select('name')->where('id', $brand_id);
+            if (!$is_supervisor) {
+                $this->db->where('bd_id', $user_id);
+            }
+            $brand = $this->db->get('brands')->row();
+            if (!$brand) {
+                return $this->output->set_output(json_encode([
+                    'success' => false,
+                    'message' => 'Brand tidak ditemukan atau akses ditolak',
+                    'products' => []
+                ]));
+            }
             $brand_name = $brand->name ?? '';
         }
         
@@ -1062,14 +1075,16 @@ private function generate_bd_affiliate_link_internal($campaign_id, $product_id, 
 
 public function approve_product_with_commission() {
     $this->output->set_content_type('application/json');
-     $user_id = $this->session->userdata('user_id');
+    $user_id = $this->session->userdata('user_id');
     $username = $this->session->userdata('username');
+    $email = $this->session->userdata('email');
+    $role = $this->session->userdata('role');
+    $is_supervisor = ($email === 'bd@toopai.com' || $role === 'admin');
     
-    // 🔥 HANYA USER ID = 1 (TIFFANY) YANG BISA GENERATE LINK
-    if ($user_id != 1) {
+    if (!$is_supervisor) {
         return $this->output->set_output(json_encode([
             'success' => false,
-            'message' => 'Anda tidak memiliki akses untuk generate link. Hanya Head BA yang dapat generate link afiliasi.',
+            'message' => 'Anda tidak memiliki akses untuk approve produk. Hanya Head BA yang dapat melakukan approve produk.',
             'can_generate' => false
         ]));
     }
@@ -2185,8 +2200,23 @@ public function get_all_pending_products_for_brand() {
     
     try {
         // 🔥 Ambil brand name dari database jika hanya ada brand_id
+        $user_id = $this->session->userdata('user_id');
+        $email = $this->session->userdata('email');
+        $role = $this->session->userdata('role');
+        $is_supervisor = ($email === 'bd@toopai.com' || $role === 'admin');
         if ($brand_id && !$brand_name) {
-            $brand = $this->db->select('name')->where('id', $brand_id)->get('brands')->row();
+            $this->db->select('name')->where('id', $brand_id);
+            if (!$is_supervisor) {
+                $this->db->where('bd_id', $user_id);
+            }
+            $brand = $this->db->get('brands')->row();
+            if (!$brand) {
+                return $this->output->set_output(json_encode([
+                    'success' => false,
+                    'message' => 'Brand tidak ditemukan atau akses ditolak',
+                    'products' => []
+                ]));
+            }
             $brand_name = $brand->name ?? '';
         }
         
@@ -2455,12 +2485,19 @@ public function sync_campaigns_page() {
  public function get_brand_detail() {
     $this->output->set_content_type('application/json');
     
+    $user_id = $this->session->userdata('user_id');
+    $email = $this->session->userdata('email');
+    $role = $this->session->userdata('role');
+    $is_supervisor = ($email === 'bd@toopai.com' || $role === 'admin');
     $brand_id = $this->input->post('brand_id');
     
     $this->db->select('b.*, u.username as bd_username, u.full_name as bd_name');
     $this->db->from('brands b');
     $this->db->join('users u', 'b.bd_id = u.id', 'left');
     $this->db->where('b.id', $brand_id);
+    if (!$is_supervisor) {
+        $this->db->where('b.bd_id', $user_id);
+    }
     $brand = $this->db->get()->row();
     
     if ($brand) {
@@ -2470,7 +2507,7 @@ public function sync_campaigns_page() {
         }
         return $this->output->set_output(json_encode(['success' => true, 'data' => $brand]));
     }
-    return $this->output->set_output(json_encode(['success' => false, 'message' => 'Brand not found']));
+    return $this->output->set_output(json_encode(['success' => false, 'message' => 'Brand not found or access denied']));
 }
     /**
      * Update brand status (for task progression)
@@ -2487,11 +2524,20 @@ public function update_brand_status() {
         return $this->output->set_output(json_encode(['success' => false, 'message' => 'Missing required fields']));
     }
     
+    $user_id = $this->session->userdata('user_id');
+    $email = $this->session->userdata('email');
+    $role = $this->session->userdata('role');
+    $is_supervisor = ($email === 'bd@toopai.com' || $role === 'admin');
+    
     // Ambil brand yang sedang diupdate
-    $current_brand = $this->db->get_where('brands', ['id' => $brand_id])->row();
+    $this->db->where('id', $brand_id);
+    if (!$is_supervisor) {
+        $this->db->where('bd_id', $user_id);
+    }
+    $current_brand = $this->db->get('brands')->row();
     
     if (!$current_brand) {
-        return $this->output->set_output(json_encode(['success' => false, 'message' => 'Brand not found']));
+        return $this->output->set_output(json_encode(['success' => false, 'message' => 'Brand not found or access denied']));
     }
     
     // 🔥 CEK JIKA STATUS AKAN BERUBAH MENJADI DEAL (CAMPAIGN_READY atau ACTIVE)
@@ -2666,6 +2712,20 @@ public function update_brand_status() {
         
         // Update status brand berdasarkan task
         if ($brand_id) {
+            $user_id = $this->session->userdata('user_id');
+            $email = $this->session->userdata('email');
+            $role = $this->session->userdata('role');
+            $is_supervisor = ($email === 'bd@toopai.com' || $role === 'admin');
+            
+            $this->db->where('id', $brand_id);
+            if (!$is_supervisor) {
+                $this->db->where('bd_id', $user_id);
+            }
+            $brand = $this->db->get('brands')->row();
+            if (!$brand) {
+                return $this->output->set_output(json_encode(['success' => false, 'message' => 'Brand not found or access denied']));
+            }
+            
             if ($stage == 2) {
                 $status = 'DEAL_CLOSED';
             } elseif ($stage == 3) {
@@ -2677,6 +2737,9 @@ public function update_brand_status() {
             }
             
             $this->db->where('id', $brand_id);
+            if (!$is_supervisor) {
+                $this->db->where('bd_id', $user_id);
+            }
             $this->db->update('brands', ['status' => $status, 'updated_at' => date('Y-m-d H:i:s')]);
         }
         
@@ -2735,15 +2798,22 @@ public function get_brand_followup_detail() {
         return $this->output->set_output(json_encode(['success' => false, 'message' => 'Brand ID required']));
     }
     
-    $brand = $this->db->select('b.*, u.username as bd_username')
+    $user_id = $this->session->userdata('user_id');
+    $email = $this->session->userdata('email');
+    $role = $this->session->userdata('role');
+    $is_supervisor = ($email === 'bd@toopai.com' || $role === 'admin');
+    
+    $this->db->select('b.*, u.username as bd_username')
         ->from('brands b')
         ->join('users u', 'b.bd_id = u.id', 'left')
-        ->where('b.id', $brand_id)
-        ->get()
-        ->row();
+        ->where('b.id', $brand_id);
+    if (!$is_supervisor) {
+        $this->db->where('b.bd_id', $user_id);
+    }
+    $brand = $this->db->get()->row();
     
     if (!$brand) {
-        return $this->output->set_output(json_encode(['success' => false, 'message' => 'Brand not found']));
+        return $this->output->set_output(json_encode(['success' => false, 'message' => 'Brand not found or access denied']));
     }
     
     // Ambil open commission rate dari database
@@ -2798,7 +2868,19 @@ public function save_follow_up() {
     }
     
     // Ambil brand
-    $brand = $this->db->select('name, whatsapp_number')->where('id', $brand_id)->get('brands')->row();
+    $user_id = $this->session->userdata('user_id');
+    $email = $this->session->userdata('email');
+    $role = $this->session->userdata('role');
+    $is_supervisor = ($email === 'bd@toopai.com' || $role === 'admin');
+    
+    $this->db->select('name, whatsapp_number')->where('id', $brand_id);
+    if (!$is_supervisor) {
+        $this->db->where('bd_id', $user_id);
+    }
+    $brand = $this->db->get('brands')->row();
+    if (!$brand) {
+        return $this->output->set_output(json_encode(['success' => false, 'message' => 'Brand not found or access denied']));
+    }
     
     // Cek apakah brand sudah registrasi
     $product_count = $this->db->select('COUNT(*) as total')
@@ -2864,10 +2946,19 @@ public function check_brand_registration() {
         return $this->output->set_output(json_encode(['success' => false, 'message' => 'Brand ID required']));
     }
     
-    $brand = $this->db->select('id, name, status, is_duplicate, duplicate_of')->where('id', $brand_id)->get('brands')->row();
+    $user_id = $this->session->userdata('user_id');
+    $email = $this->session->userdata('email');
+    $role = $this->session->userdata('role');
+    $is_supervisor = ($email === 'bd@toopai.com' || $role === 'admin');
+    
+    $this->db->select('id, name, status, is_duplicate, duplicate_of')->where('id', $brand_id);
+    if (!$is_supervisor) {
+        $this->db->where('bd_id', $user_id);
+    }
+    $brand = $this->db->get('brands')->row();
     
     if (!$brand) {
-        return $this->output->set_output(json_encode(['success' => false, 'message' => 'Brand not found']));
+        return $this->output->set_output(json_encode(['success' => false, 'message' => 'Brand not found or access denied']));
     }
     
     // Resolve keluarga brand (original + semua duplikat)
@@ -3396,13 +3487,31 @@ public function get_product_recommendations_by_gmv($category, $exclude_brand_nam
 public function get_brand_requirements() {
     $this->output->set_content_type('application/json');
     
+    $user_id = $this->session->userdata('user_id');
+    $email = $this->session->userdata('email');
+    $role = $this->session->userdata('role');
+    $is_supervisor = ($email === 'bd@toopai.com' || $role === 'admin');
     $brand_id = $this->input->post('brand_id');
     
     if (!$brand_id) {
         return $this->output->set_output(json_encode(['success' => false, 'message' => 'Brand ID required']));
     }
     
-    $brand = $this->db->select('
+    // Ambil data brand target
+    $target_brand = $this->db->select('id, name, is_duplicate, duplicate_of, bd_id, owner_id')
+        ->where('id', $brand_id)
+        ->get('brands')
+        ->row();
+
+    if (!$target_brand) {
+        return $this->output->set_output(json_encode(['success' => false, 'message' => 'Brand not found']));
+    }
+
+    $is_dup = ($target_brand->is_duplicate || !empty($target_brand->duplicate_of));
+    $original_id = ($is_dup && $target_brand->duplicate_of) ? $target_brand->duplicate_of : $target_brand->id;
+
+    // Cari data requirement dari brand ini atau keluarga duplikat yang creator_level-nya sudah terisi
+    $this->db->select('
             creator_level, 
             creator_gmv, 
             content_type, 
@@ -3411,9 +3520,35 @@ public function get_brand_requirements() {
             requirements_filled_by, 
             requirements_filled_at
         ')
-        ->where('id', $brand_id)
-        ->get('brands')
-        ->row();
+        ->from('brands')
+        ->group_start()
+            ->where('id', $brand_id)
+            ->or_where('id', $original_id)
+            ->or_where('duplicate_of', $original_id)
+            ->or_where('name', $target_brand->name)
+        ->group_end()
+        ->where('creator_level IS NOT NULL', NULL, FALSE)
+        ->order_by('requirements_filled_at', 'DESC')
+        ->order_by('id', 'DESC')
+        ->limit(1);
+
+    $brand = $this->db->get()->row();
+
+    // Fallback jika belum terisi pada entry mana pun, ambil dari target_brand
+    if (!$brand) {
+        $brand = $this->db->select('
+                creator_level, 
+                creator_gmv, 
+                content_type, 
+                sample_method, 
+                campaign_notes, 
+                requirements_filled_by, 
+                requirements_filled_at
+            ')
+            ->where('id', $brand_id)
+            ->get('brands')
+            ->row();
+    }
     
     return $this->output->set_output(json_encode([
         'success' => true,
@@ -3443,7 +3578,7 @@ public function save_brand_requirements() {
     }
 
     // ========== 🔥 VALIDASI: BRAND PERLU DI-CLAIM DULU SEBELUM ISI REQUIREMENTS ==========
-    $brand = $this->db->select('id, status, owner_id, bd_id, is_duplicate, duplicate_of')
+    $brand = $this->db->select('id, name, status, owner_id, bd_id, is_duplicate, duplicate_of')
         ->where('id', $brand_id)
         ->get('brands')
         ->row();
@@ -3473,9 +3608,9 @@ public function save_brand_requirements() {
         }
     }
 
-    // ========== 🔥 VALIDASI: HANYA BD PEMILIK BRAND INI YANG BOLEH ISI ==========
-    // BD hanya boleh update entry brand miliknya sendiri
-    if ($brand->bd_id != $user_id) {
+    // ========== 🔥 VALIDASI: HANYA BD PEMILIK/OWNER BRAND INI YANG BOLEH ISI ==========
+    // BD pembuat (bd_id) atau BD owner (owner_id) boleh update requirement
+    if ($brand->bd_id != $user_id && $brand->owner_id != $user_id) {
         return $this->output->set_output(json_encode([
             'success' => false,
             'message' => 'Anda tidak memiliki akses untuk mengisi requirements brand ini.'
@@ -3493,7 +3628,16 @@ public function save_brand_requirements() {
         'updated_at'             => date('Y-m-d H:i:s')
     ];
 
-    $this->db->where('id', $brand_id);
+    // 🔥 Sync requirement ke seluruh keluarga duplikat brand (original, duplicate_of, & nama brand)
+    $is_dup = ($brand->is_duplicate || !empty($brand->duplicate_of));
+    $original_id = ($is_dup && $brand->duplicate_of) ? $brand->duplicate_of : $brand->id;
+
+    $this->db->group_start()
+        ->where('id', $brand_id)
+        ->or_where('id', $original_id)
+        ->or_where('duplicate_of', $original_id)
+        ->or_where('name', $brand->name)
+    ->group_end();
     $this->db->update('brands', $update_data);
 
     // Log activity
@@ -3519,8 +3663,11 @@ public function generate_multi_link() {
     
     $user_id = $this->session->userdata('user_id');
     $username = $this->session->userdata('username');
+    $email = $this->session->userdata('email');
+    $role = $this->session->userdata('role');
+    $is_supervisor = ($email === 'bd@toopai.com' || $role === 'admin');
     
-    if ($user_id != 1) {
+    if (!$is_supervisor) {
         return $this->output->set_output(json_encode([
             'success' => false,
             'message' => 'Hanya Head BA yang dapat generate multi link afiliasi.'
@@ -3687,13 +3834,14 @@ public function get_followup_brands() {
     $this->output->set_content_type('application/json');
     
     $user_id = $this->session->userdata('user_id');
-    $is_supervisor = ($user_id == 1);
+    $email = $this->session->userdata('email');
+    $role = $this->session->userdata('role');
+    $is_supervisor = ($email === 'bd@toopai.com' || $role === 'admin');
     
     $this->db->select('b.*, u.username as bd_username')
         ->from('brands b')
         ->join('users u', 'b.bd_id = u.id', 'left')
         ->where('b.status', 'FOLLOW_UP');
-    
     if (!$is_supervisor) {
         $this->db->where('b.bd_id', $user_id);
     }
@@ -3741,10 +3889,19 @@ public function get_brand_detail_full() {
     
     $brand_id = $this->input->post('brand_id');
     
+    $user_id = $this->session->userdata('user_id');
+    $email = $this->session->userdata('email');
+    $role = $this->session->userdata('role');
+    $is_supervisor = ($email === 'bd@toopai.com' || $role === 'admin');
+    
     // Ambil data brand
-    $brand = $this->db->get_where('brands', ['id' => $brand_id])->row();
+    $this->db->where('id', $brand_id);
+    if (!$is_supervisor) {
+        $this->db->where('bd_id', $user_id);
+    }
+    $brand = $this->db->get('brands')->row();
     if (!$brand) {
-        return $this->output->set_output(json_encode(['success' => false, 'message' => 'Brand not found']));
+        return $this->output->set_output(json_encode(['success' => false, 'message' => 'Brand not found or access denied']));
     }
     
     // Ambil produk brand
@@ -3940,7 +4097,9 @@ public function search_hunting_brands() {
     
     $keyword = $this->input->post('keyword');
     $user_id = $this->session->userdata('user_id');
-    $is_supervisor = ($user_id == 1);
+    $email = $this->session->userdata('email');
+    $role = $this->session->userdata('role');
+    $is_supervisor = ($email === 'bd@toopai.com' || $role === 'admin');
     
     // 🔥 DEBUG: Log keyword yang diterima
     log_message('debug', 'search_hunting_brands - keyword: ' . $keyword);
@@ -3958,8 +4117,13 @@ public function search_hunting_brands() {
         $this->db->select('b.*, u.username as bd_username, u.full_name as bd_name, b.input_by, b.input_by_name')
             ->from('brands b')
             ->join('users u', 'b.bd_id = u.id', 'left')
-            ->where('b.status', 'PENDING')
-            ->group_start()
+            ->where('b.status', 'PENDING');
+            
+        if (!$is_supervisor) {
+            $this->db->where('b.bd_id', $user_id);
+        }
+        
+        $this->db->group_start()
                 ->like('b.name', $keyword)
                 ->or_like('b.shop_name', $keyword)
                 ->or_like('b.whatsapp_number', $keyword)
@@ -3967,16 +4131,6 @@ public function search_hunting_brands() {
             ->group_end()
             ->order_by('b.created_at', 'DESC')
             ->limit(100);
-        
-        if (!$is_supervisor) {
-            $this->db->group_start()
-                ->where('b.bd_id', $user_id)
-                ->or_group_start()
-                    ->where('b.status', 'NEED_CLAIM')
-                    ->where("b.id IN (SELECT DISTINCT(duplicate_of) FROM brands WHERE bd_id = $user_id AND is_duplicate = 1)", NULL, FALSE)
-                ->group_end()
-            ->group_end();
-        }
         
         $brands = $this->db->get()->result();
         
@@ -4009,7 +4163,9 @@ public function search_followup_brands() {
     
     $keyword = $this->input->post('keyword');
     $user_id = $this->session->userdata('user_id');
-    $is_supervisor = ($user_id == 1);
+    $email = $this->session->userdata('email');
+    $role = $this->session->userdata('role');
+    $is_supervisor = ($email === 'bd@toopai.com' || $role === 'admin');
     
     if (empty($keyword)) {
         return $this->output->set_output(json_encode(['success' => false, 'message' => 'Keyword required']));
@@ -4018,8 +4174,13 @@ public function search_followup_brands() {
     $this->db->select('b.*, u.username as bd_username, u.full_name as bd_name, b.input_by, b.input_by_name')
         ->from('brands b')
         ->join('users u', 'b.bd_id = u.id', 'left')
-        ->where('b.status', 'FOLLOW_UP')
-        ->group_start()
+        ->where('b.status', 'FOLLOW_UP');
+        
+    if (!$is_supervisor) {
+        $this->db->where('b.bd_id', $user_id);
+    }
+    
+    $this->db->group_start()
             ->like('b.name', $keyword)
             ->or_like('b.shop_name', $keyword)
             ->or_like('b.whatsapp_number', $keyword)
@@ -4027,10 +4188,6 @@ public function search_followup_brands() {
         ->group_end()
         ->order_by('b.follow_up_at', 'DESC')
         ->limit(100);
-    
-    if (!$is_supervisor) {
-        $this->db->where('b.bd_id', $user_id);
-    }
     
     $brands = $this->db->get()->result();
     
@@ -4050,7 +4207,9 @@ public function search_setup_brands() {
     
     $keyword = $this->input->post('keyword');
     $user_id = $this->session->userdata('user_id');
-    $is_supervisor = ($user_id == 1);
+    $email = $this->session->userdata('email');
+    $role = $this->session->userdata('role');
+    $is_supervisor = ($email === 'bd@toopai.com' || $role === 'admin');
     
     if (empty($keyword)) {
         return $this->output->set_output(json_encode([
@@ -4071,8 +4230,19 @@ public function search_setup_brands() {
         $this->db->select('b.*, u.username as bd_username, u.full_name as bd_name, b.input_by, b.input_by_name')
             ->from('brands b')
             ->join('users u', 'b.bd_id = u.id', 'left')
-            ->where_in('b.status', ['CAMPAIGN_READY', 'NEED_CLAIM'])
-            ->group_start()
+            ->where_in('b.status', ['CAMPAIGN_READY', 'NEED_CLAIM']);
+            
+        if (!$is_supervisor) {
+            $this->db->where('b.bd_id', $user_id);
+            $this->db->group_start()
+                ->where('b.owner_id IS NULL', NULL, FALSE)
+                ->or_where('b.owner_id', $user_id)
+            ->group_end();
+        } else {
+            $this->db->where('b.is_duplicate', 0);
+        }
+        
+        $this->db->group_start()
                 ->like('b.name', $keyword)
                 ->or_like('b.shop_name', $keyword)
                 ->or_like('b.whatsapp_number', $keyword)
@@ -4081,18 +4251,6 @@ public function search_setup_brands() {
             ->order_by('b.updated_at', 'DESC')
             ->limit(100);
 
-        if ($is_supervisor) {
-            // Supervisor: hanya tampilkan entry original, cegah double
-            $this->db->where('b.is_duplicate', 0);
-        } else {
-            // Non-supervisor: tampilkan hanya brand milik user ini (berdasarkan bd_id) dan yang belum di-claim / di-claim oleh user ini
-            $this->db->where('b.bd_id', $user_id);
-            $this->db->group_start()
-                ->where('b.owner_id IS NULL', NULL, FALSE)
-                ->or_where('b.owner_id', $user_id)
-            ->group_end();
-        }
-        
         $campaign_ready = $this->db->get()->result();
         
         foreach ($campaign_ready as $brand) {
@@ -4109,8 +4267,13 @@ public function search_setup_brands() {
             ->from('brands b')
             ->join('users u', 'b.bd_id = u.id', 'left')
             ->join('affiliate_products ap', 'b.name = ap.shop_name AND ap.review_status = "PENDING"', 'inner')
-            ->where('b.status', 'ACTIVE')
-            ->group_start()
+            ->where('b.status', 'ACTIVE');
+            
+        if (!$is_supervisor) {
+            $this->db->where('b.bd_id', $user_id);
+        }
+        
+        $this->db->group_start()
                 ->like('b.name', $keyword)
                 ->or_like('b.shop_name', $keyword)
                 ->or_like('b.whatsapp_number', $keyword)
@@ -4119,16 +4282,6 @@ public function search_setup_brands() {
             ->group_by('b.id')
             ->order_by('b.updated_at', 'DESC')
             ->limit(100);
-        
-        if (!$is_supervisor) {
-            $this->db->group_start()
-                ->where('b.bd_id', $user_id)
-                ->or_group_start()
-                    ->where('b.status', 'NEED_CLAIM')
-                    ->where("b.id IN (SELECT DISTINCT(duplicate_of) FROM brands WHERE bd_id = $user_id AND is_duplicate = 1)", NULL, FALSE)
-                ->group_end()
-            ->group_end();
-        }
         
         $active_with_pending = $this->db->get()->result();
         
@@ -4209,7 +4362,9 @@ public function search_monitoring_brands() {
     
     $keyword = $this->input->post('keyword');
     $user_id = $this->session->userdata('user_id');
-    $is_supervisor = ($user_id == 1);
+    $email = $this->session->userdata('email');
+    $role = $this->session->userdata('role');
+    $is_supervisor = ($email === 'bd@toopai.com' || $role === 'admin');
     $today = date('Y-m-d');
     
     if (empty($keyword)) {
@@ -4987,8 +5142,10 @@ public function team_performance() {
     $prev_start_date = date('Y-m-d', strtotime("-$days_diff days", strtotime($start_date)));
     $prev_end_date = date('Y-m-d', strtotime('-1 day', strtotime($start_date)));
     
-    // 🔥 SUPERVISOR (user_id = 1) bisa lihat semua, yang lain hanya lihat sendiri
-    $is_supervisor = ($user_id == 1);
+    // 🔥 SUPERVISOR (bd@toopai.com atau admin) bisa lihat semua, yang lain hanya lihat sendiri
+    $email = $this->session->userdata('email');
+    $role = $this->session->userdata('role');
+    $is_supervisor = ($email === 'bd@toopai.com' || $role === 'admin');
     
     // ========== AMBIL SEMUA TEAM MEMBER BD ==========
     if ($is_supervisor) {
@@ -5250,11 +5407,13 @@ public function team_performance() {
 // ========== GENERATE AFFILIATE LINK (TANPA CREATOR) UNTUK IS (TASK 3 AFTER APPROVE)  ==========
 public function generate_bd_affiliate_link() {
     $this->output->set_content_type('application/json');
-     $user_id = $this->session->userdata('user_id');
+    $user_id = $this->session->userdata('user_id');
     $username = $this->session->userdata('username');
+    $email = $this->session->userdata('email');
+    $role = $this->session->userdata('role');
+    $is_supervisor = ($email === 'bd@toopai.com' || $role === 'admin');
     
-    // 🔥 HANYA USER ID = 1 (TIFFANY) YANG BISA GENERATE LINK
-    if ($user_id != 1) {
+    if (!$is_supervisor) {
         return $this->output->set_output(json_encode([
             'success' => false,
             'message' => 'Anda tidak memiliki akses untuk generate link. Hanya Head BA yang dapat generate link afiliasi.',
@@ -5418,9 +5577,10 @@ public function can_generate_link() {
     $user_id = $this->session->userdata('user_id');
     $role = $this->session->userdata('role');
     $username = $this->session->userdata('username');
+    $email = $this->session->userdata('email');
     
-    // 🔥 HANYA USER ID = 1 (TIFFANY) YANG BISA GENERATE LINK
-    $can_generate = ($user_id == 1);
+    // 🔥 HANYA HEAD BA / ADMIN YANG BISA GENERATE LINK
+    $can_generate = ($email === 'bd@toopai.com' || $role === 'admin');
     
     return $this->output->set_output(json_encode([
         'success' => true,
@@ -7158,7 +7318,9 @@ public function get_active_brands_list() {
     $this->output->set_content_type('application/json');
     
     $user_id = $this->session->userdata('user_id');
-    $is_supervisor = ($user_id == 1);
+    $email = $this->session->userdata('email');
+    $role = $this->session->userdata('role');
+    $is_supervisor = ($email === 'bd@toopai.com' || $role === 'admin');
     $today = date('Y-m-d');
     
     // Ambil semua brand dengan status ACTIVE

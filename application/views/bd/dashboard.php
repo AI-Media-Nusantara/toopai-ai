@@ -2998,23 +2998,39 @@ async function showTask3SetupModalWithRecommendations(brandId, brandName) {
     // Ditampilkan terlebih dahulu karena ini adalah kondisi yang sebelumnya menyebabkan bug:
     // (User B melihat Requirements Form padahal owner_id = User A)
     if (isClaimedByOther) {
-        claimHtml = `
-            <div style="background:rgba(239,68,68,0.1); border-radius:12px; padding:16px; margin-bottom:16px; border:1px solid #ef4444;">
-                <div style="color:#ef4444; font-size:14px; font-weight:bold; margin-bottom:6px;">
-                    <i class="fas fa-lock"></i> Brand Ini Sudah Di-Claim
+        if (!isSupervisor) {
+            claimHtml = `
+                <div style="background:rgba(239,68,68,0.1); border-radius:12px; padding:16px; margin-bottom:16px; border:1px solid #ef4444;">
+                    <div style="color:#ef4444; font-size:14px; font-weight:bold; margin-bottom:6px;">
+                        <i class="fas fa-lock"></i> Brand Ini Sudah Di-Claim
+                    </div>
+                    <div style="color:#9aaebe; font-size:12px; margin-bottom:8px;">
+                        Brand ini telah berhasil di-claim oleh BA lain. Anda tidak dapat mengisi Requirements untuk brand ini.
+                    </div>
+                    <div style="background:rgba(239,68,68,0.15); border-radius:8px; padding:10px 14px; display:inline-block;">
+                        <span style="font-size:11px; color:#9aaebe;">Owner saat ini:</span>
+                        <span style="font-size:13px; color:#ef4444; font-weight:bold; margin-left:6px;">
+                            <i class="fas fa-user-check"></i> ${escapeHtml(ownerName)}
+                        </span>
+                    </div>
                 </div>
-                <div style="color:#9aaebe; font-size:12px; margin-bottom:8px;">
-                    Brand ini telah berhasil di-claim oleh BA lain. Anda tidak dapat mengisi Requirements untuk brand ini.
+            `;
+            disableApproval = true;
+        } else {
+            // Supervisor / Head BA:
+            // Jika requirement sudah diisi oleh staff BA (owner), supervisor BISA approve produk!
+            disableApproval = !hasRequirements;
+            claimHtml = `
+                <div style="background:${hasRequirements ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)'}; border-radius:12px; padding:16px; margin-bottom:16px; border:1px solid ${hasRequirements ? '#10b981' : '#f59e0b'};">
+                    <div style="color:${hasRequirements ? '#10b981' : '#fbbf24'}; font-size:14px; font-weight:bold; margin-bottom:6px;">
+                        <i class="fas ${hasRequirements ? 'fa-user-check' : 'fa-exclamation-triangle'}"></i> Brand Dimiliki oleh Tim BA (${escapeHtml(ownerName)})
+                    </div>
+                    <div style="color:#9aaebe; font-size:12px;">
+                        ${hasRequirements ? 'Tim BA telah mengisi Requirements untuk brand ini. Anda dapat meninjau dan melakukan approval produk.' : 'Tim BA belum mengisi Requirements untuk brand ini. Approval produk belum dapat dilakukan sampai tim BA mengisi Requirement.'}
+                    </div>
                 </div>
-                <div style="background:rgba(239,68,68,0.15); border-radius:8px; padding:10px 14px; display:inline-block;">
-                    <span style="font-size:11px; color:#9aaebe;">Owner saat ini:</span>
-                    <span style="font-size:13px; color:#ef4444; font-weight:bold; margin-left:6px;">
-                        <i class="fas fa-user-check"></i> ${escapeHtml(ownerName)}
-                    </span>
-                </div>
-            </div>
-        `;
-        disableApproval = true;
+            `;
+        }
 
     // ---- STATE A: Brand belum di-claim / perlu resolusi claim ----
     } else if (needsClaimResolution) {
@@ -3437,7 +3453,7 @@ async function showTask3SetupModalWithRecommendations(brandId, brandName) {
                         ` : `
                         <div style="background: ${disableApproval ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)'}; padding: 6px 12px; border-radius: 20px;">
                             <span style="color: ${disableApproval ? '#ef4444' : '#f59e0b'}; font-size: 11px;">
-                                <i class="fas fa-lock"></i> ${disableApproval ? 'Approve terkunci, butuh claim kepemilikan' : 'Approve terkunci, isi requirement dulu'}
+                                <i class="fas fa-lock"></i> ${!hasRequirements ? 'Approve terkunci, isi requirement dulu' : 'Approve terkunci, butuh claim kepemilikan'}
                             </span>
                         </div>
                         `}

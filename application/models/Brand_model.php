@@ -269,13 +269,19 @@ public function get_scouting_items($limit =1000) {
      * Scout new brand (create from AI scout)
      */
     public function scout_brand($data) {
-        $existing = $this->db->get_where('brands', ['name' => $data['name']])->row();
+        $bd_id = $data['bd_id'] ?? $this->session->userdata('user_id');
+        $existing = null;
+        if ($bd_id) {
+            $existing = $this->db->get_where('brands', ['name' => $data['name'], 'bd_id' => $bd_id])->row();
+        } else {
+            $existing = $this->db->get_where('brands', ['name' => $data['name']])->row();
+        }
         
         $insert_data = [
             'name' => $data['name'],
             'shop_name' => $data['name'],
             'category' => $data['category'] ?? null,
-            'bd_id' => $data['bd_id'] ?? null,
+            'bd_id' => $bd_id,
             'selected_product_id' => $data['selected_product_id'] ?? null,
             'selected_product_name' => $data['selected_product_name'] ?? null,
             'proposed_commission' => $data['proposed_commission'] ?? 8,
