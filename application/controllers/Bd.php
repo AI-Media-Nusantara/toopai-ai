@@ -38,22 +38,49 @@ public function dashboard() {
     
     // ========== 🔥 TOTAL COUNT PER TASK (HANYA ANGKA) ==========
     
-    // Task 1: HUNTING (status PENDING)
-    $this->db->where('status', 'PENDING');
+    // Task 1: HUNTING (status PENDING atau current_task = 1)
+    $this->db->group_start()
+        ->where('current_task', 1)
+        ->or_group_start()
+            ->where('status', 'PENDING')
+            ->group_start()
+                ->where('current_task IS NULL', NULL, FALSE)
+                ->or_where('current_task', 1)
+            ->group_end()
+        ->group_end()
+    ->group_end();
     if (!$is_supervisor) {
         $this->db->where('bd_id', $user_id);
     }
     $total_hunting = $this->db->count_all_results('brands');
     
-    // Task 2: FOLLOW UP (status FOLLOW_UP)
-    $this->db->where('status', 'FOLLOW_UP');
+    // Task 2: FOLLOW UP (status FOLLOW_UP atau current_task = 2)
+    $this->db->group_start()
+        ->where('current_task', 2)
+        ->or_group_start()
+            ->where('status', 'FOLLOW_UP')
+            ->group_start()
+                ->where('current_task IS NULL', NULL, FALSE)
+                ->or_where('current_task', 2)
+            ->group_end()
+        ->group_end()
+    ->group_end();
     if (!$is_supervisor) {
         $this->db->where('bd_id', $user_id);
     }
     $total_followup = $this->db->count_all_results('brands');
     
-    // Task 3: SETUP CAMPAIGN (status CAMPAIGN_READY + NEED_CLAIM + ACTIVE dengan produk pending)
-    $this->db->where_in('status', ['CAMPAIGN_READY', 'NEED_CLAIM']);
+    // Task 3: SETUP CAMPAIGN (status CAMPAIGN_READY / NEED_CLAIM atau current_task = 3)
+    $this->db->group_start()
+        ->where('current_task', 3)
+        ->or_group_start()
+            ->where_in('status', ['CAMPAIGN_READY', 'NEED_CLAIM'])
+            ->group_start()
+                ->where('current_task IS NULL', NULL, FALSE)
+                ->or_where('current_task', 3)
+            ->group_end()
+        ->group_end()
+    ->group_end();
     if (!$is_supervisor) {
         $this->db->where('bd_id', $user_id);
         $this->db->group_start()
@@ -120,24 +147,15 @@ public function dashboard() {
     } else {
         $bd_list = [];
     }
-    
-    // ========== 🔥 AUTO-UPDATE: FOLLOW_UP -> CAMPAIGN_READY ==========
-    // Brand yang sudah konfirmasi deal (deal_confirmed_at terisi) otomatis pindah ke Step 3
-    // Hanya entry ORIGINAL (is_duplicate=0) yang boleh dipromosikan ke CAMPAIGN_READY.
-    // Entry duplikat (is_duplicate=1) tetap di FOLLOW_UP — mereka tidak ditampilkan di Step 3.
-    $updated_brands = $this->db
-        ->where('status', 'FOLLOW_UP')
-        ->where('deal_confirmed_at IS NOT NULL')
-        ->where('is_duplicate', 0)
-        ->update('brands', [
-            'status'       => 'CAMPAIGN_READY',
-            'current_task' => 3,
-            'updated_at'   => date('Y-m-d H:i:s')
-        ]);
+      // ========== 🔥 AUTO-SYNC STATUS BERDASARKAN CURRENT_TASK DARI DATABASE ==========
+    // Jika current_task diubah secara manual di database (misal ke task 2), sinkronkan status-nya ke FOLLOW_UP
+    $this->db->where('current_task', 2)
+        ->where('status !=', 'FOLLOW_UP')
+        ->update('brands', ['status' => 'FOLLOW_UP']);
 
-    if ($this->db->affected_rows() > 0) {
-        log_message('info', 'Auto-updated ' . $this->db->affected_rows() . ' brands from FOLLOW_UP to CAMPAIGN_READY on dashboard load');
-    }
+    $this->db->where('current_task', 1)
+        ->where('status !=', 'PENDING')
+        ->update('brands', ['status' => 'PENDING']);
     
     // ========== 🔥 AUTO-UPDATE: CAMPAIGN_READY -> ACTIVE ==========
     $campaign_ready_brands = $this->db->select('id, name')
@@ -268,7 +286,7 @@ public function dashboard() {
             ->result();
     }
     
-    // ========== TASK 2: FOLLOW UP (status FOLLOW_UP) ==========
+    // ========== TASK 2: FOLLOW UP (status FOLLOW_UP atau current_task = 2) ==========
     if ($is_supervisor) {
         $followup_items = $this->db->select('
                 b.*, 
@@ -281,7 +299,16 @@ public function dashboard() {
             ->from('brands b')
             ->join('users u', 'b.bd_id = u.id', 'left')
             ->join('whatsapp_logs wl', 'b.id = wl.brand_id', 'left')
-            ->where('b.status', 'FOLLOW_UP')
+            ->group_start()
+                ->where('b.current_task', 2)
+                ->or_group_start()
+                    ->where('b.status', 'FOLLOW_UP')
+                    ->group_start()
+                        ->where('b.current_task IS NULL', NULL, FALSE)
+                        ->or_where('b.current_task', 2)
+                    ->group_end()
+                ->group_end()
+            ->group_end()
             ->group_by('b.id')
             ->order_by('b.deal_confirmed_at', 'DESC')
             ->limit(1000)
@@ -300,7 +327,16 @@ public function dashboard() {
             ->join('users u', 'b.bd_id = u.id', 'left')
             ->join('whatsapp_logs wl', 'b.id = wl.brand_id', 'left')
             ->where('b.bd_id', $user_id)
-            ->where('b.status', 'FOLLOW_UP')
+            ->group_start()
+                ->where('b.current_task', 2)
+                ->or_group_start()
+                    ->where('b.status', 'FOLLOW_UP')
+                    ->group_start()
+                        ->where('b.current_task IS NULL', NULL, FALSE)
+                        ->or_where('b.current_task', 2)
+                    ->group_end()
+                ->group_end()
+            ->group_end()
             ->group_by('b.id')
             ->order_by('b.deal_confirmed_at', 'DESC')
             ->limit(1000)
@@ -327,7 +363,16 @@ public function dashboard() {
             ->from('brands b')
             ->join('users u', 'b.bd_id = u.id', 'left')
             ->where('b.is_duplicate', 0)
-            ->where_in('b.status', ['CAMPAIGN_READY', 'NEED_CLAIM'])
+            ->group_start()
+                ->where('b.current_task', 3)
+                ->or_group_start()
+                    ->where_in('b.status', ['CAMPAIGN_READY', 'NEED_CLAIM'])
+                    ->group_start()
+                        ->where('b.current_task IS NULL', NULL, FALSE)
+                        ->or_where('b.current_task', 3)
+                    ->group_end()
+                ->group_end()
+            ->group_end()
             ->order_by('b.updated_at', 'DESC')
             ->limit(1000)
             ->get()
@@ -337,7 +382,16 @@ public function dashboard() {
             ->from('brands b')
             ->join('users u', 'b.bd_id = u.id', 'left')
             ->where('b.bd_id', $user_id)
-            ->where_in('b.status', ['CAMPAIGN_READY', 'NEED_CLAIM'])
+            ->group_start()
+                ->where('b.current_task', 3)
+                ->or_group_start()
+                    ->where_in('b.status', ['CAMPAIGN_READY', 'NEED_CLAIM'])
+                    ->group_start()
+                        ->where('b.current_task IS NULL', NULL, FALSE)
+                        ->or_where('b.current_task', 3)
+                    ->group_end()
+                ->group_end()
+            ->group_end()
             ->group_start()
                 ->where('b.owner_id IS NULL', NULL, FALSE)
                 ->or_where('b.owner_id', $user_id)
@@ -3005,23 +3059,6 @@ public function check_brand_registration() {
     
     $has_products = $product_count > 0;
     
-    // 🔥 JIKA MASIH DI FOLLOW_UP TAPI SUDAH ADA PRODUK, AUTO-UPDATE KE CAMPAIGN_READY
-    // (fallback manual check — seharusnya sudah dipindahkan saat deal dikonfirmasi)
-    if ($brand->status == 'FOLLOW_UP') {
-        $deal_confirmed = $this->db->select('deal_confirmed_at')
-            ->where('id', $brand_id)
-            ->get('brands')->row()->deal_confirmed_at ?? null;
-        if (!empty($deal_confirmed) || $has_products) {
-            $this->db->where('id', $brand_id)
-                     ->update('brands', [
-                         'status'       => 'CAMPAIGN_READY',
-                         'current_task' => 3,
-                         'updated_at'   => date('Y-m-d H:i:s')
-                     ]);
-            $brand->status = 'CAMPAIGN_READY';
-        }
-    }
-    
     return $this->output->set_output(json_encode([
         'success' => true,
         'brand_name' => $brand->name,
@@ -4230,7 +4267,10 @@ public function search_setup_brands() {
         $this->db->select('b.*, u.username as bd_username, u.full_name as bd_name, b.input_by, b.input_by_name')
             ->from('brands b')
             ->join('users u', 'b.bd_id = u.id', 'left')
-            ->where_in('b.status', ['CAMPAIGN_READY', 'NEED_CLAIM']);
+            ->group_start()
+                ->where_in('b.status', ['CAMPAIGN_READY', 'NEED_CLAIM', 'DEAL_CLOSED'])
+                ->or_where('b.current_task', 3)
+            ->group_end();
             
         if (!$is_supervisor) {
             $this->db->where('b.bd_id', $user_id);

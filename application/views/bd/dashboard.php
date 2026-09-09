@@ -7072,27 +7072,7 @@ document.addEventListener('click', async function(e) {
             return;
         }
         
-        // CEK ULANG STATUS REGISTRASI SEBELUM BUKA MODAL
-        try {
-            const checkResponse = await fetch(baseUrlDashboard + 'bd/check_brand_registration', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams({ brand_id: brandId })
-            });
-            const checkResult = await checkResponse.json();
-            
-            if (checkResult.success && checkResult.has_products) {
-                // Brand sudah registrasi, refresh halaman dulu
-                showToastInModal('Brand sudah registrasi! Memuat ulang halaman...', 'success');
-                setTimeout(() => location.reload(), 1000);
-                return;
-            }
-        } catch (err) {
-            // Gagal cek, lanjutkan ke modal
-            console.error('Error checking registration:', err);
-        }
-        
-        // Buka modal follow up
+        // Buka modal follow up (Step 2)
         showTask2FollowUpModal(brandId, brandName);
     } 
     else if (stage === 3) {

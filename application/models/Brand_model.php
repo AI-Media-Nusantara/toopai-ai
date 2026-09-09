@@ -32,7 +32,13 @@ class Brand_model extends CI_Model {
      * Get brands for Task 3: SETUP CAMPAIGN (status DEAL_CLOSED atau CAMPAIGN_READY)
      */
     public function get_setup_brands($limit = 1000) {
-        $this->db->where_in('status', ['DEAL_CLOSED', 'CAMPAIGN_READY']);
+        $this->db->group_start()
+            ->where('current_task', 3)
+            ->or_group_start()
+                ->where_in('status', ['CAMPAIGN_READY', 'NEED_CLAIM'])
+                ->where('current_task IS NULL', NULL, FALSE)
+            ->group_end()
+        ->group_end();
         $this->db->limit($limit);
         $this->db->order_by('updated_at', 'DESC');
         return $this->db->get('brands')->result();
